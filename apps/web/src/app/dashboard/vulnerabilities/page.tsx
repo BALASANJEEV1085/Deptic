@@ -15,6 +15,13 @@ import { Loader2, ShieldCheck, ShieldAlert, Filter, AlertCircle, ChevronDown, Ex
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 export default function VulnerabilitiesPage() {
   const [vulns, setVulns] = useState<Vulnerability[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,36 +69,46 @@ export default function VulnerabilitiesPage() {
     );
   }
 
+  const severities = ["All", "CRITICAL", "HIGH", "MEDIUM", "LOW"];
+
   return (
-    <div className="space-y-10 max-w-7xl mx-auto pb-20">
+    <div className="space-y-10 max-w-7xl mx-auto px-4 md:px-0 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-white/5 pb-8">
         <div>
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-red-500/10 rounded-lg border border-red-500/20">
-              <ShieldAlert className="h-6 w-6 text-red-500" />
+              <ShieldAlert className="h-5 w-5 text-red-500" />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">Vulnerability Feed</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-white">Vulnerability Feed</h1>
           </div>
-          <p className="text-sm text-zinc-500">
+          <p className="text-[13px] text-zinc-500">
             Consolidated view of all detected CVEs across your integrated infrastructure.
           </p>
         </div>
         <div className="flex items-center gap-2">
-           <Filter className="h-3.5 w-3.5 text-zinc-500 mr-1" />
-           <div className="relative">
-             <select
-               value={severityFilter}
-               onChange={(e) => setSeverityFilter(e.target.value)}
-               className="appearance-none text-xs font-bold uppercase tracking-widest border border-white/10 rounded-lg bg-white/5 text-zinc-300 py-2.5 pl-4 pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer hover:bg-white/10 transition-all"
-             >
-               <option value="All">All Severities</option>
-               <option value="CRITICAL">Critical</option>
-               <option value="HIGH">High</option>
-               <option value="MEDIUM">Medium</option>
-               <option value="LOW">Low</option>
-             </select>
-             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3 w-3 text-zinc-500 pointer-events-none" />
-           </div>
+            <Filter className="h-3.5 w-3.5 text-zinc-500 mr-1" />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest border border-white/10 rounded-xl bg-white/5 text-zinc-300 py-2.5 px-5 focus:outline-none hover:bg-white/10 transition-all min-w-[160px] justify-between">
+                  {severityFilter === "All" ? "All Severities" : severityFilter}
+                  <ChevronDown className="h-3 w-3 text-zinc-500" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-card border-white/10 text-zinc-300 shadow-2xl p-1 min-w-[160px]">
+                {severities.map((s) => (
+                  <DropdownMenuItem 
+                    key={s} 
+                    onClick={() => setSeverityFilter(s)}
+                    className={cn(
+                      "cursor-pointer focus:bg-white/5 py-2 px-3 rounded-md transition-colors text-[10px] font-bold uppercase tracking-widest",
+                      severityFilter === s ? "text-indigo-400 bg-white/5" : "text-zinc-500"
+                    )}
+                  >
+                    {s === "All" ? "All Severities" : s}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
         </div>
       </div>
 
@@ -106,15 +123,15 @@ export default function VulnerabilitiesPage() {
           </p>
         </div>
       ) : (
-        <div className="rounded-2xl border border-white/5 bg-card overflow-hidden shadow-2xl">
+        <div className="rounded-2xl border border-white/5 bg-card overflow-x-auto shadow-2xl">
           <Table>
             <TableHeader className="bg-white/[0.02]">
               <TableRow className="border-white/5">
-                <TableHead className="px-6 py-4 text-zinc-400 text-[10px] uppercase tracking-widest font-bold">Project</TableHead>
-                <TableHead className="px-6 py-4 text-zinc-400 text-[10px] uppercase tracking-widest font-bold">Affected Library</TableHead>
-                <TableHead className="px-6 py-4 text-zinc-400 text-[10px] uppercase tracking-widest font-bold">CVE Reference</TableHead>
-                <TableHead className="px-6 py-4 text-zinc-400 text-[10px] uppercase tracking-widest font-bold text-center">Threat Level</TableHead>
-                <TableHead className="px-6 py-4 text-zinc-400 text-[10px] uppercase tracking-widest font-bold text-right">Context</TableHead>
+                <TableHead className="px-6 py-4 text-zinc-400 text-[9px] uppercase tracking-widest font-bold">Project</TableHead>
+                <TableHead className="px-6 py-4 text-zinc-400 text-[9px] uppercase tracking-widest font-bold">Affected Library</TableHead>
+                <TableHead className="px-6 py-4 text-zinc-400 text-[9px] uppercase tracking-widest font-bold">CVE Reference</TableHead>
+                <TableHead className="px-6 py-4 text-zinc-400 text-[9px] uppercase tracking-widest font-bold text-center">Threat Level</TableHead>
+                <TableHead className="px-6 py-4 text-zinc-400 text-[9px] uppercase tracking-widest font-bold text-right">Context</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className="divide-y divide-white/5">
@@ -130,7 +147,7 @@ export default function VulnerabilitiesPage() {
                     <TableCell className="px-6 py-5">
                       <div className="flex items-center gap-2">
                         <div className="h-1.5 w-1.5 rounded-full bg-indigo-500/40" />
-                        <span className="text-sm font-bold text-white">
+                        <span className="text-[13px] font-bold text-white">
                           {v.project_name || "Internal App"}
                         </span>
                       </div>

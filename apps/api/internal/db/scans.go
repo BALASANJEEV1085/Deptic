@@ -17,6 +17,8 @@ type Scan struct {
 	ID        string    `json:"id"`
 	ProjectID string    `json:"project_id"`
 	Status    string    `json:"status"`
+	RepoURL   string    `json:"repo_url"`
+	Ecosystem string    `json:"ecosystem"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -162,14 +164,16 @@ func GetScanWithComponents(ctx context.Context, db *sql.DB, scanID string) (scan
 	return scan, components, nil
 }
 
-func UpdateScanCompliance(ctx context.Context, db *sql.DB, scanID string, score int, ntiaCompliant, euCraCompliant bool, detailJson []byte) error {
+func UpdateScanCompliance(ctx context.Context, db *sql.DB, scanID string, score int, ntiaCompliant, euCraCompliant bool, detailJson []byte, repoURL, ecosystem string) error {
 	_, err := db.ExecContext(ctx, `
 		UPDATE scans 
 		SET compliance_score = $2, 
 		    ntia_compliant = $3, 
 		    eu_cra_compliant = $4, 
-		    compliance_detail = $5 
+		    compliance_detail = $5,
+		    repo_url = $6,
+		    ecosystem = $7
 		WHERE id = $1`, 
-		scanID, score, ntiaCompliant, euCraCompliant, detailJson)
+		scanID, score, ntiaCompliant, euCraCompliant, detailJson, repoURL, ecosystem)
 	return err
 }

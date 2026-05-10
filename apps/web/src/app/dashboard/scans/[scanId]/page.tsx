@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
-import { getScan, GetScanResponse, getScanVulnerabilities, ScanVulnerabilitiesResponse, generateSBOM, createShareLink } from "@/lib/api";
+import { getScan, GetScanResponse, getScanVulnerabilities, ScanVulnerabilitiesResponse, generateSBOM, createShareLink, getCompliance, ComplianceResponse, downloadPDFReport } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Loader2, Search, Download, Package, Layers, ShieldCheck, ShieldAlert, Share2, Copy, CheckCircle2, ChevronDown, ExternalLink, Globe, AlertTriangle, ArrowLeft, MoreVertical, FileText } from "lucide-react";
+import { Loader2, Search, Download, Package, Layers, ShieldCheck, ShieldAlert, Share2, Copy, CheckCircle2, ChevronDown, ExternalLink, Globe, AlertTriangle, ArrowLeft, MoreVertical, FileText, Check, X, FileBarChart2 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import {
@@ -30,12 +30,14 @@ export default function ScanResultsPage() {
 
   const [data, setData] = useState<GetScanResponse | null>(null);
   const [vulnData, setVulnData] = useState<ScanVulnerabilitiesResponse | null>(null);
+  const [complianceData, setComplianceData] = useState<ComplianceResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [generating, setGenerating] = useState(false);
-  const [activeTab, setActiveTab] = useState<'vulnerabilities' | 'bom'>('vulnerabilities');
+  const [activeTab, setActiveTab] = useState<'vulnerabilities' | 'compliance' | 'bom'>('vulnerabilities');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [expandedElements, setExpandedElements] = useState<Record<string, boolean>>({});
 
   // Share modal state
   const [showShareModal, setShowShareModal] = useState(false);
@@ -53,20 +55,25 @@ export default function ScanResultsPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const handleExport = async (format: "cyclonedx" | "spdx") => {
+  const handleExport = async (format: "cyclonedx" | "spdx" | "pdf") => {
     try {
       setGenerating(true);
-      const res = await generateSBOM(scanId, format);
-      setLastSbomId(res.sbom_id);
-      
-      const link = document.createElement("a");
-      link.href = res.download_url;
-      link.setAttribute("download", "");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      showToast("Artifact generated successfully");
+      if (format === "pdf") {
+        await downloadPDFReport(scanId);
+        showToast("PDF report downloaded successfully");
+      } else {
+        const res = await generateSBOM(scanId, format);
+        setLastSbomId(res.sbom_id);
+        
+        const link = document.createElement("a");
+        link.href = res.download_url;
+        link.setAttribute("download", "");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showToast("Artifact generated successfully");
+      }
     } catch (err: any) {
       alert("Export failed: " + err.message);
     } finally {
@@ -96,6 +103,10 @@ export default function ScanResultsPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const toggleElement = (name: string) => {
+    setExpandedElements(prev => ({ ...prev, [name]: !prev[name] }));
+  };
+
   useEffect(() => {
     if (!scanId) return;
     
@@ -104,11 +115,16 @@ export default function ScanResultsPage() {
       getScanVulnerabilities(scanId).catch(err => {
         console.error("Failed to load vulns", err);
         return { summary: { critical: 0, high: 0, medium: 0, low: 0 }, vulnerabilities: [] };
+      }),
+      getCompliance(scanId).catch(err => {
+        console.error("Failed to load compliance", err);
+        return null;
       })
     ])
-      .then(([scanRes, vulnRes]) => {
+      .then(([scanRes, vulnRes, compRes]) => {
         setData(scanRes);
         setVulnData(vulnRes);
+        setComplianceData(compRes);
         setLoading(false);
       })
       .catch((err) => {
@@ -124,7 +140,8 @@ export default function ScanResultsPage() {
     return data.components.filter(
       (c) =>
         c.name.toLowerCase().includes(lowerQuery) ||
-        c.license.toLowerCase().includes(lowerQuery)
+        c.license.toLowerCase().includes(lowerQuery) ||
+        c.version.toLowerCase().includes(lowerQuery)
     );
   }, [data?.components, searchQuery]);
 
@@ -156,7 +173,7 @@ export default function ScanResultsPage() {
   const uniqueLicensesCount = new Set(data.components.map(c => c.license)).size;
 
   return (
-    <div className="max-w-6xl mx-auto py-10 px-6 space-y-12 pb-20">
+    <div className="max-w-6xl mx-auto py-6 md:py-10 px-4 md:px-6 space-y-8 md:space-y-12 pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8 border-b border-white/[0.04] pb-10">
         <div>
           <div className="flex items-center gap-3 mb-4">
@@ -176,21 +193,25 @@ export default function ScanResultsPage() {
         </div>
         <div className="flex items-center gap-3">
           <DropdownMenu>
-            <DropdownMenuTrigger>
+            <DropdownMenuTrigger asChild>
               <Button disabled={generating} className="bg-white text-black hover:bg-zinc-200 h-11 px-6 rounded-xl font-bold shadow-[0_0_20px_rgba(255,255,255,0.05)] active:scale-95 transition-all">
                 {generating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
-                Generate Artifact
+                Export Report
                 <ChevronDown className="ml-2 h-3 w-3 opacity-50" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-card border-white/10 text-zinc-300 shadow-2xl p-1">
               <DropdownMenuItem onClick={() => handleExport("cyclonedx")} className="cursor-pointer focus:bg-white/5 py-2 px-3 rounded-md transition-colors">
                 <FileText className="mr-2 h-4 w-4 text-zinc-500" />
-                CycloneDX JSON (.json)
+                Download CycloneDX JSON
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleExport("spdx")} className="cursor-pointer focus:bg-white/5 py-2 px-3 rounded-md transition-colors">
                 <FileText className="mr-2 h-4 w-4 text-zinc-500" />
-                SPDX Tag-Value (.spdx)
+                Download SPDX
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport("pdf")} className="cursor-pointer focus:bg-white/5 py-2 px-3 rounded-md transition-colors">
+                <FileBarChart2 className="mr-2 h-4 w-4 text-zinc-500" />
+                Download PDF Report
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -225,7 +246,7 @@ export default function ScanResultsPage() {
       </div>
 
       {/* TAB SWITCHER */}
-      <div className="flex items-center gap-1 p-1 bg-white/[0.02] border border-white/[0.04] rounded-2xl w-fit">
+      <div className="flex items-center gap-1 p-1 bg-white/[0.02] border border-white/[0.04] rounded-2xl w-full md:w-fit overflow-x-auto no-scrollbar">
         <button
           onClick={() => setActiveTab('vulnerabilities')}
           className={cn(
@@ -237,6 +258,18 @@ export default function ScanResultsPage() {
         >
           <ShieldAlert className={cn("h-3.5 w-3.5", activeTab === 'vulnerabilities' ? "text-red-600" : "text-zinc-600")} />
           Vulnerability Analysis
+        </button>
+        <button
+          onClick={() => setActiveTab('compliance')}
+          className={cn(
+            "px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2",
+            activeTab === 'compliance' 
+              ? "bg-white text-black shadow-lg shadow-white/5" 
+              : "text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.03]"
+          )}
+        >
+          <FileBarChart2 className={cn("h-3.5 w-3.5", activeTab === 'compliance' ? "text-emerald-600" : "text-zinc-600")} />
+          Compliance
         </button>
         <button
           onClick={() => setActiveTab('bom')}
@@ -282,7 +315,7 @@ export default function ScanResultsPage() {
               </div>
             </div>
           ) : (
-            <div className="rounded-2xl border border-white/[0.04] bg-card overflow-hidden shadow-2xl">
+            <div className="rounded-2xl border border-white/[0.04] bg-card overflow-x-auto shadow-2xl">
               <Table>
                 <TableHeader className="bg-white/[0.01]">
                   <TableRow className="border-white/[0.04]">
@@ -334,6 +367,131 @@ export default function ScanResultsPage() {
         </div>
       )}
 
+      {activeTab === 'compliance' && (
+        <div className="space-y-6">
+          {!complianceData ? (
+             <div className="flex h-32 items-center justify-center border border-white/[0.04] rounded-2xl bg-card">
+               <span className="text-zinc-500 text-sm">Compliance data unavailable.</span>
+             </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex flex-col md:flex-row gap-6">
+                {/* Score Card */}
+                <div className="bg-card border border-white/[0.04] rounded-2xl p-6 flex-1 flex flex-col items-center justify-center shadow-xl">
+                  <div className="relative mb-6">
+                     <svg className="w-32 h-32 transform -rotate-90">
+                       <circle cx="64" cy="64" r="56" className="stroke-white/[0.05]" strokeWidth="12" fill="none" />
+                       <circle cx="64" cy="64" r="56" 
+                         className={cn(
+                           "transition-all duration-1000 ease-out",
+                           complianceData.ntia.score === 100 ? "stroke-emerald-500" :
+                           complianceData.ntia.score >= 60 ? "stroke-orange-500" : "stroke-red-500"
+                         )}
+                         strokeWidth="12" fill="none"
+                         strokeDasharray="351.858"
+                         strokeDashoffset={351.858 - (351.858 * complianceData.ntia.score) / 100}
+                         strokeLinecap="round"
+                       />
+                     </svg>
+                     <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-3xl font-extrabold text-white">{complianceData.ntia.score}</span>
+                        <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Score</span>
+                     </div>
+                  </div>
+                  <div className="flex flex-col gap-3 w-full">
+                    <div className={cn(
+                      "flex items-center justify-between p-3 rounded-xl border text-sm font-bold",
+                      complianceData.ntia.compliant ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-red-500/10 border-red-500/20 text-red-400"
+                    )}>
+                      <span>NTIA EO14028</span>
+                      <span>{complianceData.ntia.compliant ? 'COMPLIANT' : 'NON-COMPLIANT'}</span>
+                    </div>
+                    <div className={cn(
+                      "flex items-center justify-between p-3 rounded-xl border text-sm font-bold",
+                      complianceData.eu_cra_compliant ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-red-500/10 border-red-500/20 text-red-400"
+                    )}>
+                      <span>EU CRA</span>
+                      <span>{complianceData.eu_cra_compliant ? 'COMPLIANT' : 'NON-COMPLIANT'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Recommendations */}
+                {complianceData.ntia.recommendations.length > 0 && (
+                   <div className="bg-orange-500/5 border border-orange-500/10 rounded-2xl p-6 flex-1 shadow-xl">
+                      <div className="flex items-center gap-3 mb-4">
+                        <AlertTriangle className="h-5 w-5 text-orange-500" />
+                        <h3 className="text-white font-bold text-lg">Recommendations</h3>
+                      </div>
+                      <ul className="space-y-3">
+                        {complianceData.ntia.recommendations.map((rec, i) => (
+                           <li key={i} className="text-sm text-zinc-300 flex items-start gap-3">
+                             <div className="h-1.5 w-1.5 rounded-full bg-orange-500 mt-1.5 shrink-0" />
+                             <span>{rec}</span>
+                           </li>
+                        ))}
+                      </ul>
+                   </div>
+                )}
+              </div>
+
+              {/* Elements List */}
+              <div className="bg-card border border-white/[0.04] rounded-2xl overflow-hidden shadow-xl">
+                 <div className="p-4 border-b border-white/[0.04] bg-white/[0.01]">
+                   <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-widest">NTIA Minimum Elements</h3>
+                 </div>
+                 <div className="divide-y divide-white/[0.04]">
+                    {complianceData.ntia.elements.map((el, i) => (
+                       <div key={i} className="p-4 hover:bg-white/[0.01] transition-colors">
+                          <button 
+                            className="flex items-center justify-between w-full text-left outline-none"
+                            onClick={() => toggleElement(el.name)}
+                          >
+                             <div className="flex items-center gap-4">
+                               <div className={cn(
+                                 "flex h-8 w-8 rounded-full items-center justify-center shrink-0 border",
+                                 el.passed ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" : "bg-red-500/10 border-red-500/20 text-red-500"
+                               )}>
+                                 {el.passed ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                               </div>
+                               <div>
+                                 <p className="font-bold text-zinc-200">{el.name}</p>
+                                 <p className="text-xs text-zinc-500 mt-0.5">{el.description}</p>
+                               </div>
+                             </div>
+                             <div className="flex items-center gap-6">
+                                <div className="hidden sm:flex flex-col items-end gap-1.5">
+                                   <div className="flex items-center gap-2">
+                                     <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Coverage</span>
+                                     <span className={cn(
+                                       "text-xs font-bold",
+                                       el.coverage === 100 ? "text-emerald-400" : el.coverage > 0 ? "text-orange-400" : "text-red-400"
+                                     )}>{el.coverage}%</span>
+                                   </div>
+                                   <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                      <div 
+                                        className={cn("h-full", el.coverage === 100 ? "bg-emerald-500" : el.coverage > 0 ? "bg-orange-500" : "bg-red-500")}
+                                        style={{ width: `${el.coverage}%` }}
+                                      />
+                                   </div>
+                                </div>
+                                <ChevronDown className={cn("h-5 w-5 text-zinc-600 transition-transform duration-200", expandedElements[el.name] ? "rotate-180" : "")} />
+                             </div>
+                          </button>
+                          {expandedElements[el.name] && (
+                             <div className="mt-4 ml-12 p-4 bg-white/[0.02] rounded-xl border border-white/[0.04] text-sm text-zinc-400">
+                               <p><strong className="text-zinc-300">Detail:</strong> {el.detail}</p>
+                             </div>
+                          )}
+                       </div>
+                    ))}
+                 </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {activeTab === 'bom' && (
         <div className="space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -352,7 +510,7 @@ export default function ScanResultsPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/[0.04] bg-card overflow-hidden shadow-2xl">
+          <div className="rounded-2xl border border-white/[0.04] bg-card overflow-x-auto shadow-2xl">
             <Table>
               <TableHeader className="bg-white/[0.01]">
                 <TableRow className="border-white/[0.04]">

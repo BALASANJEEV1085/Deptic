@@ -25,7 +25,7 @@ const navItems = [
   { name: 'Reports', href: '/dashboard/reports', icon: FileText },
 ]
 
-export function Sidebar() {
+export function Sidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname()
   const supabase = createClient()
   const [user, setUser] = useState<User | null>(null)
@@ -53,9 +53,9 @@ export function Sidebar() {
   }
 
   return (
-    <div className="flex h-screen w-64 flex-col border-r border-white/[0.04] bg-[hsl(var(--sidebar-bg))] text-zinc-400">
+    <div className="flex h-full w-full flex-col border-r border-white/[0.04] bg-[hsl(var(--sidebar-bg))] text-zinc-400">
       {/* Team/Org Selector (Linear Style) */}
-      <div className="flex h-14 items-center px-4 mb-2">
+      <div className="hidden md:flex h-14 items-center px-4 mb-2">
         <div className="flex items-center gap-3 rounded-md p-1.5 hover:bg-white/5 transition-colors cursor-pointer w-full group">
           <svg width="24" height="24" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white flex-shrink-0">
             <path d="M60 30L90 60" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -73,15 +73,10 @@ export function Sidebar() {
       </div>
 
       {/* Global Actions */}
-      <div className="px-4 mb-6 space-y-1">
-        <div className="flex items-center gap-3 px-2 py-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02] rounded-md cursor-pointer transition-all">
-          <Search className="h-3.5 w-3.5" />
-          <span>Quick Search</span>
-          <span className="ml-auto text-[10px] opacity-30 font-mono">⌘K</span>
-        </div>
-        <Link href="/dashboard/projects/new" className="flex items-center gap-3 px-2 py-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02] rounded-md cursor-pointer transition-all">
+      <div className="px-4 mb-4 space-y-1">
+        <Link href="/dashboard/projects/new" onClick={onClose} className="flex items-center gap-3 px-2 py-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02] rounded-md cursor-pointer transition-all">
           <PlusCircle className="h-3.5 w-3.5" />
-          <span>New Scan</span>
+          <span>Initiate Scan</span>
         </Link>
       </div>
       
@@ -97,6 +92,7 @@ export function Sidebar() {
                 <Link
                   key={item.name}
                   href={item.href}
+                  onClick={onClose}
                   className={cn(
                     "group relative flex items-center gap-3 rounded-md px-2 py-1.5 text-[13px] font-medium transition-all duration-200",
                     isActive 
@@ -118,11 +114,12 @@ export function Sidebar() {
           </nav>
         </div>
 
-        <div className="px-4 mt-6">
+        <div className="px-4 mt-4">
            <p className="px-2 mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-600">Configuration</p>
            <nav className="space-y-0.5">
               <Link
                 href="/dashboard/settings"
+                onClick={onClose}
                 className={cn(
                   "group flex items-center gap-3 rounded-md px-2 py-1.5 text-[13px] font-medium transition-all duration-200",
                   pathname === '/dashboard/settings' 
@@ -157,7 +154,7 @@ export function Sidebar() {
             </div>
             <div className="h-1.5 w-1.5 rounded-full bg-emerald-500/40 mr-1" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56 bg-[#0c0d0e] border-white/10 text-zinc-400 shadow-2xl" align="end" side="right" sideOffset={10}>
+          <DropdownMenuContent className="w-64 bg-[#0c0d0e] border-white/10 text-zinc-400 shadow-2xl p-2" align="start" side="top" sideOffset={12}>
             <div className="px-2 py-2">
               <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1">Account</p>
               <p className="text-xs font-medium text-zinc-200 truncate">{user?.email}</p>

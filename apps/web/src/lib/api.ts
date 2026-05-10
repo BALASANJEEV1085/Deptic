@@ -23,10 +23,26 @@ export interface Scan {
 }
 
 export interface DashboardStats {
-  totalProjects: number;
-  totalScans: number;
-  criticalCves: number;
-  cleanProjects: number;
+  total_projects: number;
+  total_scans: number;
+  total_components: number;
+  critical_cves: number;
+  high_cves: number;
+  medium_cves: number;
+  low_cves: number;
+  ntia_compliant_scans: number;
+  non_compliant_scans: number;
+  clean_projects: number;
+  recent_scans: {
+    id: string;
+    repo_name: string;
+    ecosystem: string;
+    status: 'running' | 'done' | 'failed';
+    component_count: number;
+    critical_cves: number;
+    ntia_score: number;
+    created_at: string;
+  }[];
 }
 
 export interface GetScanResponse {
@@ -204,4 +220,66 @@ export async function getScanShareLinks(scanId: string): Promise<{ shares: any[]
   const response = await fetch(`${API_URL}/scans/${scanId}/shares`, { headers });
   if (!response.ok) throw new Error('Failed to list scan share links');
   return response.json();
+}
+
+// ── Compliance ──────────────────────────────────────────────────────────────
+
+export interface NTIAElement {
+  name: string;
+  description: string;
+  passed: boolean;
+  coverage: number;
+  detail: string;
+}
+
+export interface NTIAResult {
+  compliant: boolean;
+  score: number;
+  elements: NTIAElement[];
+  failed_components?: { name: string; version: string; missing: string[] }[];
+  recommendations: string[];
+}
+
+export interface ComplianceResponse {
+  ntia: NTIAResult;
+  eu_cra_compliant: boolean;
+}
+
+export async function getCompliance(scanId: string): Promise<ComplianceResponse> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/scans/${scanId}/compliance`, { headers });
+  if (!response.ok) throw new Error('Failed to fetch compliance data');
+  return response.json();
+}
+
+/**
+ * Triggers a browser file download for the PDF compliance report.
+ * Returns the fetch Response so callers can check status before consuming.
+ */
+export async function downloadPDFReport(scanId: string): Promise<void> {
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('Not authenticated');
+
+  const response = await fetch(`${API_URL}/scans/${scanId}/report/pdf`, {
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || 'Failed to generate PDF report');
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  // pick filename from Content-Disposition header if present
+  const cd = response.headers.get('Content-Disposition') || '';
+  const match = cd.match(/filename="([^"]+)"/);
+  a.download = match?.[1] ?? `sbom-report-${scanId}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }

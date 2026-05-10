@@ -114,6 +114,7 @@ func RegisterRoutes(api fiber.Router, database *sql.DB, redisClient *redis.Clien
 	api.Get("/sboms/:sbomID/shares", h.HandleListShareLinks)
 	api.Get("/scans/:scanID/shares", h.HandleListScanShareLinks)
 	api.Get("/scans/:scanID/compliance", h.GetCompliance)
+	api.Get("/scans/:scanID/report/pdf", h.DownloadPDFReport)
 	api.Delete("/sboms/:sbomID/shares/:token", h.HandleRevokeShareLink)
 }
 
@@ -197,10 +198,17 @@ func (h *ScanHandler) HandleCreateScan(c *fiber.Ctx) error {
 					ecosystem = "pip"
 					packages, err = scanner.ScanPip(ctx, h.rdb, tomlBytes, "pyproject.toml")
 				} else {
-					// Step 4: none found
-					_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed")
-					fmt.Printf("no supported manifest found in repo\n")
-					return
+					// Step 4: pom.xml (Maven)
+					pomBytes, errPom := ghClient.FetchFile(ctx, owner, repo, "pom.xml")
+					if errPom == nil {
+						ecosystem = "maven"
+						packages, err = scanner.ScanMaven(ctx, h.rdb, pomBytes)
+					} else {
+						// Step 5: no supported manifest found
+						_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed")
+						fmt.Printf("no supported manifest found in repo (tried package.json, requirements.txt, pyproject.toml, pom.xml)\n")
+						return
+					}
 				}
 			}
 		}
@@ -237,7 +245,7 @@ func (h *ScanHandler) HandleCreateScan(c *fiber.Ctx) error {
 		euCompliant := compliance.CheckEUCRA(ntiaResult)
 
 		detailBytes, _ := json.Marshal(ntiaResult)
-		if err := db.UpdateScanCompliance(ctx, h.db, scanID, ntiaResult.Score, ntiaResult.Compliant, euCompliant, detailBytes); err != nil {
+		if err := db.UpdateScanCompliance(ctx, h.db, scanID, ntiaResult.Score, ntiaResult.Compliant, euCompliant, detailBytes, req.GithubURL, ecosystem); err != nil {
 			fmt.Printf("Failed to save scan compliance: %v\n", err)
 		}
 
@@ -319,36 +327,53 @@ func (h *ScanHandler) HandleListScans(c *fiber.Ctx) error {
 func (h *ScanHandler) HandleGetDashboardStats(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 
-	var totalScans int
-	if err := h.db.QueryRowContext(c.Context(), `
-		SELECT count(*) 
-		FROM scans s 
-		JOIN projects p ON s.project_id = p.id 
-		WHERE p.user_id = $1
-	`, userID).Scan(&totalScans); err != nil {
-		totalScans = 0
-	}
-	
-	var totalProjects int
-	if err := h.db.QueryRowContext(c.Context(), "SELECT count(*) FROM projects WHERE user_id = $1", userID).Scan(&totalProjects); err != nil {
-		totalProjects = 0
-	}
+	var totalProjects, totalScans, totalComponents int
+	var criticalCves, highCves, mediumCves, lowCves int
 
-	var criticalCves int
-	if err := h.db.QueryRowContext(c.Context(), `
-		SELECT count(*) 
-		FROM component_vulnerabilities cv
+	h.db.QueryRowContext(c.Context(), "SELECT count(*) FROM projects WHERE user_id = $1", userID).Scan(&totalProjects)
+	
+	h.db.QueryRowContext(c.Context(), `
+		SELECT count(*) FROM scans s JOIN projects p ON s.project_id = p.id WHERE p.user_id = $1
+	`, userID).Scan(&totalScans)
+
+	h.db.QueryRowContext(c.Context(), `
+		SELECT count(*) FROM components c JOIN scans s ON c.scan_id = s.id JOIN projects p ON s.project_id = p.id WHERE p.user_id = $1
+	`, userID).Scan(&totalComponents)
+
+	h.db.QueryRowContext(c.Context(), `
+		SELECT count(*) FROM component_vulnerabilities cv
 		JOIN components c ON cv.component_id = c.id
 		JOIN scans s ON c.scan_id = s.id
 		JOIN projects p ON s.project_id = p.id
 		WHERE p.user_id = $1 AND cv.severity = 'CRITICAL'
-	`, userID).Scan(&criticalCves); err != nil {
-		criticalCves = 0
-	}
+	`, userID).Scan(&criticalCves)
 
-	// Compliant Systems: Projects with no critical vulnerabilities in their latest scans
+	h.db.QueryRowContext(c.Context(), `
+		SELECT count(*) FROM component_vulnerabilities cv
+		JOIN components c ON cv.component_id = c.id
+		JOIN scans s ON c.scan_id = s.id
+		JOIN projects p ON s.project_id = p.id
+		WHERE p.user_id = $1 AND cv.severity = 'HIGH'
+	`, userID).Scan(&highCves)
+
+	h.db.QueryRowContext(c.Context(), `
+		SELECT count(*) FROM component_vulnerabilities cv
+		JOIN components c ON cv.component_id = c.id
+		JOIN scans s ON c.scan_id = s.id
+		JOIN projects p ON s.project_id = p.id
+		WHERE p.user_id = $1 AND cv.severity = 'MEDIUM'
+	`, userID).Scan(&mediumCves)
+
+	h.db.QueryRowContext(c.Context(), `
+		SELECT count(*) FROM component_vulnerabilities cv
+		JOIN components c ON cv.component_id = c.id
+		JOIN scans s ON c.scan_id = s.id
+		JOIN projects p ON s.project_id = p.id
+		WHERE p.user_id = $1 AND cv.severity = 'LOW'
+	`, userID).Scan(&lowCves)
+
 	var cleanProjects int
-	if err := h.db.QueryRowContext(c.Context(), `
+	h.db.QueryRowContext(c.Context(), `
 		SELECT count(DISTINCT p.id)
 		FROM projects p
 		WHERE p.user_id = $1 AND p.id NOT IN (
@@ -356,18 +381,98 @@ func (h *ScanHandler) HandleGetDashboardStats(c *fiber.Ctx) error {
 			FROM scans s
 			JOIN components c ON s.id = c.scan_id
 			JOIN component_vulnerabilities cv ON c.id = cv.component_id
-			WHERE cv.severity = 'CRITICAL'
+			WHERE cv.severity IN ('CRITICAL', 'HIGH')
 		)
-	`, userID).Scan(&cleanProjects); err != nil {
-		cleanProjects = 0
+	`, userID).Scan(&cleanProjects)
+
+	var compliant, nonCompliant int
+	h.db.QueryRowContext(c.Context(), `
+		SELECT 
+			COALESCE(SUM(CASE WHEN is_ntia_compliant THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN NOT is_ntia_compliant THEN 1 ELSE 0 END), 0)
+		FROM scan_compliance sc
+		JOIN scans s ON sc.scan_id = s.id
+		JOIN projects p ON s.project_id = p.id
+		WHERE p.user_id = $1
+	`, userID).Scan(&compliant, &nonCompliant)
+
+	stats := fiber.Map{
+		"total_projects":       totalProjects,
+		"total_scans":          totalScans,
+		"total_components":     totalComponents,
+		"critical_cves":        criticalCves,
+		"high_cves":            highCves,
+		"medium_cves":          mediumCves,
+		"low_cves":             lowCves,
+		"ntia_compliant_scans": compliant,
+		"non_compliant_scans":  nonCompliant,
+		"clean_projects":       cleanProjects,
+		"recent_scans":         []fiber.Map{},
 	}
+
+	// Fetch recent 5 scans
+	rows, err := h.db.QueryContext(c.Context(), `
+		SELECT s.id, p.name, s.status, s.created_at
+		FROM scans s
+		JOIN projects p ON p.id = s.project_id
+		WHERE p.user_id = $1
+		ORDER BY s.created_at DESC
+		LIMIT 5
+	`, userID)
 	
-	return c.JSON(fiber.Map{
-		"totalProjects": totalProjects,
-		"totalScans":    totalScans,
-		"criticalCves":  criticalCves,
-		"cleanProjects": cleanProjects,
-	})
+	if err == nil {
+		defer rows.Close()
+		var recentScans []fiber.Map
+		for rows.Next() {
+			var scanID, projectName, status string
+			var createdAt time.Time
+			if err := rows.Scan(&scanID, &projectName, &status, &createdAt); err == nil {
+				
+				var compCount int
+				h.db.QueryRowContext(c.Context(), "SELECT count(*) FROM components WHERE scan_id = $1", scanID).Scan(&compCount)
+
+				var critCves int
+				h.db.QueryRowContext(c.Context(), `
+					SELECT count(*) FROM component_vulnerabilities cv
+					JOIN components c ON cv.component_id = c.id
+					WHERE c.scan_id = $1 AND cv.severity = 'CRITICAL'
+				`, scanID).Scan(&critCves)
+
+				var ntiaScore sql.NullInt64
+				h.db.QueryRowContext(c.Context(), "SELECT ntia_score FROM scan_compliance WHERE scan_id = $1", scanID).Scan(&ntiaScore)
+
+				var ecosystem sql.NullString
+				h.db.QueryRowContext(c.Context(), "SELECT ecosystem FROM components WHERE scan_id = $1 LIMIT 1", scanID).Scan(&ecosystem)
+				
+				ecosystemStr := ecosystem.String
+				if ecosystemStr == "" {
+					ecosystemStr = "unknown"
+				}
+
+				if projectName == "" {
+					projectName = "Unknown Project"
+				}
+
+				recentScans = append(recentScans, fiber.Map{
+					"id":              scanID,
+					"repo_name":       projectName,
+					"ecosystem":       ecosystemStr,
+					"status":          status,
+					"component_count": compCount,
+					"critical_cves":   critCves,
+					"ntia_score":      int(ntiaScore.Int64),
+					"created_at":      createdAt,
+				})
+			} else {
+				fmt.Printf("Error scanning recent scan row: %v\n", err)
+			}
+		}
+		stats["recent_scans"] = recentScans
+	} else {
+		fmt.Printf("Error fetching recent scans: %v\n", err)
+	}
+
+	return c.JSON(stats)
 }
 
 // HandleListAllScans handles GET /api/scans — returns all scans for the authenticated user

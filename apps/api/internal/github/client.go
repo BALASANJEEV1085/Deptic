@@ -62,7 +62,6 @@ func (c *Client) doRequest(ctx context.Context, req *http.Request) (*http.Respon
 	return c.httpClient.Do(req)
 }
 
-// FetchFile fetches a file from a GitHub repository and decodes its base64 content
 func (c *Client) FetchFile(ctx context.Context, owner, repo, filepath string) ([]byte, error) {
 	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/contents/%s", owner, repo, filepath)
 	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
@@ -76,36 +75,55 @@ func (c *Client) FetchFile(ctx context.Context, owner, repo, filepath string) ([
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusOK {
+		var contentResp contentResponse
+		if err := json.NewDecoder(resp.Body).Decode(&contentResp); err != nil {
+			return nil, fmt.Errorf("decoding response: %w", err)
+		}
+
+		if contentResp.Type != "file" {
+			return nil, fmt.Errorf("path is not a file, type is %s", contentResp.Type)
+		}
+
+		if contentResp.Encoding != "base64" {
+			return nil, fmt.Errorf("unsupported encoding: %s", contentResp.Encoding)
+		}
+
+		b64str := strings.ReplaceAll(contentResp.Content, "\n", "")
+		decoded, err := base64.StdEncoding.DecodeString(b64str)
+		if err != nil {
+			return nil, fmt.Errorf("decoding base64 content: %w", err)
+		}
+		return decoded, nil
+	}
+
+	// Fallback to raw.githubusercontent.com for public repos if API fails (e.g. rate limit or 404 due to token issues)
+	branches := []string{"main", "master"}
+	var lastErr error
+	for _, branch := range branches {
+		rawURL := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/%s", owner, repo, branch, filepath)
+		rawReq, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+		if err != nil {
+			continue
+		}
+		rawResp, err := c.httpClient.Do(rawReq)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		defer rawResp.Body.Close()
+
+		if rawResp.StatusCode == http.StatusOK {
+			return io.ReadAll(rawResp.Body)
+		}
+		lastErr = fmt.Errorf("raw github status: %d", rawResp.StatusCode)
+	}
+
 	if resp.StatusCode == http.StatusForbidden {
-		return nil, &RateLimitError{Message: "rate limit exceeded or access forbidden"}
+		return nil, &RateLimitError{Message: "rate limit exceeded and fallback failed"}
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
-	}
-
-	var contentResp contentResponse
-	if err := json.NewDecoder(resp.Body).Decode(&contentResp); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
-	}
-
-	if contentResp.Type != "file" {
-		return nil, fmt.Errorf("path is not a file, type is %s", contentResp.Type)
-	}
-
-	if contentResp.Encoding != "base64" {
-		return nil, fmt.Errorf("unsupported encoding: %s", contentResp.Encoding)
-	}
-
-	// GitHub's base64 content often contains newline characters, which must be removed before decoding
-	b64str := strings.ReplaceAll(contentResp.Content, "\n", "")
-	decoded, err := base64.StdEncoding.DecodeString(b64str)
-	if err != nil {
-		return nil, fmt.Errorf("decoding base64 content: %w", err)
-	}
-
-	return decoded, nil
+	return nil, fmt.Errorf("file not found or api error (last raw err: %v)", lastErr)
 }
 
 // ListFiles lists all files and directories in a specific path of a GitHub repository

@@ -5,6 +5,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/sbom-io/api/internal/compliance"
+	"github.com/sbom-io/api/internal/db"
+	"github.com/sbom-io/api/internal/scanner"
 )
 
 // GetCompliance GET /api/scans/:scanID/compliance
@@ -37,7 +39,34 @@ func (h *ScanHandler) GetCompliance(c *fiber.Ctx) error {
 	}
 
 	if len(detailBytes) == 0 {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Compliance details not found for this scan"})
+		// Fallback for old scans that don't have compliance details saved
+		scan, dbComponents, err := db.GetScanWithComponents(c.Context(), h.db, scanID)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch components for compliance"})
+		}
+		var pkgs []scanner.Package
+		for _, comp := range dbComponents {
+			pkgs = append(pkgs, scanner.Package{
+				Name:      comp.Name,
+				Version:   comp.Version,
+				License:   comp.License,
+				Ecosystem: comp.Ecosystem,
+				Depth:     comp.Depth,
+			})
+		}
+		sbomMeta := compliance.SBOMMeta{
+			AuthorName:  "SBOM.io",
+			AuthorTool:  "sbom-io-scanner v1.0.0",
+			GeneratedAt: scan.CreatedAt,
+			RepoName:    "Unknown Repository", // generic for old scans
+		}
+		
+		result := compliance.CheckNTIA(pkgs, sbomMeta)
+		
+		return c.JSON(fiber.Map{
+			"ntia":             result,
+			"eu_cra_compliant": compliance.CheckEUCRA(result),
+		})
 	}
 
 	var result compliance.NTIAResult

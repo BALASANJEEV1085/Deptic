@@ -58,6 +58,13 @@ func GenerateSPDX(scan ScanInfo, components []scanner.Package) ([]byte, string, 
 			purl = fmt.Sprintf("pkg:npm/%s@%s", pkg.Name, pkg.Version)
 		} else if pkg.Ecosystem == "pip" {
 			purl = fmt.Sprintf("pkg:pypi/%s@%s", pkg.Name, pkg.Version)
+		} else if pkg.Ecosystem == "maven" {
+			mavenParts := strings.SplitN(pkg.Name, ":", 2)
+			if len(mavenParts) == 2 {
+				purl = fmt.Sprintf("pkg:maven/%s/%s@%s", mavenParts[0], mavenParts[1], pkg.Version)
+			} else {
+				purl = fmt.Sprintf("pkg:maven/%s@%s", pkg.Name, pkg.Version)
+			}
 		} else {
 			purl = fmt.Sprintf("pkg:generic/%s@%s", pkg.Name, pkg.Version)
 		}
