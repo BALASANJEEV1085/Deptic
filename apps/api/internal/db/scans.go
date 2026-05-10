@@ -161,3 +161,15 @@ func GetScanWithComponents(ctx context.Context, db *sql.DB, scanID string) (scan
 
 	return scan, components, nil
 }
+
+func UpdateScanCompliance(ctx context.Context, db *sql.DB, scanID string, score int, ntiaCompliant, euCraCompliant bool, detailJson []byte) error {
+	_, err := db.ExecContext(ctx, `
+		UPDATE scans 
+		SET compliance_score = $2, 
+		    ntia_compliant = $3, 
+		    eu_cra_compliant = $4, 
+		    compliance_detail = $5 
+		WHERE id = $1`, 
+		scanID, score, ntiaCompliant, euCraCompliant, detailJson)
+	return err
+}

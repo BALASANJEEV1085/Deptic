@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/sbom-io/api/internal/compliance"
 	"github.com/sbom-io/api/internal/db"
 	"github.com/sbom-io/api/internal/github"
 	"github.com/sbom-io/api/internal/scanner"
@@ -111,6 +113,7 @@ func RegisterRoutes(api fiber.Router, database *sql.DB, redisClient *redis.Clien
 	api.Post("/sboms/:sbomID/share", h.HandleCreateShareLink)
 	api.Get("/sboms/:sbomID/shares", h.HandleListShareLinks)
 	api.Get("/scans/:scanID/shares", h.HandleListScanShareLinks)
+	api.Get("/scans/:scanID/compliance", h.GetCompliance)
 	api.Delete("/sboms/:sbomID/shares/:token", h.HandleRevokeShareLink)
 }
 
@@ -223,7 +226,22 @@ func (h *ScanHandler) HandleCreateScan(c *fiber.Ctx) error {
 			}
 		}
 
-		// 5. Finalize scan status
+		// 5. NTIA Compliance Check
+		sbomMeta := compliance.SBOMMeta{
+			AuthorName:  "SBOM.io",
+			AuthorTool:  "sbom-io-scanner v1.0.0",
+			GeneratedAt: time.Now(),
+			RepoName:    repo,
+		}
+		ntiaResult := compliance.CheckNTIA(packages, sbomMeta)
+		euCompliant := compliance.CheckEUCRA(ntiaResult)
+
+		detailBytes, _ := json.Marshal(ntiaResult)
+		if err := db.UpdateScanCompliance(ctx, h.db, scanID, ntiaResult.Score, ntiaResult.Compliant, euCompliant, detailBytes); err != nil {
+			fmt.Printf("Failed to save scan compliance: %v\n", err)
+		}
+
+		// 6. Finalize scan status
 		_ = db.UpdateScanStatus(ctx, h.db, scanID, "done")
 		fmt.Printf("Scan done: %d components, ecosystem=%s\n", len(packages), ecosystem)
 	}()
@@ -299,21 +317,56 @@ func (h *ScanHandler) HandleListScans(c *fiber.Ctx) error {
 
 // HandleGetDashboardStats handles GET /api/dashboard/stats
 func (h *ScanHandler) HandleGetDashboardStats(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+
 	var totalScans int
-	if err := h.db.QueryRowContext(c.Context(), "SELECT count(*) FROM scans").Scan(&totalScans); err != nil {
+	if err := h.db.QueryRowContext(c.Context(), `
+		SELECT count(*) 
+		FROM scans s 
+		JOIN projects p ON s.project_id = p.id 
+		WHERE p.user_id = $1
+	`, userID).Scan(&totalScans); err != nil {
 		totalScans = 0
 	}
 	
 	var totalProjects int
-	if err := h.db.QueryRowContext(c.Context(), "SELECT count(distinct project_id) FROM scans").Scan(&totalProjects); err != nil {
+	if err := h.db.QueryRowContext(c.Context(), "SELECT count(*) FROM projects WHERE user_id = $1", userID).Scan(&totalProjects); err != nil {
 		totalProjects = 0
+	}
+
+	var criticalCves int
+	if err := h.db.QueryRowContext(c.Context(), `
+		SELECT count(*) 
+		FROM component_vulnerabilities cv
+		JOIN components c ON cv.component_id = c.id
+		JOIN scans s ON c.scan_id = s.id
+		JOIN projects p ON s.project_id = p.id
+		WHERE p.user_id = $1 AND cv.severity = 'CRITICAL'
+	`, userID).Scan(&criticalCves); err != nil {
+		criticalCves = 0
+	}
+
+	// Compliant Systems: Projects with no critical vulnerabilities in their latest scans
+	var cleanProjects int
+	if err := h.db.QueryRowContext(c.Context(), `
+		SELECT count(DISTINCT p.id)
+		FROM projects p
+		WHERE p.user_id = $1 AND p.id NOT IN (
+			SELECT DISTINCT s.project_id
+			FROM scans s
+			JOIN components c ON s.id = c.scan_id
+			JOIN component_vulnerabilities cv ON c.id = cv.component_id
+			WHERE cv.severity = 'CRITICAL'
+		)
+	`, userID).Scan(&cleanProjects); err != nil {
+		cleanProjects = 0
 	}
 	
 	return c.JSON(fiber.Map{
 		"totalProjects": totalProjects,
 		"totalScans":    totalScans,
-		"criticalCves":  0,
-		"cleanProjects": totalProjects,
+		"criticalCves":  criticalCves,
+		"cleanProjects": cleanProjects,
 	})
 }
 

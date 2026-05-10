@@ -2,9 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
-import { getScan, GetScanResponse, getScanVulnerabilities, ScanVulnerabilitiesResponse } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { getScan, GetScanResponse, getScanVulnerabilities, ScanVulnerabilitiesResponse, generateSBOM, createShareLink } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -15,8 +13,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Search, Download, Package, Layers, ShieldCheck, ShieldAlert, Share2, Copy, CheckCircle2, ChevronDown } from "lucide-react";
-import { generateSBOM, createShareLink } from "@/lib/api";
+import { Input } from "@/components/ui/input";
+import { Loader2, Search, Download, Package, Layers, ShieldCheck, ShieldAlert, Share2, Copy, CheckCircle2, ChevronDown, ExternalLink, Globe, AlertTriangle, ArrowLeft, MoreVertical, FileText } from "lucide-react";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +34,7 @@ export default function ScanResultsPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [activeTab, setActiveTab] = useState<'vulnerabilities' | 'bom'>('vulnerabilities');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Share modal state
@@ -58,7 +59,6 @@ export default function ScanResultsPage() {
       const res = await generateSBOM(scanId, format);
       setLastSbomId(res.sbom_id);
       
-      // Auto-download
       const link = document.createElement("a");
       link.href = res.download_url;
       link.setAttribute("download", "");
@@ -66,9 +66,9 @@ export default function ScanResultsPage() {
       link.click();
       document.body.removeChild(link);
       
-      showToast("SBOM downloaded successfully");
+      showToast("Artifact generated successfully");
     } catch (err: any) {
-      alert("Failed to export SBOM: " + err.message);
+      alert("Export failed: " + err.message);
     } finally {
       setGenerating(false);
     }
@@ -76,7 +76,7 @@ export default function ScanResultsPage() {
 
   const handleCreateShare = async () => {
     if (!lastSbomId) {
-      alert("Please export an SBOM first to share it.");
+      alert("Please export an SBOM first to create a secure share link.");
       return;
     }
     try {
@@ -84,7 +84,7 @@ export default function ScanResultsPage() {
       const res = await createShareLink(lastSbomId, shareLabel, shareExpires);
       setShareLink(res.share_url);
     } catch (err: any) {
-      alert("Failed to create share link: " + err.message);
+      alert("Share failed: " + err.message);
     } finally {
       setSharing(false);
     }
@@ -131,17 +131,21 @@ export default function ScanResultsPage() {
   if (loading) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="h-10 w-10 animate-spin text-indigo-500" />
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="p-8">
-        <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-md border border-red-200 dark:border-red-800">
-          <h2 className="font-semibold text-lg mb-1">Failed to load scan</h2>
-          <p>{error || "Unknown error occurred"}</p>
+      <div className="p-8 max-w-2xl mx-auto mt-20">
+        <div className="bg-red-500/5 border border-red-500/10 text-red-400 p-10 rounded-2xl text-center">
+          <AlertTriangle className="h-12 w-12 mx-auto mb-6 opacity-30" />
+          <h2 className="text-2xl font-bold text-white mb-2">Audit Retrieval Failure</h2>
+          <p className="text-sm opacity-60 mb-8">{error || "The requested security audit could not be found."}</p>
+          <Button onClick={() => window.location.reload()} variant="outline" className="border-white/10 text-white hover:bg-white/5 rounded-xl">
+            Retry Connection
+          </Button>
         </div>
       </div>
     );
@@ -149,246 +153,176 @@ export default function ScanResultsPage() {
 
   const directDepsCount = data.components.filter(c => c.depth === 0).length;
   const transitiveDepsCount = data.total - directDepsCount;
-  
-  const uniqueLicenses = new Set(data.components.map(c => c.license));
-  const licensesCount = uniqueLicenses.size;
+  const uniqueLicensesCount = new Set(data.components.map(c => c.license)).size;
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="max-w-6xl mx-auto py-10 px-6 space-y-12 pb-20">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8 border-b border-white/[0.04] pb-10">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-            Scan Results
-          </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Scan ID: <span className="font-mono text-xs">{scanId}</span>
-          </p>
+          <div className="flex items-center gap-3 mb-4">
+             <Link href="/dashboard/scans" className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/5 hover:bg-white/10 transition-all">
+                <ArrowLeft className="h-4 w-4 text-zinc-400" />
+             </Link>
+             <div className="h-px w-4 bg-white/10" />
+             <h1 className="text-2xl font-extrabold tracking-tight text-white">Supply Chain Audit</h1>
+          </div>
+          <div className="flex items-center gap-4 text-xs font-mono">
+            <span className="text-zinc-500">Audit ID:</span>
+            <span className="text-zinc-300">{scanId}</span>
+            <Badge className="bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/10 border-0 rounded-md px-2 py-0 text-[9px] uppercase font-bold tracking-widest">
+              Authenticated
+            </Badge>
+          </div>
         </div>
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex items-center gap-3">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button disabled={generating} variant="outline" className="flex items-center gap-2">
-                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                {generating ? "Generating SBOM..." : "Export SBOM"}
-                <ChevronDown className="h-4 w-4 opacity-50" />
+            <DropdownMenuTrigger>
+              <Button disabled={generating} className="bg-white text-black hover:bg-zinc-200 h-11 px-6 rounded-xl font-bold shadow-[0_0_20px_rgba(255,255,255,0.05)] active:scale-95 transition-all">
+                {generating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
+                Generate Artifact
+                <ChevronDown className="ml-2 h-3 w-3 opacity-50" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem onClick={() => handleExport("cyclonedx")} className="cursor-pointer">
-                Download CycloneDX JSON (.json)
+            <DropdownMenuContent align="end" className="bg-card border-white/10 text-zinc-300 shadow-2xl p-1">
+              <DropdownMenuItem onClick={() => handleExport("cyclonedx")} className="cursor-pointer focus:bg-white/5 py-2 px-3 rounded-md transition-colors">
+                <FileText className="mr-2 h-4 w-4 text-zinc-500" />
+                CycloneDX JSON (.json)
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("spdx")} className="cursor-pointer">
-                Download SPDX (.spdx)
+              <DropdownMenuItem onClick={() => handleExport("spdx")} className="cursor-pointer focus:bg-white/5 py-2 px-3 rounded-md transition-colors">
+                <FileText className="mr-2 h-4 w-4 text-zinc-500" />
+                SPDX Tag-Value (.spdx)
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
           <Button 
-            variant="ghost" 
-            size="sm" 
-            className="text-primary hover:text-primary/80 hover:bg-primary/10 flex items-center gap-2"
+            variant="outline"
+            className="border-white/10 text-white hover:bg-white/5 h-11 px-6 rounded-xl font-bold transition-all"
             onClick={() => setShowShareModal(true)}
           >
-            <Share2 className="h-4 w-4" />
-            Share with auditor
+            <Share2 className="h-4 w-4 mr-2" />
+            Secure Share
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="border-gray-200 dark:border-gray-800 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Total Components</CardTitle>
-            <Package className="h-4 w-4 text-gray-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data.total}</div>
-          </CardContent>
-        </Card>
-        
-        <Card className="border-gray-200 dark:border-gray-800 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Direct Deps</CardTitle>
-            <Layers className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{directDepsCount}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-gray-200 dark:border-gray-800 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Transitive Deps</CardTitle>
-            <Layers className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{transitiveDepsCount}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-gray-200 dark:border-gray-800 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Licenses Found</CardTitle>
-            <ShieldCheck className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{licensesCount}</div>
-          </CardContent>
-        </Card>
-
-        <Card className={`border-gray-200 dark:border-gray-800 shadow-sm ${vulnData?.summary.critical ? 'bg-red-50/50 dark:bg-red-900/10' : 'bg-green-50/50 dark:bg-green-900/10'}`}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Critical CVEs</CardTitle>
-            {vulnData?.summary.critical ? (
-              <ShieldAlert className="h-4 w-4 text-red-500" />
-            ) : (
-              <ShieldCheck className="h-4 w-4 text-green-500" />
-            )}
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${vulnData?.summary.critical ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-              {vulnData?.summary.critical || 0}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {[
+          { label: 'Inventory Size', value: data.total, icon: Package, color: 'text-zinc-500' },
+          { label: 'Direct Library', value: directDepsCount, icon: Layers, color: 'text-indigo-400' },
+          { label: 'Transitive', value: transitiveDepsCount, icon: Layers, color: 'text-purple-400' },
+          { label: 'License Spread', value: uniqueLicensesCount, icon: ShieldCheck, color: 'text-emerald-400' },
+          { label: 'Active Threats', value: vulnData?.summary.critical || 0, icon: ShieldAlert, color: vulnData?.summary.critical ? 'text-red-400' : 'text-zinc-600' },
+        ].map((stat, i) => (
+          <div key={i} className="group relative rounded-2xl border border-white/[0.04] bg-white/[0.01] p-6 transition-all hover:bg-white/[0.02]">
+            <div className="flex items-center gap-2 mb-4">
+              <stat.icon className={cn("h-3.5 w-3.5", stat.color)} />
+              <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-[0.15em]">{stat.label}</span>
             </div>
-          </CardContent>
-        </Card>
+            <div className="text-xl font-extrabold text-white tracking-tight">{stat.value}</div>
+          </div>
+        ))}
       </div>
 
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-white">Dependencies</h2>
-        <div className="flex items-center">
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-            <Input
-              placeholder="Search components or licenses..."
-              className="pl-9 bg-white dark:bg-gray-950"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="border border-gray-200 dark:border-gray-800 rounded-md overflow-hidden bg-white dark:bg-gray-950">
-          <Table>
-            <TableHeader className="bg-gray-50 dark:bg-gray-900/50">
-              <TableRow>
-                <TableHead>Package Name</TableHead>
-                <TableHead>Version</TableHead>
-                <TableHead>License</TableHead>
-                <TableHead>Depth</TableHead>
-                <TableHead>Ecosystem</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredComponents.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center text-gray-500">
-                    No components found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredComponents.map((c) => (
-                  <TableRow 
-                    key={c.id}
-                    className={c.depth === 0 ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''}
-                  >
-                    <TableCell className="font-medium text-gray-900 dark:text-white">
-                      {c.name}
-                      {c.depth > 0 && <span className="ml-2 text-xs text-gray-400 font-normal">via {c.parent_name}</span>}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{c.version}</TableCell>
-                    <TableCell>
-                      <Badge variant={c.license === 'Unknown' ? 'destructive' : 'secondary'} className="font-normal">
-                        {c.license}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {c.depth === 0 ? (
-                        <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 border-0">Direct</Badge>
-                      ) : (
-                        <span className="text-gray-500">Level {c.depth}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-gray-500 capitalize">{c.ecosystem}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+      {/* TAB SWITCHER */}
+      <div className="flex items-center gap-1 p-1 bg-white/[0.02] border border-white/[0.04] rounded-2xl w-fit">
+        <button
+          onClick={() => setActiveTab('vulnerabilities')}
+          className={cn(
+            "px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2",
+            activeTab === 'vulnerabilities' 
+              ? "bg-white text-black shadow-lg shadow-white/5" 
+              : "text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.03]"
+          )}
+        >
+          <ShieldAlert className={cn("h-3.5 w-3.5", activeTab === 'vulnerabilities' ? "text-red-600" : "text-zinc-600")} />
+          Vulnerability Analysis
+        </button>
+        <button
+          onClick={() => setActiveTab('bom')}
+          className={cn(
+            "px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2",
+            activeTab === 'bom' 
+              ? "bg-white text-black shadow-lg shadow-white/5" 
+              : "text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.03]"
+          )}
+        >
+          <Package className={cn("h-3.5 w-3.5", activeTab === 'bom' ? "text-indigo-600" : "text-zinc-600")} />
+          Bill of Materials
+        </button>
       </div>
 
-      {vulnData && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-white">Vulnerabilities</h2>
+      {activeTab === 'vulnerabilities' && vulnData && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-[0.2em] flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4 text-red-500" />
+              Security Findings
+            </h2>
+            <div className="flex gap-2">
+              <div className="px-3 py-1 bg-red-500/5 rounded-full flex items-center gap-2 border border-red-500/10">
+                <div className="h-1 w-1 rounded-full bg-red-500" />
+                <span className="text-[9px] font-bold text-red-400 uppercase tracking-widest">{vulnData.summary.critical} Critical</span>
+              </div>
+              <div className="px-3 py-1 bg-orange-500/5 rounded-full flex items-center gap-2 border border-orange-500/10">
+                <div className="h-1 w-1 rounded-full bg-orange-500" />
+                <span className="text-[9px] font-bold text-orange-400 uppercase tracking-widest">{vulnData.summary.high} High</span>
+              </div>
+            </div>
           </div>
-          
+
           {(vulnData.summary.critical + vulnData.summary.high + vulnData.summary.medium + vulnData.summary.low) === 0 ? (
-            <div className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 p-4 rounded-md border border-green-200 dark:border-green-800 flex items-center gap-3">
-              <ShieldCheck className="h-5 w-5" />
-              <span className="font-medium">✓ No vulnerabilities found — this project is clean</span>
+            <div className="bg-emerald-500/[0.02] border border-emerald-500/10 text-emerald-400 p-8 rounded-2xl flex items-center gap-6 shadow-inner">
+              <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                <ShieldCheck className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="font-bold text-white mb-1">Authenticated Environment Clean</p>
+                <p className="text-xs opacity-60">No vulnerabilities detected matching the specified inventory baseline.</p>
+              </div>
             </div>
           ) : (
-            <div className="flex items-center gap-4 flex-wrap">
-              <div className="flex items-center gap-1.5 px-3 py-1 bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 rounded-full text-sm font-medium">
-                <span className="w-2 h-2 rounded-full bg-red-600"></span>
-                Critical {vulnData.summary.critical}
-              </div>
-              <div className="flex items-center gap-1.5 px-3 py-1 bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 rounded-full text-sm font-medium">
-                <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-                High {vulnData.summary.high}
-              </div>
-              <div className="flex items-center gap-1.5 px-3 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 rounded-full text-sm font-medium">
-                <span className="w-2 h-2 rounded-full bg-yellow-400"></span>
-                Medium {vulnData.summary.medium}
-              </div>
-              <div className="flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-800 dark:bg-gray-800 dark:text-green-400 rounded-full text-sm font-medium border border-transparent dark:border-gray-700">
-                <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                Low {vulnData.summary.low}
-              </div>
-            </div>
-          )}
-
-          {vulnData.vulnerabilities.length > 0 && (
-            <div className="border border-gray-200 dark:border-gray-800 rounded-md overflow-hidden bg-white dark:bg-gray-950">
+            <div className="rounded-2xl border border-white/[0.04] bg-card overflow-hidden shadow-2xl">
               <Table>
-                <TableHeader className="bg-gray-50 dark:bg-gray-900/50">
-                  <TableRow>
-                    <TableHead>Package</TableHead>
-                    <TableHead>Version</TableHead>
-                    <TableHead>CVE ID</TableHead>
-                    <TableHead>Severity</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Fix Available</TableHead>
+                <TableHeader className="bg-white/[0.01]">
+                  <TableRow className="border-white/[0.04]">
+                    <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-6 font-bold">Component</TableHead>
+                    <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-6 font-bold">Reference</TableHead>
+                    <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-6 font-bold text-center">Severity</TableHead>
+                    <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-6 font-bold">Mitigation</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {vulnData.vulnerabilities.map((v, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="font-medium text-gray-900 dark:text-white">{v.component_name}</TableCell>
-                      <TableCell className="font-mono text-xs">{v.component_version}</TableCell>
-                      <TableCell className="font-mono text-xs">{v.cve_id}</TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant="outline" 
-                          className={
-                            v.severity === 'CRITICAL' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800/30' :
-                            v.severity === 'HIGH' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800/30' :
-                            v.severity === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800/30' :
-                            'bg-green-100 text-green-800 dark:bg-gray-800 dark:text-green-400 border-green-200 dark:border-gray-700'
-                          }
-                        >
-                          {v.severity}
-                        </Badge>
+                    <TableRow key={i} className="border-white/[0.04] hover:bg-white/[0.005] transition-colors">
+                      <TableCell className="px-6 py-5">
+                        <p className="font-bold text-zinc-100 text-[13px] mb-1">{v.component_name}</p>
+                        <p className="text-[9px] text-zinc-600 font-mono italic">v{v.component_version}</p>
                       </TableCell>
-                      <TableCell className="max-w-md truncate text-sm" title={v.summary}>{v.summary}</TableCell>
-                      <TableCell>
+                      <TableCell className="px-6 py-5">
+                        <span className="text-[11px] font-mono text-indigo-400 bg-indigo-400/5 px-2 py-0.5 rounded border border-indigo-400/10 underline decoration-indigo-400/20 underline-offset-4 cursor-pointer hover:bg-indigo-400/10 transition-colors">{v.cve_id}</span>
+                      </TableCell>
+                      <TableCell className="px-6 py-5 text-center">
+                         <Badge 
+                           variant="outline" 
+                           className={cn(
+                             "text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-widest border-0",
+                             v.severity === 'CRITICAL' ? 'bg-red-500/10 text-red-400' :
+                             v.severity === 'HIGH' ? 'bg-orange-500/10 text-orange-400' :
+                             'bg-zinc-800 text-zinc-500'
+                           )}
+                         >
+                           {v.severity}
+                         </Badge>
+                      </TableCell>
+                      <TableCell className="px-6 py-5">
                         {v.fixed_version ? (
-                          <span className="text-green-600 dark:text-green-400 font-mono text-xs font-medium">
-                            {v.fixed_version}
-                          </span>
+                          <div className="flex items-center gap-2 text-emerald-500">
+                             <CheckCircle2 className="h-3.5 w-3.5" />
+                             <span className="text-[11px] font-bold">Patch to {v.fixed_version} available</span>
+                          </div>
                         ) : (
-                          <span className="text-gray-400">—</span>
+                          <span className="text-zinc-600 text-[10px] uppercase font-bold tracking-widest">Awaiting Fix</span>
                         )}
                       </TableCell>
                     </TableRow>
@@ -400,80 +334,150 @@ export default function ScanResultsPage() {
         </div>
       )}
 
-      {toastMessage && (
-        <div className="fixed bottom-4 right-4 bg-gray-900 text-white px-4 py-2 rounded-md shadow-lg flex items-center gap-2 animate-in slide-in-from-bottom-5">
-          <CheckCircle2 className="h-4 w-4 text-green-400" />
-          {toastMessage}
+      {activeTab === 'bom' && (
+        <div className="space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <h2 className="text-[13px] font-bold text-zinc-400 uppercase tracking-[0.2em] flex items-center gap-2">
+              <Package className="h-4 w-4 text-zinc-600" />
+              Software Bill of Materials
+            </h2>
+            <div className="relative w-full max-w-sm group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-600 group-focus-within:text-white transition-colors" />
+              <Input
+                placeholder="Search library, license or version..."
+                className="pl-11 bg-white/[0.02] border-white/10 text-white h-11 rounded-xl focus:ring-indigo-500/40 text-sm transition-all"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/[0.04] bg-card overflow-hidden shadow-2xl">
+            <Table>
+              <TableHeader className="bg-white/[0.01]">
+                <TableRow className="border-white/[0.04]">
+                  <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-6 font-bold">Package Information</TableHead>
+                  <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-6 font-bold">Release</TableHead>
+                  <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-6 font-bold">License</TableHead>
+                  <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-6 text-right font-bold">Origin</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-white/[0.04]">
+                {filteredComponents.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-40 text-center text-zinc-600 italic">
+                      Query returned zero results
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredComponents.map((c) => (
+                    <TableRow key={c.id} className="border-white/[0.04] hover:bg-white/[0.005] transition-colors">
+                      <TableCell className="px-6 py-5">
+                        <div className="flex items-center gap-4">
+                          <div className={cn(
+                            "h-2 w-2 rounded-full",
+                            c.depth === 0 ? "bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]" : "bg-zinc-800"
+                          )} />
+                          <div>
+                            <p className="font-bold text-zinc-200 text-[13px] mb-0.5">{c.name}</p>
+                            {c.depth > 0 && <p className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest">via {c.parent_name}</p>}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-6 py-5">
+                        <code className="text-[11px] text-zinc-500 bg-white/[0.03] px-2 py-0.5 rounded-md font-mono">{c.version}</code>
+                      </TableCell>
+                      <TableCell className="px-6 py-5">
+                        <span className={cn(
+                          "text-[10px] font-bold px-2 py-1 rounded-md border",
+                          c.license === 'Unknown' ? 'bg-red-500/5 text-red-500/50 border-red-500/10' : 'bg-white/[0.02] text-zinc-500 border-white/5'
+                        )}>
+                          {c.license}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-6 py-5 text-right text-[10px] font-bold text-zinc-600 uppercase tracking-widest">
+                        {c.ecosystem}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       )}
 
       {showShareModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-md p-6 border border-gray-200 dark:border-gray-800">
-            <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Share SBOM</h2>
-            
-            {!shareLink ? (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Label (optional)
-                  </label>
-                  <Input 
-                    placeholder='e.g. "For DRDO Audit Q1 2026"' 
-                    value={shareLabel}
-                    onChange={(e) => setShareLabel(e.target.value)}
-                  />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-in fade-in duration-200">
+           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowShareModal(false)} />
+           <div className="relative bg-card border-white/10 rounded-2xl w-full max-w-md p-10 shadow-3xl border animate-in zoom-in-95 duration-200">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent" />
+              <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">Public Artifact Share</h2>
+              <p className="text-zinc-500 text-xs mb-10 leading-relaxed font-medium">Generate a cryptographic share link for external auditing. This link will be accessible without authentication.</p>
+              
+              {!shareLink ? (
+                <div className="space-y-8">
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-bold text-zinc-600 uppercase tracking-[0.2em] mb-2 block px-1">Reference Title</label>
+                    <Input 
+                      placeholder='e.g. "Q1 Compliance Review"' 
+                      className="bg-white/[0.02] border-white/10 text-white h-12 rounded-xl focus:ring-indigo-500/40"
+                      value={shareLabel}
+                      onChange={(e) => setShareLabel(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-bold text-zinc-600 uppercase tracking-[0.2em] mb-2 block px-1">Persistence Window</label>
+                    <select 
+                      className="w-full h-12 bg-white/[0.02] border border-white/10 rounded-xl px-4 text-xs font-bold text-zinc-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 appearance-none cursor-pointer"
+                      value={shareExpires}
+                      onChange={(e) => setShareExpires(Number(e.target.value))}
+                    >
+                      <option value={30}>30 Days (Standard Audit)</option>
+                      <option value={90}>90 Days (Extended Review)</option>
+                      <option value={365}>1 Year (Archival)</option>
+                    </select>
+                  </div>
+                  <div className="pt-6 flex gap-4">
+                    <Button variant="ghost" className="flex-1 text-zinc-500 hover:text-white font-bold h-11" onClick={() => setShowShareModal(false)}>Dismiss</Button>
+                    <Button className="flex-1 bg-white text-black hover:bg-zinc-200 h-11 font-bold rounded-xl" onClick={handleCreateShare} disabled={sharing || !lastSbomId}>
+                      {sharing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Create Link
+                    </Button>
+                  </div>
+                  {!lastSbomId && (
+                    <div className="bg-amber-500/5 border border-amber-500/10 p-4 rounded-xl flex items-start gap-3">
+                      <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                      <p className="text-[10px] text-amber-500/70 leading-relaxed font-medium">An SBOM artifact must be generated via the "Generate Artifact" menu before a share link can be initialized.</p>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Expires in
-                  </label>
-                  <select 
-                    className="w-full text-sm border-gray-200 dark:border-gray-800 rounded-md bg-white dark:bg-gray-950 text-gray-900 dark:text-white py-2 pl-3 pr-8 focus:ring-primary focus:border-primary"
-                    value={shareExpires}
-                    onChange={(e) => setShareExpires(Number(e.target.value))}
-                  >
-                    <option value={30}>30 days</option>
-                    <option value={60}>60 days</option>
-                    <option value={90}>90 days</option>
-                    <option value={180}>180 days</option>
-                  </select>
+              ) : (
+                <div className="space-y-8">
+                  <div className="bg-emerald-500/5 border border-emerald-500/10 p-5 rounded-2xl text-emerald-400 flex gap-4 shadow-inner">
+                    <Globe className="h-6 w-6 shrink-0 opacity-60" />
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-widest mb-1">Decentralized Access Live</p>
+                      <p className="text-[10px] leading-relaxed opacity-70">This link provides instant, read-only access to the generated supply chain audit report.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 relative group">
+                    <Input readOnly value={shareLink} className="font-mono text-[10px] bg-white/[0.01] border-white/10 h-12 pr-24 rounded-xl text-zinc-400" />
+                    <Button onClick={copyToClipboard} className="absolute right-1 top-1 h-10 w-20 bg-white text-black hover:bg-zinc-200 rounded-lg text-[10px] font-bold uppercase tracking-widest">
+                      {copied ? "Copied" : "Copy"}
+                    </Button>
+                  </div>
+                  <Button variant="ghost" className="w-full text-zinc-600 hover:text-zinc-300 h-12 font-bold uppercase tracking-widest text-[10px]" onClick={() => setShowShareModal(false)}>Complete Session</Button>
                 </div>
-                <div className="pt-2 flex justify-end gap-2">
-                  <Button variant="ghost" onClick={() => setShowShareModal(false)}>Cancel</Button>
-                  <Button onClick={handleCreateShare} disabled={sharing || !lastSbomId}>
-                    {sharing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Generate Share Link
-                  </Button>
-                </div>
-                {!lastSbomId && (
-                  <p className="text-xs text-orange-500 mt-2 text-center">
-                    You must Export the SBOM first before sharing it.
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-sm text-green-600 dark:text-green-400 font-medium bg-green-50 dark:bg-green-900/20 p-3 rounded-md flex gap-2">
-                  <CheckCircle2 className="h-5 w-5 shrink-0" />
-                  Success! This link works without login — share it with any auditor.
-                </p>
-                <div className="flex gap-2">
-                  <Input readOnly value={shareLink} className="font-mono text-xs" />
-                  <Button variant="outline" onClick={copyToClipboard} className="shrink-0 w-24">
-                    {copied ? <CheckCircle2 className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
-                    {copied ? "Copied" : "Copy"}
-                  </Button>
-                </div>
-                <div className="pt-2 flex justify-end">
-                  <Button onClick={() => {
-                    setShowShareModal(false);
-                    setShareLink("");
-                  }}>Close</Button>
-                </div>
-              </div>
-            )}
-          </div>
+              )}
+           </div>
+        </div>
+      )}
+
+      {toastMessage && (
+        <div className="fixed bottom-10 right-10 z-[200] bg-white text-black px-8 py-4 rounded-2xl shadow-3xl flex items-center gap-4 animate-in slide-in-from-bottom-10 duration-500 border border-white/20">
+          <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+          <span className="text-sm font-extrabold tracking-tight">{toastMessage}</span>
         </div>
       )}
     </div>
