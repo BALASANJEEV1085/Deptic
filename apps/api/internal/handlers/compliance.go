@@ -62,10 +62,15 @@ func (h *ScanHandler) GetCompliance(c *fiber.Ctx) error {
 		}
 		
 		result := compliance.CheckNTIA(pkgs, sbomMeta)
+		euCompliant = compliance.CheckEUCRA(result)
+		detailBytes, _ = json.Marshal(result)
+
+		// Self-heal: save the calculated compliance back to the DB so it shows up in lists/dashboard
+		_ = db.UpdateScanCompliance(c.Context(), h.db, scanID, result.Score, result.Compliant, euCompliant, detailBytes, scan.RepoURL, scan.Ecosystem)
 		
 		return c.JSON(fiber.Map{
 			"ntia":             result,
-			"eu_cra_compliant": compliance.CheckEUCRA(result),
+			"eu_cra_compliant": euCompliant,
 		})
 	}
 

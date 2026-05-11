@@ -34,8 +34,8 @@ export default function DashboardLayout({
       )}>
         <div className="flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-2">
-             <div className="h-6 w-6 bg-indigo-600 rounded flex items-center justify-center">
-                <span className="text-[10px] font-bold text-white">S</span>
+             <div className="h-6 w-6 bg-[#22c55e] rounded flex items-center justify-center">
+                <span className="text-[10px] font-bold text-black">S</span>
              </div>
              <span className="text-sm font-bold text-white">SBOM.io</span>
           </div>
@@ -62,8 +62,8 @@ export default function DashboardLayout({
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex items-center gap-3">
-             <div className="h-8 w-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(79,70,229,0.3)]">
-                <span className="text-xs font-bold text-white">S</span>
+             <div className="h-8 w-8 bg-[#22c55e] rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(34,197,94,0.3)]">
+                <span className="text-xs font-bold text-black">S</span>
              </div>
              <span className="text-base font-bold tracking-tight text-white">SBOM.io</span>
           </div>

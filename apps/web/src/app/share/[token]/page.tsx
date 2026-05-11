@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { getPublicShare } from "@/lib/api";
-import { ShieldCheck, ShieldAlert, CheckCircle2, XCircle, FileJson, Package, Layers, Globe, Clock, Hash, AlertTriangle, ExternalLink } from "lucide-react";
+import { ShieldCheck, ShieldAlert, CheckCircle2, XCircle, FileJson, Package, Layers, Globe, Clock, Hash, AlertTriangle, ExternalLink, Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -14,6 +14,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
+
+function EcoDot({ eco }: { eco: string }) {
+  const e = (eco || 'unknown').toLowerCase();
+  switch (e) {
+    case 'npm': return <div className="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />;
+    case 'pip': return <div className="h-2 w-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]" />;
+    case 'maven': return <div className="h-2 w-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]" />;
+    default: return <div className="h-2 w-2 rounded-full bg-zinc-600" />;
+  }
+}
 
 export default function PublicSharePage() {
   const params = useParams();
@@ -49,12 +60,30 @@ export default function PublicSharePage() {
     }
   }, [data?.generated_at]);
 
+  const directCount = useMemo(() => {
+    if (!data?.components) return 0;
+    return data.components.filter((c: any) => c.Depth === 0).length;
+  }, [data?.components]);
+
+  const transitiveCount = useMemo(() => {
+    if (!data?.components) return 0;
+    return data.components.filter((c: any) => c.Depth > 0).length;
+  }, [data?.components]);
+
+  const groupedComponents = useMemo(() => {
+    if (!data?.components) return { direct: [], transitive: [] };
+    return {
+      direct: data.components.filter((c: any) => c.Depth === 0),
+      transitive: data.components.filter((c: any) => c.Depth > 0)
+    };
+  }, [data?.components]);
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background text-zinc-500">
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0c10] text-zinc-500">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-          <div className="text-sm font-medium tracking-widest uppercase">Decrypting Audit Log...</div>
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#22c55e] border-t-transparent" />
+          <div className="text-xs font-bold tracking-[0.2em] uppercase text-zinc-600">Decrypting Audit Log...</div>
         </div>
       </div>
     );
@@ -62,8 +91,8 @@ export default function PublicSharePage() {
 
   if (error === "expired") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-6">
-        <div className="text-center p-12 bg-card border border-red-500/20 rounded-3xl max-w-md w-full shadow-2xl">
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0c10] px-6">
+        <div className="text-center p-12 bg-[#0f1117] border border-red-500/20 rounded-3xl max-w-md w-full shadow-2xl">
           <div className="h-16 w-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <ShieldAlert className="h-8 w-8 text-red-500" />
           </div>
@@ -73,7 +102,7 @@ export default function PublicSharePage() {
           </p>
           <div className="pt-6 border-t border-white/5 flex items-center justify-center gap-2 text-zinc-600">
             <ShieldCheck className="h-4 w-4 opacity-30" />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Verified by SBOM.io</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-700">Verified by SBOM.io</span>
           </div>
         </div>
       </div>
@@ -82,7 +111,7 @@ export default function PublicSharePage() {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background text-red-400 p-6 text-center">
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0c10] text-red-400 p-6 text-center">
         <div className="max-w-md">
           <AlertTriangle className="h-10 w-10 mx-auto mb-4 opacity-50" />
           <p className="font-bold mb-1">Authorization Failed</p>
@@ -92,60 +121,65 @@ export default function PublicSharePage() {
     );
   }
 
-  const { compliance = {}, vulnerability_summary = {}, components = [], vulnerabilities = [] } = data;
+  const { compliance = {}, vulnerability_summary = {} } = data;
 
   return (
-    <div className="min-h-screen bg-background text-zinc-300 selection:bg-indigo-500/30 selection:text-indigo-400">
+    <div className="min-h-screen bg-[#0a0c10] text-zinc-300 selection:bg-[#22c55e]/30 selection:text-[#22c55e]">
       {/* Top Banner */}
-      <div className="bg-indigo-600 px-6 py-2 text-center">
-        <p className="text-[10px] font-bold text-white uppercase tracking-[0.2em] flex items-center justify-center gap-2">
-          <Globe className="h-3 w-3" /> Secure Public Report — Read Only Access Authorized
+      <div className="bg-[#0d2818] px-6 py-2 text-center border-b border-[#22c55e]/10">
+        <p className="text-[10px] font-bold text-[#22c55e] uppercase tracking-[0.2em] flex items-center justify-center gap-2">
+          <Globe className="h-3 w-3 text-[#22c55e]" /> SECURE PUBLIC REPORT — READ ONLY ACCESS AUTHORIZED
         </p>
       </div>
 
       <div className="max-w-7xl mx-auto py-12 px-6 space-y-12">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8 border-b border-white/5 pb-10">
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="flex items-center gap-3">
-              <svg width="32" height="32" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white">
+              <svg width="28" height="28" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-[#22c55e]">
                 <path d="M60 30L90 60" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M90 60L60 90" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M60 90L30 60" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M30 60L60 30" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                <g transform="translate(48, 18)"><path d="M12 2L22 7L12 12L2 7L12 2Z" fill="currentColor" fillOpacity="0.1" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" /><path d="M22 7V17L12 22V12L22 7Z" fill="currentColor" fillOpacity="0.05" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" /><path d="M2 7V17L12 22V12L2 7Z" fill="currentColor" fillOpacity="0.08" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" /></g>
-                <g transform="translate(78, 48)"><path d="M12 2L22 7L12 12L2 7L12 2Z" fill="currentColor" fillOpacity="0.1" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" /><path d="M22 7V17L12 22V12L22 7Z" fill="currentColor" fillOpacity="0.05" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" /><path d="M2 7V17L12 22V12L2 7Z" fill="currentColor" fillOpacity="0.08" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" /></g>
-                <g transform="translate(48, 78)"><path d="M12 2L22 7L12 12L2 7L12 2Z" fill="currentColor" fillOpacity="0.1" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" /><path d="M22 7V17L12 22V12L22 7Z" fill="currentColor" fillOpacity="0.05" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" /><path d="M2 7V17L12 22V12L2 7Z" fill="currentColor" fillOpacity="0.08" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" /></g>
-                <g transform="translate(18, 48)"><path d="M12 2L22 7L12 12L2 7L12 2Z" fill="currentColor" fillOpacity="0.1" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" /><path d="M22 7V17L12 22V12L22 7Z" fill="currentColor" fillOpacity="0.05" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" /><path d="M2 7V17L12 22V12L2 7Z" fill="currentColor" fillOpacity="0.08" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" /></g>
               </svg>
               <span className="font-bold text-lg text-white tracking-tight">SBOM.io</span>
             </div>
-            <h1 className="text-4xl font-extrabold text-white tracking-tight">Software Compliance Report</h1>
-            <p className="text-zinc-500 font-medium italic">Ref: {data.label}</p>
+            <div>
+              <h1 className="text-4xl font-extrabold text-white tracking-tight mb-2">Software Compliance Report</h1>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Project:</span>
+                <span className="text-sm font-bold text-white uppercase tracking-tight">{data.repo_name}</span>
+              </div>
+            </div>
           </div>
           
           <div className="grid grid-cols-1 gap-y-3 text-right">
-             <div className="flex items-center gap-2 justify-end text-xs">
-                <span className="text-zinc-500 uppercase font-bold tracking-widest">Project</span>
-                <span className="text-white font-bold">{data.repo_name}</span>
+             <div className="flex items-center gap-2 justify-end text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                Ref: <span className="text-zinc-300 font-mono">{(data.sha256_hash || data.sha256 || '').substring(0, 16)}</span>
              </div>
              <div className="flex items-center gap-2 justify-end text-xs">
                 <Clock className="h-3 w-3 text-zinc-600" />
-                <span className="text-zinc-400">{formattedDate}</span>
+                <span className="text-zinc-500 font-medium">{formattedDate}</span>
              </div>
-             <div className="flex items-center gap-2 justify-end text-xs">
-                <Hash className="h-3 w-3 text-zinc-600" />
-                <span className="font-mono text-[10px] text-zinc-500 bg-white/5 px-2 py-0.5 rounded">{data.sha256}</span>
+             <div className="flex items-center justify-end pt-2">
+                <a 
+                  href={`/api/share/${token}/download`}
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-[#22c55e]/30 rounded-xl text-[11px] font-bold text-[#22c55e] hover:bg-[#22c55e]/5 transition-all"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  ↓ Download CycloneDX
+                </a>
              </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* NTIA Checklist */}
-          <div className="lg:col-span-1 space-y-4">
-            <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 h-full">
-              <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-[0.15em] mb-6 flex items-center gap-2">
-                <ShieldCheck className="h-3 w-3 text-emerald-500" /> NTIA Minimum Elements
+          <div className="lg:col-span-1">
+            <div className="bg-[#0f1117] border border-white/5 rounded-2xl p-6 h-full">
+              <h2 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                <ShieldCheck className="h-3 w-3 text-[#22c55e]" /> NTIA Minimum Elements
               </h2>
               <ul className="space-y-4">
                 {[
@@ -162,7 +196,7 @@ export default function PublicSharePage() {
                       {item.label}
                     </span>
                     {compliance[item.key] ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      <CheckCircle2 className="h-4 w-4 text-[#22c55e]" />
                     ) : (
                       <XCircle className="h-4 w-4 text-red-500" />
                     )}
@@ -174,7 +208,7 @@ export default function PublicSharePage() {
                   <FileJson className="h-4 w-4 text-zinc-600" />
                   <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Protocol</span>
                 </div>
-                <Badge className="bg-indigo-500/10 text-indigo-400 border-0 text-[10px] uppercase">{data.format} {data.spec_version}</Badge>
+                <Badge variant="outline" className="text-[#22c55e] border-[#22c55e]/30 bg-transparent text-[10px] uppercase font-mono">{data.format} {data.spec_version}</Badge>
               </div>
             </div>
           </div>
@@ -184,157 +218,154 @@ export default function PublicSharePage() {
             {/* Vuln Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: 'Critical', value: vulnerability_summary.critical || 0, color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' },
-                { label: 'High', value: vulnerability_summary.high || 0, color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
-                { label: 'Medium', value: vulnerability_summary.medium || 0, color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20' },
-                { label: 'Low', value: vulnerability_summary.low || 0, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+                { label: 'Critical', value: vulnerability_summary.critical || 0, color: 'text-red-500', bg: 'bg-red-500/15', border: 'border-red-500/20' },
+                { label: 'High', value: vulnerability_summary.high || 0, color: 'text-orange-500', bg: 'bg-orange-500/15', border: 'border-orange-500/20' },
+                { label: 'Medium', value: vulnerability_summary.medium || 0, color: 'text-yellow-500', bg: 'bg-yellow-500/15', border: 'border-yellow-500/20' },
+                { label: 'Low', value: vulnerability_summary.low || 0, color: 'text-[#22c55e]', bg: 'bg-[#22c55e]/15', border: 'border-[#22c55e]/20' },
               ].map((v, i) => (
-                <div key={i} className={cn("rounded-2xl border p-5 flex flex-col items-center justify-center gap-1 transition-transform hover:scale-[1.02]", v.bg, v.border)}>
-                  <span className={cn("text-2xl font-extrabold", v.color)}>{v.value}</span>
-                  <span className={cn("text-[10px] font-bold uppercase tracking-widest", v.color)}>{v.label}</span>
+                <div key={i} className={cn("rounded-2xl border p-6 flex flex-col items-center justify-center gap-2", v.bg, v.border)}>
+                  <span className="text-[9px] font-bold uppercase tracking-[0.2em] opacity-80 mb-1">{v.label}</span>
+                  <span className={cn("text-3xl font-black", v.color)}>{v.value}</span>
+                  <span className="text-[8px] font-bold uppercase tracking-widest opacity-50">vulnerabilities</span>
                 </div>
               ))}
             </div>
 
-            {/* Component Count Glass Card */}
-            <div className="relative group overflow-hidden rounded-2xl border border-white/5 bg-white/[0.02] p-8 flex items-center justify-between transition-all hover:bg-white/[0.04]">
-              <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 to-transparent -z-10" />
-              <div>
-                <h2 className="text-2xl font-bold text-white tracking-tight">Inventory Coverage</h2>
-                <p className="text-sm text-zinc-500">Verified components extracted from primary manifests.</p>
+            {/* Inventory Coverage visualization */}
+            <div className="rounded-2xl border border-white/5 bg-[#0f1117] p-8 space-y-6 transition-all hover:bg-white/[0.03]">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-white tracking-tight">Inventory Coverage</h2>
+                  <p className="text-sm text-zinc-500">Verified components extracted from primary manifests.</p>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-4xl font-black text-[#22c55e]">{data.component_count}</span>
+                  <Package className="h-4 w-4 text-zinc-700" />
+                </div>
               </div>
-              <div className="flex items-baseline gap-2">
-                 <span className="text-5xl font-black text-indigo-500">{data.component_count}</span>
-                 <Package className="h-5 w-5 text-zinc-700" />
+              
+              <div className="space-y-3">
+                <div className="h-3 w-full bg-zinc-800 rounded-full overflow-hidden flex">
+                  <div 
+                    className="h-full bg-[#22c55e] transition-all duration-1000" 
+                    style={{ width: `${(directCount / (data.component_count || 1)) * 100}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-[#22c55e]" />
+                    <span className="text-zinc-300">Direct ({directCount})</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-zinc-700" />
+                    <span className="text-zinc-500">Transitive ({transitiveCount})</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Components Table */}
+        {/* Components Ledger Table */}
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <Layers className="h-5 w-5 text-zinc-600" /> Component Ledger
+          <div className="flex items-center justify-between border-b border-white/5 pb-4">
+            <h2 className="text-xl font-bold text-white flex items-center gap-3">
+              <Layers className="h-5 w-5 text-[#22c55e]" /> Component Ledger
             </h2>
-            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Page 1 of {Math.ceil((components?.length || 0)/100)}</span>
           </div>
-          <div className="rounded-2xl border border-white/5 bg-card overflow-hidden shadow-2xl">
-            <div className="max-h-[500px] overflow-y-auto">
-              <Table>
-                <TableHeader className="bg-white/[0.02] sticky top-0 z-20">
-                  <TableRow className="border-white/5">
-                    <TableHead className="px-6 py-4 text-zinc-400 text-[10px] uppercase tracking-widest font-bold">Package Information</TableHead>
-                    <TableHead className="px-6 py-4 text-zinc-400 text-[10px] uppercase tracking-widest font-bold">Release</TableHead>
-                    <TableHead className="px-6 py-4 text-zinc-400 text-[10px] uppercase tracking-widest font-bold">License</TableHead>
-                    <TableHead className="px-6 py-4 text-zinc-400 text-[10px] uppercase tracking-widest font-bold text-right">Scope</TableHead>
+          
+          <div className="rounded-2xl border border-white/5 bg-[#0f1117] overflow-hidden shadow-2xl">
+            <Table>
+              <TableHeader className="bg-white/[0.01]">
+                <TableRow className="border-white/5">
+                  <TableHead className="px-6 py-4 text-zinc-500 text-[10px] uppercase tracking-widest font-bold">Package Name</TableHead>
+                  <TableHead className="px-6 py-4 text-zinc-500 text-[10px] uppercase tracking-widest font-bold">Release</TableHead>
+                  <TableHead className="px-6 py-4 text-zinc-500 text-[10px] uppercase tracking-widest font-bold">License</TableHead>
+                  <TableHead className="px-6 py-4 text-zinc-500 text-[10px] uppercase tracking-widest font-bold text-right">Scope</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {/* Direct dependencies */}
+                {groupedComponents.direct.map((c: any, i: number) => (
+                  <TableRow key={`dir-${i}`} className="hover:bg-white/[0.01] transition-colors border-white/5">
+                    <TableCell className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <EcoDot eco={c.Ecosystem} />
+                        <span className="text-sm font-bold text-zinc-200">{c.Name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="px-6 py-4">
+                      <code className="text-[10px] text-zinc-500 font-mono font-bold bg-white/5 px-2 py-0.5 rounded uppercase">{c.Version}</code>
+                    </TableCell>
+                    <TableCell className="px-6 py-4">
+                      <span className="text-[10px] text-zinc-600 font-medium px-2 py-0.5 border border-white/5 rounded-md">{c.License || 'Proprietary'}</span>
+                    </TableCell>
+                    <TableCell className="px-6 py-4 text-right">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded bg-[#22c55e]/10 text-[#22c55e] text-[9px] font-black uppercase tracking-widest border border-[#22c55e]/20">Direct</span>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody className="divide-y divide-white/5">
-                  {components.length === 0 ? (
-                    <TableRow><TableCell colSpan={4} className="text-center py-20 text-zinc-600 italic">Inventory list empty</TableCell></TableRow>
-                  ) : components.map((c: any, i: number) => (
-                    <TableRow key={i} className="hover:bg-white/[0.01] transition-colors border-white/5">
-                      <TableCell className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className={cn("h-1.5 w-1.5 rounded-full", c.Depth === 0 ? "bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]" : "bg-zinc-700")} />
-                          <span className="text-sm font-bold text-white leading-none">{c.Name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-6 py-4">
-                        <code className="text-xs text-zinc-500 bg-white/5 px-2 py-0.5 rounded">{c.Version}</code>
-                      </TableCell>
-                      <TableCell className="px-6 py-4">
-                        <Badge variant="outline" className="text-[10px] font-medium text-zinc-400 border-zinc-800 bg-transparent px-2 py-0.5">{c.License || 'Proprietary'}</Badge>
-                      </TableCell>
-                      <TableCell className="px-6 py-4 text-right">
-                        {c.Depth === 0 ? (
-                          <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Primary</span>
-                        ) : (
-                          <span className="text-[10px] text-zinc-600 uppercase">Dependency</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+
+                {/* Separator */}
+                {groupedComponents.transitive.length > 0 && (
+                  <TableRow className="bg-white/[0.01] border-none pointer-events-none">
+                    <TableCell colSpan={4} className="py-2 px-6">
+                      <div className="flex items-center gap-4">
+                        <div className="h-[1px] flex-1 bg-white/5" />
+                        <span className="text-[9px] font-bold text-zinc-700 uppercase tracking-[0.2em] whitespace-nowrap">
+                          Direct dependencies above · Transitive below
+                        </span>
+                        <div className="h-[1px] flex-1 bg-white/5" />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+
+                {/* Transitive dependencies */}
+                {groupedComponents.transitive.map((c: any, i: number) => (
+                  <TableRow key={`trans-${i}`} className="hover:bg-white/[0.01] transition-colors border-white/5">
+                    <TableCell className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <EcoDot eco={c.Ecosystem} />
+                        <span className="text-sm font-bold text-zinc-400">{c.Name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="px-6 py-4">
+                      <code className="text-[10px] text-zinc-600 font-mono font-bold bg-white/5 px-2 py-0.5 rounded uppercase">{c.Version}</code>
+                    </TableCell>
+                    <TableCell className="px-6 py-4">
+                      <span className="text-[10px] text-zinc-700 font-medium px-2 py-0.5 border border-white/5 rounded-md">{c.License || 'Proprietary'}</span>
+                    </TableCell>
+                    <TableCell className="px-6 py-4 text-right">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded bg-zinc-800/50 text-zinc-600 text-[9px] font-bold uppercase tracking-widest border border-white/5">Transitive</span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         </div>
-
-        {/* Vulnerabilities Section */}
-        {vulnerabilities.length > 0 && (
-          <div className="space-y-6 pt-12">
-            <h2 className="text-xl font-bold text-red-400 flex items-center gap-3">
-              <ShieldAlert className="h-6 w-6" /> Detected Vulnerabilities
-            </h2>
-            <div className="rounded-2xl border border-red-500/10 bg-card overflow-hidden shadow-[0_0_50px_rgba(239,68,68,0.05)]">
-              <Table>
-                <TableHeader className="bg-red-500/[0.02]">
-                  <TableRow className="border-white/5">
-                    <TableHead className="px-6 py-4 text-zinc-400 text-[10px] uppercase tracking-widest font-bold">CVE Reference</TableHead>
-                    <TableHead className="px-6 py-4 text-zinc-400 text-[10px] uppercase tracking-widest font-bold text-center">Threat</TableHead>
-                    <TableHead className="px-6 py-4 text-zinc-400 text-[10px] uppercase tracking-widest font-bold">Affected Identity</TableHead>
-                    <TableHead className="px-6 py-4 text-zinc-400 text-[10px] uppercase tracking-widest font-bold text-right">Remediation</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody className="divide-y divide-white/5">
-                  {vulnerabilities.map((v: any, i: number) => (
-                    <TableRow key={i} className="hover:bg-red-500/[0.01] transition-colors border-white/5">
-                      <TableCell className="px-6 py-5">
-                         <span className="text-xs font-mono text-white underline decoration-zinc-700 underline-offset-4">{v.cve_id}</span>
-                      </TableCell>
-                      <TableCell className="px-6 py-5 text-center">
-                        <Badge 
-                          variant="outline"
-                          className={cn(
-                            "text-[9px] font-bold uppercase tracking-[0.15em] px-2 py-0.5 border-0",
-                            v.severity === 'CRITICAL' ? 'bg-red-500/10 text-red-400' :
-                            v.severity === 'HIGH' ? 'bg-orange-500/10 text-orange-400' :
-                            v.severity === 'MEDIUM' ? 'bg-yellow-500/10 text-yellow-400' :
-                            'bg-zinc-800 text-zinc-400'
-                          )}
-                        >
-                          {v.severity}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="px-6 py-5">
-                         <div className="flex flex-col">
-                           <span className="text-xs font-bold text-white">{v.component_name}</span>
-                           <span className="text-[10px] text-zinc-500 font-mono">v{v.component_version}</span>
-                         </div>
-                      </TableCell>
-                      <TableCell className="px-6 py-5 text-right">
-                        {v.fixed_version ? (
-                          <div className="flex items-center justify-end gap-1.5 text-emerald-400 text-xs font-bold">
-                            <span className="text-[10px] uppercase tracking-widest">Patch to</span>
-                            <code className="bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">{v.fixed_version}</code>
-                          </div>
-                        ) : (
-                          <span className="text-zinc-600 text-[10px] uppercase font-bold">No patch yet</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        )}
 
         {/* Footer */}
-        <div className="pt-24 pb-4 text-center border-t border-white/5 flex flex-col items-center gap-6">
-          <div className="flex items-center gap-3">
-             <div className="h-6 w-6 rounded bg-white/10 flex items-center justify-center">
-               <ShieldCheck className="h-4 w-4 text-zinc-400" />
+        <div className="pt-20 pb-10 border-t border-white/5 text-center space-y-8">
+           <div className="flex flex-col items-center gap-3">
+             <div className="flex items-center gap-3 mb-2">
+                <svg width="24" height="24" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-zinc-700 opacity-50">
+                  <path d="M60 30L90 60" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M90 60L60 90" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M60 90L30 60" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M30 60L60 30" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span className="text-xs font-black text-zinc-600 tracking-[0.3em] uppercase">Powered by SBOM.io</span>
              </div>
-             <span className="text-sm font-bold text-white tracking-widest uppercase">Verified Certification by SBOM.io</span>
-          </div>
-          <div className="flex gap-10 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-600">
-             <span className="flex items-center gap-2"><ShieldCheck className="h-3 w-3" /> End-to-End Encrypted</span>
-             <span className="flex items-center gap-2"><Globe className="h-3 w-3" /> Immutable Manifest</span>
-          </div>
-          <p className="text-[10px] text-zinc-700 italic">This document is a generated artifact and is legally valid for regulatory audits as per the EU CRA 2024 directives.</p>
+             <p className="text-[10px] text-zinc-700 font-medium">
+               Report generated: {formattedDate} · Platform: <Link href="/" className="text-zinc-500 hover:text-[#22c55e] transition-colors underline underline-offset-4 decoration-zinc-800">sbom.io</Link>
+             </p>
+           </div>
+           <p className="text-[9px] text-zinc-800 max-w-2xl mx-auto leading-relaxed">
+             This cryptographic artifact is generated and signed by the SBOM.io platform. 
+             Authorized for external auditing and supply chain transparency as per NIST and EU CRA 2024 directives.
+           </p>
         </div>
       </div>
     </div>

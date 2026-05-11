@@ -20,6 +20,30 @@ export interface Scan {
   project_id: string;
   status: 'running' | 'done' | 'failed';
   created_at: string;
+  repo_url?: string;
+  repo_name?: string;
+  ecosystem?: string;
+  ntia_score?: number;
+  component_count?: number;
+  critical_cves?: number;
+  high_cves?: number;
+  medium_cves?: number;
+  low_cves?: number;
+}
+
+export interface Project {
+  latest_scan_id: string;
+  repo_url: string;
+  repo_name: string;
+  ecosystem: string;
+  status: 'running' | 'done' | 'failed';
+  created_at: string;
+  ntia_score: number;
+  component_count: number;
+  critical_cves: number;
+  high_cves: number;
+  medium_cves: number;
+  low_cves: number;
 }
 
 export interface DashboardStats {
@@ -113,6 +137,53 @@ export async function listScans(): Promise<{ scans: Scan[], total: number }> {
     throw new Error('Failed to fetch scans');
   }
   return response.json();
+}
+
+export async function listProjects(): Promise<{ projects: Project[], total: number }> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/projects`, { headers });
+  if (!response.ok) throw new Error('Failed to fetch projects');
+  return response.json();
+}
+
+// ── Shared UI Helpers ────────────────────────────────────────────────────────
+
+export function shortId(id: string): string {
+  return id.slice(0, 8);
+}
+
+export function relativeTime(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diff = Math.floor((now - then) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 86400 * 30) return `${Math.floor(diff / 86400)}d ago`;
+  return new Date(dateStr).toLocaleDateString();
+}
+
+export function ecosystemLabel(eco: string | undefined, status?: string): string {
+  if (!eco || eco === '' || eco.toLowerCase() === 'unknown') {
+    if (status === 'running') return 'Detecting...';
+    return 'Unknown';
+  }
+  return eco.toLowerCase();
+}
+
+export function ecosystemColorClass(eco: string | undefined): string {
+  switch ((eco || '').toLowerCase()) {
+    case 'npm':    return 'bg-blue-500/15 text-blue-400 border-blue-500/20';
+    case 'pip':    return 'bg-yellow-500/15 text-yellow-400 border-yellow-500/20';
+    case 'maven':  return 'bg-orange-500/15 text-orange-400 border-orange-500/20';
+    default:       return 'bg-zinc-800/60 text-zinc-500 border-zinc-700/40';
+  }
+}
+
+export function ntiaScoreColor(score: number): string {
+  if (score === 100) return 'text-emerald-400';
+  if (score >= 60)   return 'text-orange-400';
+  return 'text-red-400';
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {

@@ -18,6 +18,7 @@ type Scan struct {
 	ProjectID string    `json:"project_id"`
 	Status    string    `json:"status"`
 	RepoURL   string    `json:"repo_url"`
+	RepoName  string    `json:"repo_name"`
 	Ecosystem string    `json:"ecosystem"`
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -61,9 +62,9 @@ func CreateOrGetDefaultProject(ctx context.Context, db *sql.DB, userID string) (
 }
 
 // CreateScan inserts a new scan row with status="running" and returns its UUID
-func CreateScan(ctx context.Context, db *sql.DB, projectID string) (scanID string, err error) {
-	query := `INSERT INTO scans (id, project_id, status, created_at) VALUES (gen_random_uuid(), $1, 'running', now()) RETURNING id`
-	err = db.QueryRowContext(ctx, query, projectID).Scan(&scanID)
+func CreateScan(ctx context.Context, db *sql.DB, projectID, repoURL string) (scanID string, err error) {
+	query := `INSERT INTO scans (id, project_id, status, repo_url, created_at) VALUES (gen_random_uuid(), $1, 'running', $2, now()) RETURNING id`
+	err = db.QueryRowContext(ctx, query, projectID, repoURL).Scan(&scanID)
 	if err != nil {
 		fmt.Printf("CreateScan DB error: %v\n", err)
 		return "", fmt.Errorf("creating scan: %w", err)
@@ -71,10 +72,10 @@ func CreateScan(ctx context.Context, db *sql.DB, projectID string) (scanID strin
 	return scanID, nil
 }
 
-// UpdateScanStatus updates the scan status (e.g. "running" | "done" | "failed")
-func UpdateScanStatus(ctx context.Context, db *sql.DB, scanID, status string) error {
-	query := `UPDATE scans SET status = $1 WHERE id = $2`
-	_, err := db.ExecContext(ctx, query, status, scanID)
+// UpdateScanStatus updates the scan status and optionally the ecosystem
+func UpdateScanStatus(ctx context.Context, db *sql.DB, scanID, status, ecosystem string) error {
+	query := `UPDATE scans SET status = $1, ecosystem = $2 WHERE id = $3`
+	_, err := db.ExecContext(ctx, query, status, ecosystem, scanID)
 	if err != nil {
 		return fmt.Errorf("updating scan status: %w", err)
 	}
@@ -130,8 +131,8 @@ func insertComponentsBatch(ctx context.Context, db *sql.DB, scanID string, batch
 
 // GetScanWithComponents fetches a scan and all its associated components
 func GetScanWithComponents(ctx context.Context, db *sql.DB, scanID string) (scan Scan, components []Component, err error) {
-	err = db.QueryRowContext(ctx, `SELECT id, project_id, status, created_at FROM scans WHERE id = $1`, scanID).
-		Scan(&scan.ID, &scan.ProjectID, &scan.Status, &scan.CreatedAt)
+	err = db.QueryRowContext(ctx, `SELECT id, project_id, status, COALESCE(repo_url, ''), COALESCE(ecosystem, ''), created_at FROM scans WHERE id = $1`, scanID).
+		Scan(&scan.ID, &scan.ProjectID, &scan.Status, &scan.RepoURL, &scan.Ecosystem, &scan.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return scan, nil, fmt.Errorf("scan not found")

@@ -107,6 +107,7 @@ func RegisterRoutes(api fiber.Router, database *sql.DB, redisClient *redis.Clien
 	api.Get("/scans/:scanID/vulnerabilities", h.HandleGetScanVulnerabilities)
 	api.Post("/scans/:scanID/sbom", h.HandleGenerateSBOM)
 	api.Get("/vulnerabilities", h.HandleGetAllVulnerabilities)
+	api.Get("/projects", h.HandleListProjects)
 	api.Get("/projects/:projectID/scans", h.HandleListScans)
 	api.Get("/dashboard/stats", h.HandleGetDashboardStats)
 	api.Get("/sboms/:sbomID/download", h.HandleDownloadSBOM)
@@ -116,6 +117,20 @@ func RegisterRoutes(api fiber.Router, database *sql.DB, redisClient *redis.Clien
 	api.Get("/scans/:scanID/compliance", h.GetCompliance)
 	api.Get("/scans/:scanID/report/pdf", h.DownloadPDFReport)
 	api.Delete("/sboms/:sbomID/shares/:token", h.HandleRevokeShareLink)
+}
+
+func deriveRepoName(repoURL, id string) string {
+	if repoURL != "" {
+		parts := strings.Split(strings.TrimSuffix(repoURL, "/"), "/")
+		if len(parts) >= 2 {
+			return parts[len(parts)-2] + "/" + parts[len(parts)-1]
+		}
+		return repoURL
+	}
+	if len(id) >= 8 {
+		return id[:8]
+	}
+	return id
 }
 
 type createScanRequest struct {
@@ -163,7 +178,7 @@ func (h *ScanHandler) HandleCreateScan(c *fiber.Ctx) error {
 	}
 
 	// Create scan record in database
-	scanID, err := db.CreateScan(c.Context(), h.db, projectID)
+	scanID, err := db.CreateScan(c.Context(), h.db, projectID, req.GithubURL)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create scan record"})
 	}
@@ -210,7 +225,7 @@ func (h *ScanHandler) HandleCreateScan(c *fiber.Ctx) error {
 		}
 
 		if manifestBytes == nil {
-			_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed")
+			_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed", "")
 			fmt.Printf("no supported manifest found in repo (tried package.json, requirements.txt, pyproject.toml, pom.xml)\n")
 			return
 		}
@@ -226,14 +241,14 @@ func (h *ScanHandler) HandleCreateScan(c *fiber.Ctx) error {
 		}
 
 		if err != nil {
-			_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed")
+			_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed", ecosystem)
 			fmt.Printf("Scan failed parsing %s: %v\n", ecosystem, err)
 			return
 		}
 
 		// 3. Save resolved components
 		if err := db.SaveComponents(ctx, h.db, scanID, packages); err != nil {
-			_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed")
+			_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed", ecosystem)
 			fmt.Printf("Scan failed saving components: %v\n", err)
 			return
 		}
@@ -262,7 +277,7 @@ func (h *ScanHandler) HandleCreateScan(c *fiber.Ctx) error {
 		}
 
 		// 6. Finalize scan status
-		_ = db.UpdateScanStatus(ctx, h.db, scanID, "done")
+		_ = db.UpdateScanStatus(ctx, h.db, scanID, "done", ecosystem)
 		fmt.Printf("Scan done: %d components, ecosystem=%s\n", len(packages), ecosystem)
 	}()
 
@@ -289,6 +304,8 @@ func (h *ScanHandler) HandleGetScan(c *fiber.Ctx) error {
 		components = []db.Component{}
 	}
 
+	scan.RepoName = deriveRepoName(scan.RepoURL, scan.ID)
+
 	return c.JSON(fiber.Map{
 		"scan":       scan,
 		"components": components,
@@ -301,7 +318,7 @@ func (h *ScanHandler) HandleListScans(c *fiber.Ctx) error {
 	projectID := c.Params("projectID")
 	
 	rows, err := h.db.QueryContext(c.Context(), `
-		SELECT id, project_id, status, created_at 
+		SELECT id, project_id, status, COALESCE(repo_url, ''), COALESCE(ecosystem, ''), created_at 
 		FROM scans 
 		WHERE project_id = $1 
 		ORDER BY created_at DESC
@@ -315,9 +332,10 @@ func (h *ScanHandler) HandleListScans(c *fiber.Ctx) error {
 	var scans []db.Scan
 	for rows.Next() {
 		var s db.Scan
-		if err := rows.Scan(&s.ID, &s.ProjectID, &s.Status, &s.CreatedAt); err != nil {
+		if err := rows.Scan(&s.ID, &s.ProjectID, &s.Status, &s.RepoURL, &s.Ecosystem, &s.CreatedAt); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to parse scan row"})
 		}
+		s.RepoName = deriveRepoName(s.RepoURL, s.ID)
 		scans = append(scans, s)
 	}
 
@@ -400,11 +418,12 @@ func (h *ScanHandler) HandleGetDashboardStats(c *fiber.Ctx) error {
 	var compliant, nonCompliant int
 	h.db.QueryRowContext(c.Context(), `
 		SELECT 
-			COALESCE(SUM(CASE WHEN ntia_compliant THEN 1 ELSE 0 END), 0),
-			COALESCE(SUM(CASE WHEN ntia_compliant IS FALSE THEN 1 ELSE 0 END), 0)
+			COUNT(*) FILTER (WHERE ntia_compliant = true),
+			COUNT(*) FILTER (WHERE ntia_compliant = false OR ntia_compliant IS NULL)
 		FROM scans s
 		JOIN projects p ON s.project_id = p.id
 		WHERE p.user_id = $1
+		  AND s.status = 'done'
 	`, userID).Scan(&compliant, &nonCompliant)
 
 	stats := fiber.Map{
@@ -421,9 +440,13 @@ func (h *ScanHandler) HandleGetDashboardStats(c *fiber.Ctx) error {
 		"recent_scans":         []fiber.Map{},
 	}
 
-	// Fetch recent 5 scans
+	// Fetch recent 5 scans with counts and metadata in one go
 	rows, err := h.db.QueryContext(c.Context(), `
-		SELECT s.id, p.name, s.status, s.created_at
+		SELECT 
+			s.id, s.status, s.created_at, COALESCE(s.repo_url, ''), COALESCE(s.ecosystem, 'unknown'),
+			COALESCE(s.compliance_score, 0),
+			(SELECT COUNT(*) FROM components WHERE scan_id = s.id) as component_count,
+			(SELECT COUNT(*) FROM component_vulnerabilities cv JOIN components c ON cv.component_id = c.id WHERE c.scan_id = s.id AND cv.severity = 'CRITICAL') as critical_cves
 		FROM scans s
 		JOIN projects p ON p.id = s.project_id
 		WHERE p.user_id = $1
@@ -435,54 +458,21 @@ func (h *ScanHandler) HandleGetDashboardStats(c *fiber.Ctx) error {
 		defer rows.Close()
 		var recentScans []fiber.Map
 		for rows.Next() {
-			var scanID, projectName, status string
+			var scanID, status, repoURL, ecosystem string
 			var createdAt time.Time
-			if err := rows.Scan(&scanID, &projectName, &status, &createdAt); err == nil {
-				
-				var compCount int
-				h.db.QueryRowContext(c.Context(), "SELECT count(*) FROM components WHERE scan_id = $1", scanID).Scan(&compCount)
-
-				var critCves int
-				h.db.QueryRowContext(c.Context(), `
-					SELECT count(*) FROM component_vulnerabilities cv
-					JOIN components c ON cv.component_id = c.id
-					WHERE c.scan_id = $1 AND cv.severity = 'CRITICAL'
-				`, scanID).Scan(&critCves)
-
-				var ntiaScore sql.NullInt64
-				var ecosystemDB sql.NullString
-				var repoURL sql.NullString
-				h.db.QueryRowContext(c.Context(),
-					"SELECT compliance_score, ecosystem, repo_url FROM scans WHERE id = $1",
-					scanID,
-				).Scan(&ntiaScore, &ecosystemDB, &repoURL)
-
-				ecosystemStr := ecosystemDB.String
-				if ecosystemStr == "" {
-					ecosystemStr = "unknown"
-				}
-
-				// Derive a friendly repo name from repo_url or fall back to project name
-				displayName := projectName
-				if repoURL.String != "" {
-					parts := strings.Split(strings.TrimSuffix(repoURL.String, "/"), "/")
-					if len(parts) >= 2 {
-						displayName = parts[len(parts)-2] + "/" + parts[len(parts)-1]
-					}
-				}
-
+			var compCount, critCves, ntiaScore int
+			
+			if err := rows.Scan(&scanID, &status, &createdAt, &repoURL, &ecosystem, &ntiaScore, &compCount, &critCves); err == nil {
 				recentScans = append(recentScans, fiber.Map{
 					"id":              scanID,
-					"repo_name":       displayName,
-					"ecosystem":       ecosystemStr,
+					"repo_name":       deriveRepoName(repoURL, scanID),
+					"ecosystem":       ecosystem,
 					"status":          status,
 					"component_count": compCount,
 					"critical_cves":   critCves,
-					"ntia_score":      int(ntiaScore.Int64),
+					"ntia_score":      ntiaScore,
 					"created_at":      createdAt,
 				})
-			} else {
-				fmt.Printf("Error scanning recent scan row: %v\n", err)
 			}
 		}
 		stats["recent_scans"] = recentScans
@@ -493,12 +483,14 @@ func (h *ScanHandler) HandleGetDashboardStats(c *fiber.Ctx) error {
 	return c.JSON(stats)
 }
 
-// HandleListAllScans handles GET /api/scans — returns all scans for the authenticated user
+// HandleListAllScans handles GET /api/scans — returns all scans with rich metadata
 func (h *ScanHandler) HandleListAllScans(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 
 	rows, err := h.db.QueryContext(c.Context(), `
-		SELECT s.id, s.project_id, s.status, s.created_at
+		SELECT s.id, s.project_id, s.status, s.created_at,
+		       COALESCE(s.repo_url, ''), COALESCE(s.ecosystem, ''),
+		       COALESCE(s.compliance_score, 0)
 		FROM scans s
 		JOIN projects p ON s.project_id = p.id
 		WHERE p.user_id = $1
@@ -506,33 +498,142 @@ func (h *ScanHandler) HandleListAllScans(c *fiber.Ctx) error {
 	`, userID)
 
 	if err != nil {
-		// Fallback: return all scans if projects join fails (e.g. no projects table)
-		rows, err = h.db.QueryContext(c.Context(), `
-			SELECT id, project_id, status, created_at FROM scans ORDER BY created_at DESC LIMIT 100
-		`)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to query scans"})
-		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to query scans"})
 	}
 	defer rows.Close()
 
-	var scans []db.Scan
+	var scans []fiber.Map
 	for rows.Next() {
-		var s db.Scan
-		if err := rows.Scan(&s.ID, &s.ProjectID, &s.Status, &s.CreatedAt); err != nil {
+		var id, projectID, status, repoURL, ecosystem string
+		var createdAt time.Time
+		var ntiaScore int
+		if err := rows.Scan(&id, &projectID, &status, &createdAt, &repoURL, &ecosystem, &ntiaScore); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to parse scan row"})
 		}
-		scans = append(scans, s)
+
+		// Parse repo name from URL
+		repoName := deriveRepoName(repoURL, id)
+
+		if ecosystem == "" {
+			ecosystem = "unknown"
+		}
+
+		// Component count
+		var compCount int
+		h.db.QueryRowContext(c.Context(), `SELECT count(*) FROM components WHERE scan_id = $1`, id).Scan(&compCount)
+
+		// Vuln counts
+		var critCves, highCves, medCves, lowCves int
+		h.db.QueryRowContext(c.Context(), `
+			SELECT
+			  COUNT(*) FILTER (WHERE cv.severity='CRITICAL'),
+			  COUNT(*) FILTER (WHERE cv.severity='HIGH'),
+			  COUNT(*) FILTER (WHERE cv.severity='MEDIUM'),
+			  COUNT(*) FILTER (WHERE cv.severity='LOW')
+			FROM component_vulnerabilities cv
+			JOIN components c ON cv.component_id = c.id
+			WHERE c.scan_id = $1
+		`, id).Scan(&critCves, &highCves, &medCves, &lowCves)
+
+		scans = append(scans, fiber.Map{
+			"id":              id,
+			"project_id":      projectID,
+			"status":          status,
+			"created_at":      createdAt,
+			"repo_url":        repoURL,
+			"repo_name":       repoName,
+			"ecosystem":       ecosystem,
+			"ntia_score":      ntiaScore,
+			"component_count": compCount,
+			"critical_cves":   critCves,
+			"high_cves":       highCves,
+			"medium_cves":     medCves,
+			"low_cves":        lowCves,
+		})
 	}
 
 	if scans == nil {
-		scans = []db.Scan{}
+		scans = []fiber.Map{}
 	}
 
 	return c.JSON(fiber.Map{
 		"scans": scans,
 		"total": len(scans),
 	})
+}
+
+// HandleListProjects handles GET /api/projects — groups scans by github_url
+func (h *ScanHandler) HandleListProjects(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+
+	// Get the latest scan per github_url for this user
+	rows, err := h.db.QueryContext(c.Context(), `
+		SELECT DISTINCT ON (s.repo_url)
+			s.id, s.repo_url, COALESCE(s.ecosystem,''), s.status, s.created_at,
+			COALESCE(s.compliance_score,0)
+		FROM scans s
+		JOIN projects p ON s.project_id = p.id
+		WHERE p.user_id = $1 AND s.repo_url IS NOT NULL AND s.repo_url != ''
+		ORDER BY s.repo_url, s.created_at DESC
+	`, userID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to query projects"})
+	}
+	defer rows.Close()
+
+	var projects []fiber.Map
+	for rows.Next() {
+		var id, repoURL, ecosystem, status string
+		var createdAt time.Time
+		var ntiaScore int
+		if err := rows.Scan(&id, &repoURL, &ecosystem, &status, &createdAt, &ntiaScore); err != nil {
+			continue
+		}
+
+		repoName := repoURL
+		parts := strings.Split(strings.TrimSuffix(repoURL, "/"), "/")
+		if len(parts) >= 2 {
+			repoName = parts[len(parts)-2] + "/" + parts[len(parts)-1]
+		}
+		if ecosystem == "" {
+			ecosystem = "unknown"
+		}
+
+		var compCount int
+		h.db.QueryRowContext(c.Context(), `SELECT count(*) FROM components WHERE scan_id = $1`, id).Scan(&compCount)
+
+		var critCves, highCves, medCves, lowCves int
+		h.db.QueryRowContext(c.Context(), `
+			SELECT
+			  COUNT(*) FILTER (WHERE cv.severity='CRITICAL'),
+			  COUNT(*) FILTER (WHERE cv.severity='HIGH'),
+			  COUNT(*) FILTER (WHERE cv.severity='MEDIUM'),
+			  COUNT(*) FILTER (WHERE cv.severity='LOW')
+			FROM component_vulnerabilities cv
+			JOIN components c ON cv.component_id = c.id
+			WHERE c.scan_id = $1
+		`, id).Scan(&critCves, &highCves, &medCves, &lowCves)
+
+		projects = append(projects, fiber.Map{
+			"latest_scan_id":  id,
+			"repo_url":        repoURL,
+			"repo_name":       repoName,
+			"ecosystem":       ecosystem,
+			"status":          status,
+			"created_at":      createdAt,
+			"ntia_score":      ntiaScore,
+			"component_count": compCount,
+			"critical_cves":   critCves,
+			"high_cves":       highCves,
+			"medium_cves":     medCves,
+			"low_cves":        lowCves,
+		})
+	}
+
+	if projects == nil {
+		projects = []fiber.Map{}
+	}
+	return c.JSON(fiber.Map{"projects": projects, "total": len(projects)})
 }
 
 // Response structure
@@ -615,13 +716,17 @@ func (h *ScanHandler) HandleGetAllVulnerabilities(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 
 	query := `
-		SELECT p.name, s.id, c.name, c.version, cv.cve_id, cv.severity, cv.summary, cv.fixed_version
+		SELECT COALESCE(s.repo_url,''), s.id, c.name, c.version, cv.cve_id, cv.severity, cv.summary, cv.fixed_version
 		FROM component_vulnerabilities cv
 		JOIN components c ON c.id = cv.component_id
 		JOIN scans s ON c.scan_id = s.id
 		JOIN projects p ON s.project_id = p.id
 		WHERE p.user_id = $1
-		ORDER BY s.created_at DESC
+		ORDER BY
+			CASE cv.severity
+				WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 WHEN 'LOW' THEN 4 ELSE 5
+			END ASC,
+			s.created_at DESC
 		LIMIT 500
 	`
 	rows, err := h.db.QueryContext(c.Context(), query, userID)
@@ -633,8 +738,17 @@ func (h *ScanHandler) HandleGetAllVulnerabilities(c *fiber.Ctx) error {
 	var vulns []VulnerabilityResponse
 	for rows.Next() {
 		var v VulnerabilityResponse
-		if err := rows.Scan(&v.ProjectName, &v.ScanID, &v.ComponentName, &v.ComponentVersion, &v.CVEID, &v.Severity, &v.Summary, &v.FixedVersion); err != nil {
+		var repoURL string
+		if err := rows.Scan(&repoURL, &v.ScanID, &v.ComponentName, &v.ComponentVersion, &v.CVEID, &v.Severity, &v.Summary, &v.FixedVersion); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to parse vulnerability row"})
+		}
+		// Parse owner/repo from URL
+		v.ProjectName = repoURL
+		if repoURL != "" {
+			parts := strings.Split(strings.TrimSuffix(repoURL, "/"), "/")
+			if len(parts) >= 2 {
+				v.ProjectName = parts[len(parts)-2] + "/" + parts[len(parts)-1]
+			}
 		}
 		vulns = append(vulns, v)
 	}
