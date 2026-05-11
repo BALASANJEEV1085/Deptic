@@ -180,37 +180,49 @@ func (h *ScanHandler) HandleCreateScan(c *fiber.Ctx) error {
 		var err error
 		ecosystem := ""
 
-		// Step 1: package.json
-		pkgBytes, errPkg := ghClient.FetchFile(ctx, owner, repo, "package.json")
-		if errPkg == nil {
-			ecosystem = "npm"
-			packages, err = scanner.ScanNPM(ctx, h.rdb, pkgBytes)
-		} else {
-			// Step 2: requirements.txt
-			reqBytes, errReq := ghClient.FetchFile(ctx, owner, repo, "requirements.txt")
-			if errReq == nil {
-				ecosystem = "pip"
-				packages, err = scanner.ScanPip(ctx, h.rdb, reqBytes, "requirements.txt")
-			} else {
-				// Step 3: pyproject.toml
-				tomlBytes, errToml := ghClient.FetchFile(ctx, owner, repo, "pyproject.toml")
-				if errToml == nil {
-					ecosystem = "pip"
-					packages, err = scanner.ScanPip(ctx, h.rdb, tomlBytes, "pyproject.toml")
-				} else {
-					// Step 4: pom.xml (Maven)
-					pomBytes, errPom := ghClient.FetchFile(ctx, owner, repo, "pom.xml")
-					if errPom == nil {
-						ecosystem = "maven"
-						packages, err = scanner.ScanMaven(ctx, h.rdb, pomBytes)
-					} else {
-						// Step 5: no supported manifest found
-						_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed")
-						fmt.Printf("no supported manifest found in repo (tried package.json, requirements.txt, pyproject.toml, pom.xml)\n")
-						return
-					}
-				}
+		// Manifest detection — search entire repo tree, not just root
+		type manifest struct {
+			filename  string
+			ecosystem string
+		}
+		manifests := []manifest{
+			{"package.json", "npm"},
+			{"requirements.txt", "pip"},
+			{"pyproject.toml", "pip"},
+			{"pom.xml", "maven"},
+		}
+
+		var manifestPath string
+		var manifestBytes []byte
+		for _, m := range manifests {
+			foundPath, foundBytes, findErr := ghClient.FindManifestFile(ctx, owner, repo, m.filename)
+			if findErr != nil {
+				fmt.Printf("FindManifestFile(%s) error: %v — skipping\n", m.filename, findErr)
+				continue
 			}
+			if foundBytes != nil {
+				manifestPath = foundPath
+				manifestBytes = foundBytes
+				ecosystem = m.ecosystem
+				fmt.Printf("Found manifest: %s (ecosystem: %s)\n", manifestPath, ecosystem)
+				break
+			}
+		}
+
+		if manifestBytes == nil {
+			_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed")
+			fmt.Printf("no supported manifest found in repo (tried package.json, requirements.txt, pyproject.toml, pom.xml)\n")
+			return
+		}
+
+		// Parse the manifest
+		switch ecosystem {
+		case "npm":
+			packages, err = scanner.ScanNPM(ctx, h.rdb, manifestBytes)
+		case "pip":
+			packages, err = scanner.ScanPip(ctx, h.rdb, manifestBytes, manifestPath)
+		case "maven":
+			packages, err = scanner.ScanMaven(ctx, h.rdb, manifestBytes)
 		}
 
 		if err != nil {
@@ -388,10 +400,9 @@ func (h *ScanHandler) HandleGetDashboardStats(c *fiber.Ctx) error {
 	var compliant, nonCompliant int
 	h.db.QueryRowContext(c.Context(), `
 		SELECT 
-			COALESCE(SUM(CASE WHEN is_ntia_compliant THEN 1 ELSE 0 END), 0),
-			COALESCE(SUM(CASE WHEN NOT is_ntia_compliant THEN 1 ELSE 0 END), 0)
-		FROM scan_compliance sc
-		JOIN scans s ON sc.scan_id = s.id
+			COALESCE(SUM(CASE WHEN ntia_compliant THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN ntia_compliant IS FALSE THEN 1 ELSE 0 END), 0)
+		FROM scans s
 		JOIN projects p ON s.project_id = p.id
 		WHERE p.user_id = $1
 	`, userID).Scan(&compliant, &nonCompliant)
@@ -439,23 +450,30 @@ func (h *ScanHandler) HandleGetDashboardStats(c *fiber.Ctx) error {
 				`, scanID).Scan(&critCves)
 
 				var ntiaScore sql.NullInt64
-				h.db.QueryRowContext(c.Context(), "SELECT ntia_score FROM scan_compliance WHERE scan_id = $1", scanID).Scan(&ntiaScore)
+				var ecosystemDB sql.NullString
+				var repoURL sql.NullString
+				h.db.QueryRowContext(c.Context(),
+					"SELECT compliance_score, ecosystem, repo_url FROM scans WHERE id = $1",
+					scanID,
+				).Scan(&ntiaScore, &ecosystemDB, &repoURL)
 
-				var ecosystem sql.NullString
-				h.db.QueryRowContext(c.Context(), "SELECT ecosystem FROM components WHERE scan_id = $1 LIMIT 1", scanID).Scan(&ecosystem)
-				
-				ecosystemStr := ecosystem.String
+				ecosystemStr := ecosystemDB.String
 				if ecosystemStr == "" {
 					ecosystemStr = "unknown"
 				}
 
-				if projectName == "" {
-					projectName = "Unknown Project"
+				// Derive a friendly repo name from repo_url or fall back to project name
+				displayName := projectName
+				if repoURL.String != "" {
+					parts := strings.Split(strings.TrimSuffix(repoURL.String, "/"), "/")
+					if len(parts) >= 2 {
+						displayName = parts[len(parts)-2] + "/" + parts[len(parts)-1]
+					}
 				}
 
 				recentScans = append(recentScans, fiber.Map{
 					"id":              scanID,
-					"repo_name":       projectName,
+					"repo_name":       displayName,
 					"ecosystem":       ecosystemStr,
 					"status":          status,
 					"component_count": compCount,

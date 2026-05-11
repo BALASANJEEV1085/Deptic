@@ -126,6 +126,77 @@ func (c *Client) FetchFile(ctx context.Context, owner, repo, filepath string) ([
 	return nil, fmt.Errorf("file not found or api error (last raw err: %v)", lastErr)
 }
 
+// treeEntry is a single node in the GitHub Git Tree response.
+type treeEntry struct {
+	Path string `json:"path"`
+	Type string `json:"type"` // "blob" or "tree"
+}
+
+// treeResponse is the top-level response from the Git Trees API.
+type treeResponse struct {
+	Tree     []treeEntry `json:"tree"`
+	Truncated bool        `json:"truncated"`
+}
+
+// FindManifestFile searches the entire repository recursively for a file whose
+// base name matches filename, returning the shallowest match (fewest path
+// segments). Returns ("", nil, nil) when the file is not present.
+func (c *Client) FindManifestFile(ctx context.Context, owner, repo, filename string) (path string, data []byte, err error) {
+	treeURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/trees/HEAD?recursive=1", owner, repo)
+	req, err := http.NewRequest(http.MethodGet, treeURL, nil)
+	if err != nil {
+		return "", nil, fmt.Errorf("building tree request: %w", err)
+	}
+
+	resp, err := c.doRequest(ctx, req)
+	if err != nil {
+		return "", nil, fmt.Errorf("executing tree request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", nil, fmt.Errorf("git tree api returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var tree treeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&tree); err != nil {
+		return "", nil, fmt.Errorf("decoding tree response: %w", err)
+	}
+
+	// Find all matching blobs, pick the shallowest one (fewest "/" separators).
+	bestPath := ""
+	bestDepth := -1
+	for _, entry := range tree.Tree {
+		if entry.Type != "blob" {
+			continue
+		}
+		// Match exact filename or path ending with /filename
+		base := entry.Path
+		if idx := strings.LastIndex(entry.Path, "/"); idx >= 0 {
+			base = entry.Path[idx+1:]
+		}
+		if base != filename {
+			continue
+		}
+		depth := strings.Count(entry.Path, "/")
+		if bestDepth == -1 || depth < bestDepth {
+			bestPath = entry.Path
+			bestDepth = depth
+		}
+	}
+
+	if bestPath == "" {
+		return "", nil, nil
+	}
+
+	fileBytes, err := c.FetchFile(ctx, owner, repo, bestPath)
+	if err != nil {
+		return "", nil, fmt.Errorf("fetching %s: %w", bestPath, err)
+	}
+	return bestPath, fileBytes, nil
+}
+
 // ListFiles lists all files and directories in a specific path of a GitHub repository
 func (c *Client) ListFiles(ctx context.Context, owner, repo, path string) ([]FileEntry, error) {
 	// If path is empty, we don't append a trailing slash
