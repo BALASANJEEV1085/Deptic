@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/sbom-io/api/internal/compliance"
@@ -66,7 +67,9 @@ func (h *ScanHandler) GetCompliance(c *fiber.Ctx) error {
 		detailBytes, _ = json.Marshal(result)
 
 		// Self-heal: save the calculated compliance back to the DB so it shows up in lists/dashboard
-		_ = db.UpdateScanCompliance(c.Context(), h.db, scanID, result.Score, result.Compliant, euCompliant, detailBytes, scan.RepoURL, scan.Ecosystem)
+		if err := db.UpdateScanCompliance(c.Context(), h.db, scanID, result.Score, result.Compliant, euCompliant, detailBytes, scan.RepoURL, scan.Ecosystem); err != nil {
+			fmt.Printf("Failed to self-heal compliance for %s: %v\n", scanID, err)
+		}
 		
 		return c.JSON(fiber.Map{
 			"ntia":             result,

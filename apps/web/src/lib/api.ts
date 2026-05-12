@@ -12,6 +12,7 @@ export interface Component {
   ecosystem: string;
   depth: number;
   parent_name: string;
+  source_path: string;
   created_at: string;
 }
 
@@ -73,6 +74,9 @@ export interface GetScanResponse {
   scan: Scan;
   components: Component[];
   total: number;
+  ecosystems: string[];
+  ecosystem_breakdown: Record<string, { count: number; direct: number; transitive: number }>;
+  manifest_files: { path: string; ecosystem: string }[];
 }
 
 export interface StartScanResponse {

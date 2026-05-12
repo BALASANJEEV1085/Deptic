@@ -23,6 +23,7 @@ type Package struct {
 	Ecosystem   string // always "npm"
 	Depth       int    // 0=direct, 1=transitive level 1, etc
 	ParentName  string // which package required this
+	SourcePath  string // which manifest file this came from e.g. "frontend/package.json"
 }
 
 type packageJSON struct {

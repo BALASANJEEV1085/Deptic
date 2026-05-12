@@ -14,13 +14,23 @@ import (
 
 // Scan represents a single SBOM scan operation
 type Scan struct {
-	ID        string    `json:"id"`
-	ProjectID string    `json:"project_id"`
-	Status    string    `json:"status"`
-	RepoURL   string    `json:"repo_url"`
-	RepoName  string    `json:"repo_name"`
-	Ecosystem string    `json:"ecosystem"`
-	CreatedAt time.Time `json:"created_at"`
+	ID              string    `json:"id"`
+	ProjectID       string    `json:"project_id"`
+	Status          string    `json:"status"`
+	RepoURL         string    `json:"repo_url"`
+	RepoName        string    `json:"repo_name"`
+	Ecosystem       string    `json:"ecosystem"`
+	ComplianceScore int       `json:"ntia_score"`
+	NTIACompliant   bool      `json:"ntia_compliant"`
+	EUCRACompliant  bool      `json:"eu_cra_compliant"`
+	CreatedAt       time.Time `json:"created_at"`
+
+	// Derived/Subquery fields
+	ComponentCount int `json:"component_count"`
+	CriticalCVEs   int `json:"critical_cves"`
+	HighCVEs       int `json:"high_cves"`
+	MediumCVEs     int `json:"medium_cves"`
+	LowCVEs        int `json:"low_cves"`
 }
 
 // Component represents a resolved dependency package inside a scan
@@ -34,6 +44,7 @@ type Component struct {
 	Ecosystem   string    `json:"ecosystem"`
 	Depth       int       `json:"depth"`
 	ParentName  string    `json:"parent_name"`
+	SourcePath  string    `json:"source_path"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 
@@ -110,16 +121,16 @@ func insertComponentsBatch(ctx context.Context, db *sql.DB, scanID string, batch
 	valueArgs := make([]interface{}, 0, len(batch)*8)
 
 	for i, pkg := range batch {
-		baseIdx := i * 8
-		// 8 fields per row: scan_id, name, version, version_spec, license, ecosystem, depth, parent_name
-		valueStrings = append(valueStrings, fmt.Sprintf("(gen_random_uuid(), $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, now())",
-			baseIdx+1, baseIdx+2, baseIdx+3, baseIdx+4, baseIdx+5, baseIdx+6, baseIdx+7, baseIdx+8))
+		baseIdx := i * 9
+		// 9 fields per row: scan_id, name, version, version_spec, license, ecosystem, depth, parent_name, source_path
+		valueStrings = append(valueStrings, fmt.Sprintf("(gen_random_uuid(), $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, now())",
+			baseIdx+1, baseIdx+2, baseIdx+3, baseIdx+4, baseIdx+5, baseIdx+6, baseIdx+7, baseIdx+8, baseIdx+9))
 		
-		valueArgs = append(valueArgs, scanID, pkg.Name, pkg.Version, pkg.VersionSpec, pkg.License, pkg.Ecosystem, pkg.Depth, pkg.ParentName)
+		valueArgs = append(valueArgs, scanID, pkg.Name, pkg.Version, pkg.VersionSpec, pkg.License, pkg.Ecosystem, pkg.Depth, pkg.ParentName, pkg.SourcePath)
 	}
 
 	query := fmt.Sprintf(`
-		INSERT INTO components (id, scan_id, name, version, version_spec, license, ecosystem, depth, parent_name, created_at)
+		INSERT INTO components (id, scan_id, name, version, version_spec, license, ecosystem, depth, parent_name, source_path, created_at)
 		VALUES %s`, strings.Join(valueStrings, ","))
 
 	_, err := db.ExecContext(ctx, query, valueArgs...)
@@ -131,8 +142,12 @@ func insertComponentsBatch(ctx context.Context, db *sql.DB, scanID string, batch
 
 // GetScanWithComponents fetches a scan and all its associated components
 func GetScanWithComponents(ctx context.Context, db *sql.DB, scanID string) (scan Scan, components []Component, err error) {
-	err = db.QueryRowContext(ctx, `SELECT id, project_id, status, COALESCE(repo_url, ''), COALESCE(ecosystem, ''), created_at FROM scans WHERE id = $1`, scanID).
-		Scan(&scan.ID, &scan.ProjectID, &scan.Status, &scan.RepoURL, &scan.Ecosystem, &scan.CreatedAt)
+	err = db.QueryRowContext(ctx, `
+		SELECT id, project_id, status, COALESCE(repo_url, ''), COALESCE(ecosystem, ''), 
+		       COALESCE(compliance_score, 0), ntia_compliant, eu_cra_compliant, created_at 
+		FROM scans WHERE id = $1`, scanID).
+		Scan(&scan.ID, &scan.ProjectID, &scan.Status, &scan.RepoURL, &scan.Ecosystem, 
+			&scan.ComplianceScore, &scan.NTIACompliant, &scan.EUCRACompliant, &scan.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return scan, nil, fmt.Errorf("scan not found")
@@ -141,7 +156,7 @@ func GetScanWithComponents(ctx context.Context, db *sql.DB, scanID string) (scan
 	}
 
 	rows, err := db.QueryContext(ctx, `
-		SELECT id, scan_id, name, version, version_spec, license, ecosystem, depth, parent_name, created_at
+		SELECT id, scan_id, name, version, version_spec, license, ecosystem, depth, parent_name, COALESCE(source_path, ''), created_at
 		FROM components
 		WHERE scan_id = $1
 		ORDER BY depth ASC, name ASC`, scanID)
@@ -152,7 +167,7 @@ func GetScanWithComponents(ctx context.Context, db *sql.DB, scanID string) (scan
 
 	for rows.Next() {
 		var c Component
-		if err := rows.Scan(&c.ID, &c.ScanID, &c.Name, &c.Version, &c.VersionSpec, &c.License, &c.Ecosystem, &c.Depth, &c.ParentName, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.ScanID, &c.Name, &c.Version, &c.VersionSpec, &c.License, &c.Ecosystem, &c.Depth, &c.ParentName, &c.SourcePath, &c.CreatedAt); err != nil {
 			return scan, nil, fmt.Errorf("scanning component row: %w", err)
 		}
 		components = append(components, c)
@@ -166,15 +181,22 @@ func GetScanWithComponents(ctx context.Context, db *sql.DB, scanID string) (scan
 }
 
 func UpdateScanCompliance(ctx context.Context, db *sql.DB, scanID string, score int, ntiaCompliant, euCraCompliant bool, detailJson []byte, repoURL, ecosystem string) error {
-	_, err := db.ExecContext(ctx, `
+	res, err := db.ExecContext(ctx, `
 		UPDATE scans 
 		SET compliance_score = $2, 
 		    ntia_compliant = $3, 
 		    eu_cra_compliant = $4, 
-		    compliance_detail = $5,
+		    compliance_detail = $5::jsonb,
 		    repo_url = $6,
 		    ecosystem = $7
 		WHERE id = $1`, 
-		scanID, score, ntiaCompliant, euCraCompliant, detailJson, repoURL, ecosystem)
-	return err
+		scanID, score, ntiaCompliant, euCraCompliant, string(detailJson), repoURL, ecosystem)
+	if err != nil {
+		return fmt.Errorf("UpdateScanCompliance Exec failed: %w", err)
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("UpdateScanCompliance: no rows updated for id %s", scanID)
+	}
+	return nil
 }

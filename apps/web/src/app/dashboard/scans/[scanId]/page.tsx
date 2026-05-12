@@ -55,6 +55,7 @@ export default function ScanResultsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [generating, setGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState<'vulnerabilities' | 'compliance' | 'bom'>('vulnerabilities');
+  const [activeEcosystem, setActiveEcosystem] = useState<string>('All');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [expandedElements, setExpandedElements] = useState<Record<string, boolean>>({});
 
@@ -164,16 +165,22 @@ export default function ScanResultsPage() {
 
   const filteredComponents = useMemo(() => {
     if (!data?.components) return [];
-    if (!searchQuery) return data.components;
+    let filtered = data.components;
+    
+    if (activeEcosystem !== 'All') {
+      filtered = filtered.filter(c => c.ecosystem === activeEcosystem);
+    }
+    
+    if (!searchQuery) return filtered;
     const lowerQuery = searchQuery.toLowerCase();
-    return data.components.filter(
+    return filtered.filter(
       (c) =>
         c.name.toLowerCase().includes(lowerQuery) ||
         c.license.toLowerCase().includes(lowerQuery) ||
         c.version.toLowerCase().includes(lowerQuery) ||
         c.ecosystem.toLowerCase().includes(lowerQuery)
     );
-  }, [data?.components, searchQuery]);
+  }, [data?.components, searchQuery, activeEcosystem]);
 
   if (loading) {
     return (
@@ -279,6 +286,30 @@ export default function ScanResultsPage() {
           </div>
         ))}
       </div>
+
+      {/* ECOSYSTEM TABS */}
+      {data.ecosystems && data.ecosystems.length > 1 && (
+        <div className="flex items-center gap-3 bg-white/[0.01] border border-white/[0.04] p-1 rounded-xl w-fit">
+          {['All', ...data.ecosystems].map((eco) => (
+            <button
+              key={eco}
+              onClick={() => setActiveEcosystem(eco)}
+              className={cn(
+                "px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-2",
+                activeEcosystem === eco
+                  ? "bg-white/5 text-white shadow-sm"
+                  : "text-zinc-500 hover:text-zinc-300"
+              )}
+            >
+              {eco !== 'All' && <EcoDot eco={eco} />}
+              {eco}
+              <span className="opacity-40 ml-1">
+                ({eco === 'All' ? data.total : data.ecosystem_breakdown[eco]?.count || 0})
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* TAB SWITCHER */}
       <div className="flex items-center gap-2 p-1 border-b border-white/[0.04] w-full overflow-x-auto no-scrollbar">
@@ -492,6 +523,39 @@ export default function ScanResultsPage() {
             </div>
           </div>
 
+          {/* MANIFEST FILES LIST */}
+          {data.manifest_files && data.manifest_files.length > 0 && (
+            <div className="bg-white/[0.01] border border-white/[0.04] rounded-xl overflow-hidden">
+              <button 
+                onClick={() => toggleElement('manifests')}
+                className="w-full flex items-center justify-between p-4 hover:bg-white/[0.02] transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <FileText className="h-4 w-4 text-zinc-500" />
+                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Manifest Files Found ({data.manifest_files.length})</span>
+                </div>
+                <ChevronDown className={cn("h-4 w-4 text-zinc-600 transition-transform", expandedElements['manifests'] && "rotate-180")} />
+              </button>
+              {expandedElements['manifests'] && (
+                <div className="p-4 pt-0 space-y-2 border-t border-white/[0.04]">
+                  {data.manifest_files.map((file, idx) => (
+                    <div key={idx} className="flex items-center justify-between py-2 px-3 bg-white/[0.02] rounded-lg border border-white/[0.04]">
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-3.5 w-3.5 text-zinc-600" />
+                        <span className="text-xs text-zinc-300 font-mono">{file.path}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-tighter bg-zinc-800 px-1.5 py-0.5 rounded">
+                          {file.ecosystem}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="rounded-xl border border-white/[0.04] bg-[#0c0d0e] overflow-x-auto shadow-2xl">
             <Table>
               <TableHeader className="bg-white/[0.01]">
@@ -500,6 +564,7 @@ export default function ScanResultsPage() {
                   <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-6 font-bold py-4">Release</TableHead>
                   <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-6 font-bold py-4">License</TableHead>
                   <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-6 font-bold py-4">Origin</TableHead>
+                  <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-6 font-bold py-4">Manifest</TableHead>
                   <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-6 font-bold py-4 text-right">Depth</TableHead>
                 </TableRow>
               </TableHeader>
@@ -530,6 +595,11 @@ export default function ScanResultsPage() {
                       <TableCell className="px-6 py-5">
                         <span className="inline-flex items-center px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 text-[9px] font-bold uppercase tracking-wider">
                           {c.ecosystem.toLowerCase()}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-6 py-5">
+                        <span className="text-[10px] text-zinc-500 font-mono truncate max-w-[120px] block" title={c.source_path}>
+                          {c.source_path}
                         </span>
                       </TableCell>
                       <TableCell className="px-6 py-5 text-right">

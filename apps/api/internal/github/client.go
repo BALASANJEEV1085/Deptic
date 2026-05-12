@@ -42,6 +42,12 @@ type FileEntry struct {
 	Type string `json:"type"` // "file" or "dir"
 }
 
+type ManifestFile struct {
+	Path string // e.g. "backend/pom.xml"
+	Type string // "npm" | "pip" | "maven"
+	Data []byte // file content
+}
+
 // contentResponse represents the response from the GitHub contents API for a single file
 type contentResponse struct {
 	Type     string `json:"type"`
@@ -195,6 +201,93 @@ func (c *Client) FindManifestFile(ctx context.Context, owner, repo, filename str
 		return "", nil, fmt.Errorf("fetching %s: %w", bestPath, err)
 	}
 	return bestPath, fileBytes, nil
+}
+
+// FindAllManifests recursively traverses the repo and returns all supported manifests.
+func (c *Client) FindAllManifests(ctx context.Context, owner, repo string) ([]ManifestFile, error) {
+	treeURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/trees/HEAD?recursive=1", owner, repo)
+	req, err := http.NewRequest(http.MethodGet, treeURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("building tree request: %w", err)
+	}
+
+	resp, err := c.doRequest(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("executing tree request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("git tree api returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var tree treeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&tree); err != nil {
+		return nil, fmt.Errorf("decoding tree response: %w", err)
+	}
+
+	var manifests []ManifestFile
+	skipPatterns := []string{"node_modules", ".git", "dist", "build", "__pycache__", ".venv", "vendor", "target"}
+
+	for _, entry := range tree.Tree {
+		if entry.Type != "blob" {
+			continue
+		}
+
+		// Skip noisy paths
+		shouldSkip := false
+		for _, p := range skipPatterns {
+			if strings.Contains(entry.Path, p) {
+				shouldSkip = true
+				break
+			}
+		}
+		if shouldSkip {
+			continue
+		}
+
+		filename := entry.Path
+		if idx := strings.LastIndex(entry.Path, "/"); idx >= 0 {
+			filename = entry.Path[idx+1:]
+		}
+
+		var ecoType string
+		depth := strings.Count(entry.Path, "/")
+
+		if filename == "package.json" {
+			if depth <= 5 {
+				ecoType = "npm"
+			}
+		} else if filename == "pom.xml" {
+			ecoType = "maven"
+		} else if filename == "requirements.txt" || filename == "pyproject.toml" || filename == "setup.py" || filename == "Pipfile" {
+			ecoType = "pip"
+		}
+
+		if ecoType != "" {
+			manifests = append(manifests, ManifestFile{
+				Path: entry.Path,
+				Type: ecoType,
+			})
+		}
+
+		if len(manifests) >= 30 {
+			break
+		}
+	}
+
+	// Fetch content for each found manifest
+	for i := range manifests {
+		data, err := c.FetchFile(ctx, owner, repo, manifests[i].Path)
+		if err != nil {
+			fmt.Printf("Warning: failed to fetch %s: %v\n", manifests[i].Path, err)
+			continue
+		}
+		manifests[i].Data = data
+	}
+
+	return manifests, nil
 }
 
 // ListFiles lists all files and directories in a specific path of a GitHub repository

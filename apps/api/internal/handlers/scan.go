@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/MicahParks/keyfunc/v2"
@@ -191,64 +192,111 @@ func (h *ScanHandler) HandleCreateScan(c *fiber.Ctx) error {
 
 		ghClient := github.NewClient(githubToken)
 
-		var packages []scanner.Package
-		var err error
-		ecosystem := ""
-
-		// Manifest detection — search entire repo tree, not just root
-		type manifest struct {
-			filename  string
-			ecosystem string
-		}
-		manifests := []manifest{
-			{"package.json", "npm"},
-			{"requirements.txt", "pip"},
-			{"pyproject.toml", "pip"},
-			{"pom.xml", "maven"},
-		}
-
-		var manifestPath string
-		var manifestBytes []byte
-		for _, m := range manifests {
-			foundPath, foundBytes, findErr := ghClient.FindManifestFile(ctx, owner, repo, m.filename)
-			if findErr != nil {
-				fmt.Printf("FindManifestFile(%s) error: %v — skipping\n", m.filename, findErr)
-				continue
-			}
-			if foundBytes != nil {
-				manifestPath = foundPath
-				manifestBytes = foundBytes
-				ecosystem = m.ecosystem
-				fmt.Printf("Found manifest: %s (ecosystem: %s)\n", manifestPath, ecosystem)
-				break
-			}
-		}
-
-		if manifestBytes == nil {
-			_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed", "")
-			fmt.Printf("no supported manifest found in repo (tried package.json, requirements.txt, pyproject.toml, pom.xml)\n")
-			return
-		}
-
-		// Parse the manifest
-		switch ecosystem {
-		case "npm":
-			packages, err = scanner.ScanNPM(ctx, h.rdb, manifestBytes)
-		case "pip":
-			packages, err = scanner.ScanPip(ctx, h.rdb, manifestBytes, manifestPath)
-		case "maven":
-			packages, err = scanner.ScanMaven(ctx, h.rdb, manifestBytes)
-		}
-
+		allManifests, err := ghClient.FindAllManifests(ctx, owner, repo)
 		if err != nil {
-			_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed", ecosystem)
-			fmt.Printf("Scan failed parsing %s: %v\n", ecosystem, err)
+			_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed", "")
+			fmt.Printf("FindAllManifests error: %v\n", err)
 			return
 		}
+
+		if len(allManifests) == 0 {
+			_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed", "")
+			fmt.Printf("No supported manifest files found\n")
+			return
+		}
+
+		manifestPaths := make([]string, len(allManifests))
+		for i, m := range allManifests {
+			manifestPaths[i] = m.Path
+		}
+		fmt.Printf("Found %d manifests: %v\n", len(allManifests), manifestPaths)
+
+		var allPackages []scanner.Package
+		var mu sync.Mutex
+		var wg sync.WaitGroup
+
+		// Scan each manifest
+		for _, m := range allManifests {
+			m := m
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				var pkgs []scanner.Package
+				var scanErr error
+
+				switch m.Type {
+				case "npm":
+					pkgs, scanErr = scanner.ScanNPM(ctx, h.rdb, m.Data)
+				case "pip":
+					// Pip scanner might need filename to decide between requirements.txt and pyproject.toml
+					filename := m.Path
+					if idx := strings.LastIndex(m.Path, "/"); idx >= 0 {
+						filename = m.Path[idx+1:]
+					}
+					pkgs, scanErr = scanner.ScanPip(ctx, h.rdb, m.Data, filename)
+				case "maven":
+					pkgs, scanErr = scanner.ScanMaven(ctx, h.rdb, m.Data)
+				}
+
+				if scanErr != nil {
+					fmt.Printf("Warning: failed to scan %s (%s): %v\n", m.Path, m.Type, scanErr)
+					return
+				}
+
+				// Tag with SourcePath
+				for i := range pkgs {
+					pkgs[i].SourcePath = m.Path
+				}
+
+				mu.Lock()
+				allPackages = append(allPackages, pkgs...)
+				mu.Unlock()
+			}()
+		}
+
+		wg.Wait()
+
+		if len(allPackages) == 0 {
+			_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed", "")
+			fmt.Printf("No components found in %d manifests\n", len(allManifests))
+			return
+		}
+
+		// Deduplicate packages by Name+Version+Ecosystem
+		type pkgKey struct {
+			Name      string
+			Version   string
+			Ecosystem string
+		}
+		uniquePkgs := make(map[pkgKey]scanner.Package)
+		for _, p := range allPackages {
+			key := pkgKey{Name: p.Name, Version: p.Version, Ecosystem: p.Ecosystem}
+			if existing, ok := uniquePkgs[key]; ok {
+				// Keep the shallower one
+				if p.Depth < existing.Depth {
+					uniquePkgs[key] = p
+				}
+			} else {
+				uniquePkgs[key] = p
+			}
+		}
+
+		allPackages = make([]scanner.Package, 0, len(uniquePkgs))
+		ecosystemsMap := make(map[string]bool)
+		for _, p := range uniquePkgs {
+			allPackages = append(allPackages, p)
+			ecosystemsMap[p.Ecosystem] = true
+		}
+
+		var ecosystemList []string
+		for e := range ecosystemsMap {
+			ecosystemList = append(ecosystemList, e)
+		}
+		ecosystemStr := strings.Join(ecosystemList, "+")
 
 		// 3. Save resolved components
-		if err := db.SaveComponents(ctx, h.db, scanID, packages); err != nil {
-			_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed", ecosystem)
+		if err := db.SaveComponents(ctx, h.db, scanID, allPackages); err != nil {
+			_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed", ecosystemStr)
 			fmt.Printf("Scan failed saving components: %v\n", err)
 			return
 		}
@@ -268,17 +316,17 @@ func (h *ScanHandler) HandleCreateScan(c *fiber.Ctx) error {
 			GeneratedAt: time.Now(),
 			RepoName:    repo,
 		}
-		ntiaResult := compliance.CheckNTIA(packages, sbomMeta)
+		ntiaResult := compliance.CheckNTIA(allPackages, sbomMeta)
 		euCompliant := compliance.CheckEUCRA(ntiaResult)
 
 		detailBytes, _ := json.Marshal(ntiaResult)
-		if err := db.UpdateScanCompliance(ctx, h.db, scanID, ntiaResult.Score, ntiaResult.Compliant, euCompliant, detailBytes, req.GithubURL, ecosystem); err != nil {
-			fmt.Printf("Failed to save scan compliance: %v\n", err)
+		if err := db.UpdateScanCompliance(ctx, h.db, scanID, ntiaResult.Score, ntiaResult.Compliant, euCompliant, detailBytes, req.GithubURL, ecosystemStr); err != nil {
+			fmt.Printf("Warning: failed to save scan compliance: %v\n", err)
 		}
 
 		// 6. Finalize scan status
-		_ = db.UpdateScanStatus(ctx, h.db, scanID, "done", ecosystem)
-		fmt.Printf("Scan done: %d components, ecosystem=%s\n", len(packages), ecosystem)
+		_ = db.UpdateScanStatus(ctx, h.db, scanID, "done", ecosystemStr)
+		fmt.Printf("Scan done: %d components, ecosystems=%s\n", len(allPackages), ecosystemStr)
 	}()
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
@@ -306,10 +354,58 @@ func (h *ScanHandler) HandleGetScan(c *fiber.Ctx) error {
 
 	scan.RepoName = deriveRepoName(scan.RepoURL, scan.ID)
 
+	// Fetch ecosystem breakdown
+	rows, err := h.db.QueryContext(c.Context(), `
+		SELECT ecosystem, COUNT(*) as count,
+		  SUM(CASE WHEN depth=0 THEN 1 ELSE 0 END) as direct,
+		  SUM(CASE WHEN depth>0 THEN 1 ELSE 0 END) as transitive
+		FROM components WHERE scan_id=$1
+		GROUP BY ecosystem
+	`, scanID)
+	
+	breakdown := make(map[string]interface{})
+	var ecosystemList []string
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var eco string
+			var count, direct, transitive int
+			if err := rows.Scan(&eco, &count, &direct, &transitive); err == nil {
+				breakdown[eco] = fiber.Map{
+					"count":      count,
+					"direct":     direct,
+					"transitive": transitive,
+				}
+				ecosystemList = append(ecosystemList, eco)
+			}
+		}
+	}
+
+	// Fetch manifest files
+	manifestRows, err := h.db.QueryContext(c.Context(), `
+		SELECT DISTINCT source_path, ecosystem FROM components WHERE scan_id=$1 AND source_path != ''
+	`, scanID)
+	var manifestFiles []fiber.Map
+	if err == nil {
+		defer manifestRows.Close()
+		for manifestRows.Next() {
+			var path, eco string
+			if err := manifestRows.Scan(&path, &eco); err == nil {
+				manifestFiles = append(manifestFiles, fiber.Map{
+					"path":      path,
+					"ecosystem": eco,
+				})
+			}
+		}
+	}
+
 	return c.JSON(fiber.Map{
-		"scan":       scan,
-		"components": components,
-		"total":      len(components),
+		"scan":                scan,
+		"components":          components,
+		"total":               len(components),
+		"ecosystems":          ecosystemList,
+		"ecosystem_breakdown": breakdown,
+		"manifest_files":      manifestFiles,
 	})
 }
 
@@ -318,10 +414,14 @@ func (h *ScanHandler) HandleListScans(c *fiber.Ctx) error {
 	projectID := c.Params("projectID")
 	
 	rows, err := h.db.QueryContext(c.Context(), `
-		SELECT id, project_id, status, COALESCE(repo_url, ''), COALESCE(ecosystem, ''), created_at 
-		FROM scans 
-		WHERE project_id = $1 
-		ORDER BY created_at DESC
+		SELECT s.id, s.project_id, s.status, s.created_at,
+		       COALESCE(s.repo_url, ''), COALESCE(s.ecosystem, ''),
+		       COALESCE(s.compliance_score, 0),
+		       (SELECT COUNT(*) FROM components WHERE scan_id = s.id) as component_count,
+		       (SELECT COUNT(*) FROM component_vulnerabilities cv JOIN components c ON cv.component_id = c.id WHERE c.scan_id = s.id AND cv.severity = 'CRITICAL') as critical_cves
+		FROM scans s
+		WHERE s.project_id = $1 
+		ORDER BY s.created_at DESC
 	`, projectID)
 	
 	if err != nil {
@@ -332,7 +432,7 @@ func (h *ScanHandler) HandleListScans(c *fiber.Ctx) error {
 	var scans []db.Scan
 	for rows.Next() {
 		var s db.Scan
-		if err := rows.Scan(&s.ID, &s.ProjectID, &s.Status, &s.RepoURL, &s.Ecosystem, &s.CreatedAt); err != nil {
+		if err := rows.Scan(&s.ID, &s.ProjectID, &s.Status, &s.CreatedAt, &s.RepoURL, &s.Ecosystem, &s.ComplianceScore, &s.ComponentCount, &s.CriticalCVEs); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to parse scan row"})
 		}
 		s.RepoName = deriveRepoName(s.RepoURL, s.ID)
@@ -544,6 +644,7 @@ func (h *ScanHandler) HandleListAllScans(c *fiber.Ctx) error {
 			"repo_name":       repoName,
 			"ecosystem":       ecosystem,
 			"ntia_score":      ntiaScore,
+			"ntia_compliant":  ntiaScore == 100, // Derived if not in query
 			"component_count": compCount,
 			"critical_cves":   critCves,
 			"high_cves":       highCves,
