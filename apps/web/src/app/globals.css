@@ -9,27 +9,38 @@
     scroll-behavior: smooth;
   }
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
     --primary: 142 71% 45%;
     --primary-foreground: 142 10% 98%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
     --ring: 142 71% 45%;
     --radius: 0.75rem;
-    --sidebar-bg: 240 10% 2%;
+    --sidebar-bg: 0 0% 98%;
+
+    /* Landing Page Specific Design System - Light Defaults */
+    --lp-bg: #ffffff;
+    --lp-card: #f9fafb;
+    --lp-border: #e5e7eb;
+    --lp-border2: #d1d5db;
+    --lp-green: #22c55e;
+    --lp-green-dim: #f0fdf4;
+    --lp-text: #111827;
+    --lp-text2: #4b5563;
+    --lp-text3: #9ca3af;
   }
 
   .dark {
@@ -53,6 +64,18 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 142 71% 45%;
+    --sidebar-bg: 240 10% 2%;
+
+    /* Landing Page Specific Design System - Dark */
+    --lp-bg: #0a0c10;
+    --lp-card: #0f1117;
+    --lp-border: #1e2230;
+    --lp-border2: #252836;
+    --lp-green: #22c55e;
+    --lp-green-dim: #0d2818;
+    --lp-text: #f0f2f8;
+    --lp-text2: #8b91a8;
+    --lp-text3: #4a5068;
   }
 }
 
@@ -94,31 +117,31 @@
   }
 
   .btn-primary {
-    background-color: white;
-    color: black;
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
     padding: 0.5rem 1.5rem;
     border-radius: 0.5rem;
     font-weight: 700;
     transition: all 0.2s;
   }
   .btn-primary:hover {
-    background-color: #e5e7eb;
+    opacity: 0.9;
   }
   .btn-primary:active {
     transform: scale(0.95);
   }
 
   .btn-secondary {
-    background-color: rgba(255, 255, 255, 0.05);
-    color: white;
+    background-color: hsl(var(--secondary));
+    color: hsl(var(--secondary-foreground));
     padding: 0.5rem 1.5rem;
     border-radius: 0.5rem;
     font-weight: 700;
     transition: all 0.2s;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid hsl(var(--border));
   }
   .btn-secondary:hover {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: hsl(var(--accent));
   }
 
   .bg-grid {
@@ -155,18 +178,7 @@
   75% { transform: translateX(4px); }
 }
 
-/* Landing Page Specific Design System */
-:root {
-  --lp-bg: #0a0c10;
-  --lp-card: #0f1117;
-  --lp-border: #1e2230;
-  --lp-border2: #252836;
-  --lp-green: #22c55e;
-  --lp-green-dim: #0d2818;
-  --lp-text: #f0f2f8;
-  --lp-text2: #8b91a8;
-  --lp-text3: #4a5068;
-}
+
 
 .font-syne { font-family: 'Satoshi', sans-serif; }
 .font-mono-dm { font-family: var(--font-mono), monospace; }

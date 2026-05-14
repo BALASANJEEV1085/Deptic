@@ -42,6 +42,16 @@ type FileEntry struct {
 	Type string `json:"type"` // "file" or "dir"
 }
 
+// Repository represents a GitHub repository
+type Repository struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	FullName    string `json:"full_name"`
+	HTMLURL     string `json:"html_url"`
+	Description string `json:"description"`
+	Private     bool   `json:"private"`
+}
+
 type ManifestFile struct {
 	Path string // e.g. "backend/pom.xml"
 	Type string // "npm" | "pip" | "maven"
@@ -325,6 +335,33 @@ func (c *Client) ListFiles(ctx context.Context, owner, repo, path string) ([]Fil
 	}
 
 	return entries, nil
+}
+
+// ListUserRepositories fetches all repositories accessible by the authenticated user
+func (c *Client) ListUserRepositories(ctx context.Context) ([]Repository, error) {
+	apiURL := "https://api.github.com/user/repos?sort=updated&per_page=100&visibility=all"
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := c.doRequest(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("executing request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("github api error %d: %s", resp.StatusCode, string(body))
+	}
+
+	var repos []Repository
+	if err := json.NewDecoder(resp.Body).Decode(&repos); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return repos, nil
 }
 
 // ParseRepoURL parses a GitHub repository URL and extracts the owner and repo name

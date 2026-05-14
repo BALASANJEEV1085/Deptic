@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import "./globals.css";
 import { DM_Mono } from "next/font/google";
+import "./globals.css";
+import { ThemeProvider } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
 
 const dmMono = DM_Mono({ 
@@ -20,9 +21,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("dark", dmMono.variable)}>
+    <html lang="en" className={cn(dmMono.variable)} suppressHydrationWarning>
       <body className="antialiased bg-background text-foreground" style={{ fontFamily: "'Satoshi', sans-serif" }}>
-        {children}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

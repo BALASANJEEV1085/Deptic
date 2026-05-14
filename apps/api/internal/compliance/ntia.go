@@ -2,6 +2,8 @@ package compliance
 
 import (
 	"fmt"
+	"log"
+	"strings"
 	"time"
 
 	"github.com/sbom-io/api/internal/scanner"
@@ -46,8 +48,8 @@ func CheckNTIA(components []scanner.Package, sbomMeta SBOMMeta) NTIAResult {
 		return result
 	}
 
-	var supplierCount, nameCount, versionCount, purlCount int
-	var hasTransitive bool
+	var supplierPassCount, namePassCount, versionPassCount, purlPassCount int
+	var relationshipCount int
 
 	failedComponentsMap := make(map[string]*FailedComponent)
 
@@ -62,26 +64,35 @@ func CheckNTIA(components []scanner.Package, sbomMeta SBOMMeta) NTIAResult {
 	}
 
 	for _, p := range components {
-		// Element 1 & 2: Supplier Name and Component Name
+		// Element 1: Supplier Name
+		// npm/pip: not collected. maven: groupID (Name contains ":")
+		hasSupplier := false
+		if p.Ecosystem == "maven" && strings.Contains(p.Name, ":") {
+			hasSupplier = true
+		}
+		if hasSupplier {
+			supplierPassCount++
+		}
+
+		// Element 2: Component Name
 		if p.Name != "" {
-			supplierCount++
-			nameCount++
+			namePassCount++
 		} else {
 			fc := getFailedComp(p)
 			fc.Missing = append(fc.Missing, "Name")
 		}
 
 		// Element 3: Version
-		if p.Version != "" && p.Version != "unknown" {
-			versionCount++
+		if p.Version != "" && p.Version != "unknown" && p.Version != "latest" {
+			versionPassCount++
 		} else {
 			fc := getFailedComp(p)
 			fc.Missing = append(fc.Missing, "Version")
 		}
 
-		// Element 4: PURL (Name, Version, Ecosystem)
-		if p.Name != "" && p.Version != "" && p.Version != "unknown" && p.Ecosystem != "" {
-			purlCount++
+		// Element 4: Unique Identifiers (PURL)
+		if p.Name != "" && p.Version != "" && p.Ecosystem != "" {
+			purlPassCount++
 		} else {
 			fc := getFailedComp(p)
 			if p.Ecosystem == "" {
@@ -89,9 +100,9 @@ func CheckNTIA(components []scanner.Package, sbomMeta SBOMMeta) NTIAResult {
 			}
 		}
 
-		// Element 5 helper: Depth check
-		if p.Depth > 0 {
-			hasTransitive = true
+		// Element 5 helper: Dependency Relationships
+		if p.Depth > 0 && p.ParentName != "" {
+			relationshipCount++
 		}
 	}
 
@@ -102,27 +113,27 @@ func CheckNTIA(components []scanner.Package, sbomMeta SBOMMeta) NTIAResult {
 	}
 
 	// Element 1: Supplier Name
-	supplierCov := (supplierCount * 100) / total
+	supplierCov := (supplierPassCount * 100) / total
 	e1 := NTIAElement{
 		Name:        "Supplier Name",
 		Description: "Identify the manufacturer or supplier of each component",
 		Passed:      supplierCov == 100,
 		Coverage:    supplierCov,
-		Detail:      fmt.Sprintf("%d out of %d components have a supplier/name identified", supplierCount, total),
+		Detail:      fmt.Sprintf("%d out of %d components have a supplier identified", supplierPassCount, total),
 	}
 	result.Elements = append(result.Elements, e1)
 	if !e1.Passed {
-		result.Recommendations = append(result.Recommendations, "Element 1 failed: Ensure all components have an identifiable supplier/name.")
+		result.Recommendations = append(result.Recommendations, "Supplier name not collected during scan. Score cannot reach 100/100 without supplier data.")
 	}
 
 	// Element 2: Component Name
-	nameCov := (nameCount * 100) / total
+	nameCov := (namePassCount * 100) / total
 	e2 := NTIAElement{
 		Name:        "Component Name",
 		Description: "Name of the component as determined by the supplier",
 		Passed:      nameCov == 100,
 		Coverage:    nameCov,
-		Detail:      fmt.Sprintf("%d out of %d components have a name", nameCount, total),
+		Detail:      fmt.Sprintf("%d out of %d components have a name", namePassCount, total),
 	}
 	result.Elements = append(result.Elements, e2)
 	if !e2.Passed {
@@ -130,27 +141,27 @@ func CheckNTIA(components []scanner.Package, sbomMeta SBOMMeta) NTIAResult {
 	}
 
 	// Element 3: Version
-	versionCov := (versionCount * 100) / total
+	versionCov := (versionPassCount * 100) / total
 	e3 := NTIAElement{
-		Name:        "Version",
+		Name:        "Version String",
 		Description: "Version of the component",
 		Passed:      versionCov == 100,
 		Coverage:    versionCov,
-		Detail:      fmt.Sprintf("%d out of %d components have a precise version string", versionCount, total),
+		Detail:      fmt.Sprintf("%d out of %d components have a valid version string", versionPassCount, total),
 	}
 	result.Elements = append(result.Elements, e3)
 	if !e3.Passed {
-		result.Recommendations = append(result.Recommendations, fmt.Sprintf("Element 3 failed: %d components are missing version strings. Consider pinning all dependencies to exact versions.", total-versionCount))
+		result.Recommendations = append(result.Recommendations, fmt.Sprintf("Element 3 failed: %d components are missing version strings.", total-versionPassCount))
 	}
 
 	// Element 4: Unique Identifiers
-	purlCov := (purlCount * 100) / total
+	purlCov := (purlPassCount * 100) / total
 	e4 := NTIAElement{
-		Name:        "Unique Identifiers",
+		Name:        "Unique Identifiers (PURL)",
 		Description: "Other unique identifiers like PURL or CPE",
 		Passed:      purlCov == 100,
 		Coverage:    purlCov,
-		Detail:      fmt.Sprintf("%d out of %d components have enough metadata to form a valid PURL", purlCount, total),
+		Detail:      fmt.Sprintf("%d out of %d components have enough metadata to form a valid PURL", purlPassCount, total),
 	}
 	result.Elements = append(result.Elements, e4)
 	if !e4.Passed {
@@ -158,21 +169,21 @@ func CheckNTIA(components []scanner.Package, sbomMeta SBOMMeta) NTIAResult {
 	}
 
 	// Element 5: Dependency Relationships
-	depsPassed := hasTransitive || (total > 1)
+	depsPassed := relationshipCount > 0 && total > 1
 	depsCov := 0
-	if depsPassed {
-		depsCov = 100
+	if total > 1 {
+		depsCov = (relationshipCount * 100) / total
 	}
 	e5 := NTIAElement{
 		Name:        "Dependency Relationships",
 		Description: "How the components relate to each other",
 		Passed:      depsPassed,
 		Coverage:    depsCov,
-		Detail:      "Dependency tree contains relationships (transitive dependencies or multiple direct)",
+		Detail:      fmt.Sprintf("%d out of %d components have a parent relationship defined", relationshipCount, total),
 	}
 	result.Elements = append(result.Elements, e5)
 	if !e5.Passed {
-		result.Recommendations = append(result.Recommendations, "Element 5 failed: No distinct dependency relationships found.")
+		result.Recommendations = append(result.Recommendations, "Element 5 failed: No dependency relationships found (all components at depth 0).")
 	}
 
 	// Element 6: Author of SBOM
@@ -182,7 +193,7 @@ func CheckNTIA(components []scanner.Package, sbomMeta SBOMMeta) NTIAResult {
 		authorCov = 100
 	}
 	e6 := NTIAElement{
-		Name:        "Author of SBOM",
+		Name:        "Author of SBOM Data",
 		Description: "Name of the entity that creates the SBOM data",
 		Passed:      authorPassed,
 		Coverage:    authorCov,
@@ -194,8 +205,9 @@ func CheckNTIA(components []scanner.Package, sbomMeta SBOMMeta) NTIAResult {
 	}
 
 	// Element 7: Timestamp
-	oneYearAgo := time.Now().AddDate(-1, 0, 0)
-	timestampPassed := !sbomMeta.GeneratedAt.IsZero() && sbomMeta.GeneratedAt.After(oneYearAgo)
+	now := time.Now()
+	oneYearAgo := now.AddDate(-1, 0, 0)
+	timestampPassed := !sbomMeta.GeneratedAt.IsZero() && sbomMeta.GeneratedAt.After(oneYearAgo) && sbomMeta.GeneratedAt.Before(now.Add(24*time.Hour))
 	timestampCov := 0
 	if timestampPassed {
 		timestampCov = 100
@@ -214,13 +226,17 @@ func CheckNTIA(components []scanner.Package, sbomMeta SBOMMeta) NTIAResult {
 
 	// Calculate final score
 	passedCount := 0
+	totalCoverage := 0
 	for _, e := range result.Elements {
 		if e.Passed {
 			passedCount++
 		}
+		totalCoverage += e.Coverage
 	}
-	result.Score = (passedCount * 100) / 7
+	result.Score = totalCoverage / len(result.Elements)
 	result.Compliant = result.Score == 100
+
+	log.Printf("NTIA result: score=%d passed=%d/7", result.Score, passedCount)
 
 	return result
 }

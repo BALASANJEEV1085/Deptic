@@ -184,13 +184,13 @@ export default function DashboardPage() {
           </div>
 
           <div className="bg-card border border-white/[0.05] rounded-xl overflow-hidden divide-y divide-white/[0.04]">
-            {stats.recent_scans.length === 0 ? (
+            {(stats.recent_scans?.length ?? 0) === 0 ? (
               <div className="p-10 text-center">
                 <Activity className="h-8 w-8 text-zinc-700 mx-auto mb-3" />
                 <p className="text-sm text-zinc-600">No recent scans found.</p>
               </div>
             ) : (
-              stats.recent_scans.map((scan) => (
+              (stats.recent_scans ?? []).map((scan) => (
                 <Link key={scan.id} href={`/dashboard/scans/${scan.id}`} className="block p-4 hover:bg-white/[0.02] transition-colors group">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2.5">
@@ -307,7 +307,7 @@ export default function DashboardPage() {
                       </p>
                     </div>
                     <div className="space-y-2">
-                      {stats.recent_scans
+                      {(stats.recent_scans ?? [])
                         .filter((s: { ntia_score: number }) => s.ntia_score < 100)
                         .slice(0, 3)
                         .map((s: { id: string; repo_name: string }) => (

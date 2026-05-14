@@ -47,6 +47,15 @@ export interface Project {
   low_cves: number;
 }
 
+export interface GitHubRepository {
+  id: number;
+  name: string;
+  full_name: string;
+  html_url: string;
+  description: string;
+  private: boolean;
+}
+
 export interface DashboardStats {
   total_projects: number;
   total_scans: number;
@@ -318,6 +327,7 @@ export interface NTIAResult {
 export interface ComplianceResponse {
   ntia: NTIAResult;
   eu_cra_compliant: boolean;
+  status: string;
 }
 
 export async function getCompliance(scanId: string): Promise<ComplianceResponse> {
@@ -357,4 +367,14 @@ export async function downloadPDFReport(scanId: string): Promise<void> {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+export async function listGitHubRepos(): Promise<{ repositories: GitHubRepository[] }> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/github/repos`, { headers });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || 'Failed to fetch GitHub repositories');
+  }
+  return response.json();
 }

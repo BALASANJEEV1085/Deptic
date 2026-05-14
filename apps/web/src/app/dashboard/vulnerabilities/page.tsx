@@ -111,11 +111,9 @@ export default function VulnerabilitiesPage() {
 
           {/* Severity dropdown */}
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 px-3 py-2 bg-white/[0.02] border border-white/[0.08] rounded-lg text-xs font-bold text-zinc-400 hover:bg-white/[0.04] transition-colors focus:outline-none min-w-[160px] justify-between">
-                {severityFilter === "All" ? "All Severities" : severityFilter}
-                <ChevronDown className="h-3.5 w-3.5 text-zinc-600" />
-              </button>
+            <DropdownMenuTrigger className="flex items-center gap-2 px-3 py-2 bg-white/[0.02] border border-white/[0.08] rounded-lg text-xs font-bold text-zinc-400 hover:bg-white/[0.04] transition-colors focus:outline-none min-w-[160px] justify-between">
+              {severityFilter === "All" ? "All Severities" : severityFilter}
+              <ChevronDown className="h-3.5 w-3.5 text-zinc-600" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-[#0d0e10] border-white/10 text-zinc-300 p-1 min-w-[160px]">
               {["All", "CRITICAL", "HIGH", "MEDIUM", "LOW"].map(s => (

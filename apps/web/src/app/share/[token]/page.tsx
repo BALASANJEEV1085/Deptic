@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
+import { cn, getComplianceStatus } from "@/lib/utils";
 import Link from "next/link";
 
 function EcoDot({ eco }: { eco: string }) {
@@ -80,7 +80,7 @@ export default function PublicSharePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0c10] text-zinc-500">
+      <div className="min-h-screen flex items-center justify-center bg-background text-zinc-500">
         <div className="flex flex-col items-center gap-4">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#22c55e] border-t-transparent" />
           <div className="text-xs font-bold tracking-[0.2em] uppercase text-zinc-600">Decrypting Audit Log...</div>
@@ -91,16 +91,16 @@ export default function PublicSharePage() {
 
   if (error === "expired") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0c10] px-6">
-        <div className="text-center p-12 bg-[#0f1117] border border-red-500/20 rounded-3xl max-w-md w-full shadow-2xl">
+      <div className="min-h-screen flex items-center justify-center bg-background px-6">
+        <div className="text-center p-12 bg-card border border-red-500/20 rounded-3xl max-w-md w-full shadow-2xl">
           <div className="h-16 w-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <ShieldAlert className="h-8 w-8 text-red-500" />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-3">Audit Link Expired</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-3">Audit Link Expired</h1>
           <p className="text-zinc-500 text-sm leading-relaxed mb-8">
             Access to this secure compliance report has been revoked due to expiration. Please contact the project administrator for a refreshed manifest.
           </p>
-          <div className="pt-6 border-t border-white/5 flex items-center justify-center gap-2 text-zinc-600">
+          <div className="pt-6 border-t border-border flex items-center justify-center gap-2 text-zinc-600">
             <ShieldCheck className="h-4 w-4 opacity-30" />
             <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-700">Verified by SBOM.io</span>
           </div>
@@ -111,7 +111,7 @@ export default function PublicSharePage() {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0c10] text-red-400 p-6 text-center">
+      <div className="min-h-screen flex items-center justify-center bg-background text-red-400 p-6 text-center">
         <div className="max-w-md">
           <AlertTriangle className="h-10 w-10 mx-auto mb-4 opacity-50" />
           <p className="font-bold mb-1">Authorization Failed</p>
@@ -124,7 +124,7 @@ export default function PublicSharePage() {
   const { compliance = {}, vulnerability_summary = {} } = data;
 
   return (
-    <div className="min-h-screen bg-[#0a0c10] text-zinc-300 selection:bg-[#22c55e]/30 selection:text-[#22c55e]">
+    <div className="min-h-screen bg-background text-zinc-300 selection:bg-[#22c55e]/30 selection:text-[#22c55e]">
       {/* Top Banner */}
       <div className="bg-[#0d2818] px-6 py-2 text-center border-b border-[#22c55e]/10">
         <p className="text-[10px] font-bold text-[#22c55e] uppercase tracking-[0.2em] flex items-center justify-center gap-2">
@@ -134,7 +134,7 @@ export default function PublicSharePage() {
 
       <div className="max-w-7xl mx-auto py-12 px-6 space-y-12">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8 border-b border-white/5 pb-10">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8 border-b border-border pb-10">
           <div className="space-y-6">
             <div className="flex items-center gap-3">
               <svg width="28" height="28" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-[#22c55e]">
@@ -143,13 +143,13 @@ export default function PublicSharePage() {
                 <path d="M60 90L30 60" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M30 60L60 30" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <span className="font-bold text-lg text-white tracking-tight">SBOM.io</span>
+              <span className="font-bold text-lg text-foreground tracking-tight">SBOM.io</span>
             </div>
             <div>
-              <h1 className="text-4xl font-extrabold text-white tracking-tight mb-2">Software Compliance Report</h1>
+              <h1 className="text-4xl font-extrabold text-foreground tracking-tight mb-2">Software Compliance Report</h1>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Project:</span>
-                <span className="text-sm font-bold text-white uppercase tracking-tight">{data.repo_name}</span>
+                <span className="text-sm font-bold text-foreground uppercase tracking-tight">{data.repo_name}</span>
               </div>
             </div>
           </div>
@@ -177,7 +177,7 @@ export default function PublicSharePage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* NTIA Checklist */}
           <div className="lg:col-span-1">
-            <div className="bg-[#0f1117] border border-white/5 rounded-2xl p-6 h-full">
+            <div className="bg-card border border-border rounded-2xl p-6 h-full">
               <h2 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
                 <ShieldCheck className="h-3 w-3 text-[#22c55e]" /> NTIA Minimum Elements
               </h2>
@@ -203,7 +203,27 @@ export default function PublicSharePage() {
                   </li>
                 ))}
               </ul>
-              <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between">
+              <div className="mt-6 pt-5 border-t border-border">
+                {(() => {
+                  const score = compliance?.ntia_score ?? null;
+                  if (score !== null && score !== undefined) {
+                    const s = getComplianceStatus(score);
+                    return (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">NTIA Status</span>
+                        <span className={cn(
+                          "text-[9px] font-bold px-2 py-0.5 rounded border uppercase tracking-widest",
+                          s.color === 'green' ? "bg-[#22c55e]/10 text-[#22c55e] border-[#22c55e]/20" :
+                          s.color === 'amber' ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
+                          "bg-red-500/10 text-red-400 border-red-500/20"
+                        )}>{s.label}</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+              <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <FileJson className="h-4 w-4 text-zinc-600" />
                   <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Protocol</span>
@@ -232,10 +252,10 @@ export default function PublicSharePage() {
             </div>
 
             {/* Inventory Coverage visualization */}
-            <div className="rounded-2xl border border-white/5 bg-[#0f1117] p-8 space-y-6 transition-all hover:bg-white/[0.03]">
+            <div className="rounded-2xl border border-border bg-card p-8 space-y-6 transition-all hover:bg-muted/40">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-bold text-white tracking-tight">Inventory Coverage</h2>
+                  <h2 className="text-xl font-bold text-foreground tracking-tight">Inventory Coverage</h2>
                   <p className="text-sm text-zinc-500">Verified components extracted from primary manifests.</p>
                 </div>
                 <div className="flex items-baseline gap-2">
@@ -268,16 +288,16 @@ export default function PublicSharePage() {
 
         {/* Components Ledger Table */}
         <div className="space-y-6">
-          <div className="flex items-center justify-between border-b border-white/5 pb-4">
-            <h2 className="text-xl font-bold text-white flex items-center gap-3">
+          <div className="flex items-center justify-between border-b border-border pb-4">
+            <h2 className="text-xl font-bold text-foreground flex items-center gap-3">
               <Layers className="h-5 w-5 text-[#22c55e]" /> Component Ledger
             </h2>
           </div>
           
-          <div className="rounded-2xl border border-white/5 bg-[#0f1117] overflow-hidden shadow-2xl">
+          <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-2xl">
             <Table>
-              <TableHeader className="bg-white/[0.01]">
-                <TableRow className="border-white/5">
+              <TableHeader className="bg-muted/30">
+                <TableRow className="border-border">
                   <TableHead className="px-6 py-4 text-zinc-500 text-[10px] uppercase tracking-widest font-bold">Package Name</TableHead>
                   <TableHead className="px-6 py-4 text-zinc-500 text-[10px] uppercase tracking-widest font-bold">Release</TableHead>
                   <TableHead className="px-6 py-4 text-zinc-500 text-[10px] uppercase tracking-widest font-bold">License</TableHead>
@@ -287,7 +307,7 @@ export default function PublicSharePage() {
               <TableBody>
                 {/* Direct dependencies */}
                 {groupedComponents.direct.map((c: any, i: number) => (
-                  <TableRow key={`dir-${i}`} className="hover:bg-white/[0.01] transition-colors border-white/5">
+                  <TableRow key={`dir-${i}`} className="hover:bg-muted/30 transition-colors border-border">
                     <TableCell className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <EcoDot eco={c.Ecosystem} />
@@ -295,10 +315,10 @@ export default function PublicSharePage() {
                       </div>
                     </TableCell>
                     <TableCell className="px-6 py-4">
-                      <code className="text-[10px] text-zinc-500 font-mono font-bold bg-white/5 px-2 py-0.5 rounded uppercase">{c.Version}</code>
+                      <code className="text-[10px] text-zinc-500 font-mono font-bold bg-muted/50 px-2 py-0.5 rounded uppercase">{c.Version}</code>
                     </TableCell>
                     <TableCell className="px-6 py-4">
-                      <span className="text-[10px] text-zinc-600 font-medium px-2 py-0.5 border border-white/5 rounded-md">{c.License || 'Proprietary'}</span>
+                      <span className="text-[10px] text-zinc-600 font-medium px-2 py-0.5 border border-border rounded-md">{c.License || 'Proprietary'}</span>
                     </TableCell>
                     <TableCell className="px-6 py-4 text-right">
                       <span className="inline-flex items-center px-2 py-0.5 rounded bg-[#22c55e]/10 text-[#22c55e] text-[9px] font-black uppercase tracking-widest border border-[#22c55e]/20">Direct</span>
@@ -308,14 +328,14 @@ export default function PublicSharePage() {
 
                 {/* Separator */}
                 {groupedComponents.transitive.length > 0 && (
-                  <TableRow className="bg-white/[0.01] border-none pointer-events-none">
+                  <TableRow className="bg-muted/30 border-none pointer-events-none">
                     <TableCell colSpan={4} className="py-2 px-6">
                       <div className="flex items-center gap-4">
-                        <div className="h-[1px] flex-1 bg-white/5" />
+                        <div className="h-[1px] flex-1 bg-muted/50" />
                         <span className="text-[9px] font-bold text-zinc-700 uppercase tracking-[0.2em] whitespace-nowrap">
                           Direct dependencies above · Transitive below
                         </span>
-                        <div className="h-[1px] flex-1 bg-white/5" />
+                        <div className="h-[1px] flex-1 bg-muted/50" />
                       </div>
                     </TableCell>
                   </TableRow>
@@ -323,7 +343,7 @@ export default function PublicSharePage() {
 
                 {/* Transitive dependencies */}
                 {groupedComponents.transitive.map((c: any, i: number) => (
-                  <TableRow key={`trans-${i}`} className="hover:bg-white/[0.01] transition-colors border-white/5">
+                  <TableRow key={`trans-${i}`} className="hover:bg-muted/30 transition-colors border-border">
                     <TableCell className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <EcoDot eco={c.Ecosystem} />
@@ -331,13 +351,13 @@ export default function PublicSharePage() {
                       </div>
                     </TableCell>
                     <TableCell className="px-6 py-4">
-                      <code className="text-[10px] text-zinc-600 font-mono font-bold bg-white/5 px-2 py-0.5 rounded uppercase">{c.Version}</code>
+                      <code className="text-[10px] text-zinc-600 font-mono font-bold bg-muted/50 px-2 py-0.5 rounded uppercase">{c.Version}</code>
                     </TableCell>
                     <TableCell className="px-6 py-4">
-                      <span className="text-[10px] text-zinc-700 font-medium px-2 py-0.5 border border-white/5 rounded-md">{c.License || 'Proprietary'}</span>
+                      <span className="text-[10px] text-zinc-700 font-medium px-2 py-0.5 border border-border rounded-md">{c.License || 'Proprietary'}</span>
                     </TableCell>
                     <TableCell className="px-6 py-4 text-right">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded bg-zinc-800/50 text-zinc-600 text-[9px] font-bold uppercase tracking-widest border border-white/5">Transitive</span>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded bg-zinc-800/50 text-zinc-600 text-[9px] font-bold uppercase tracking-widest border border-border">Transitive</span>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -347,7 +367,7 @@ export default function PublicSharePage() {
         </div>
 
         {/* Footer */}
-        <div className="pt-20 pb-10 border-t border-white/5 text-center space-y-8">
+        <div className="pt-20 pb-10 border-t border-border text-center space-y-8">
            <div className="flex flex-col items-center gap-3">
              <div className="flex items-center gap-3 mb-2">
                 <svg width="24" height="24" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-zinc-700 opacity-50">

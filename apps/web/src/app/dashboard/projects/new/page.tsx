@@ -2,22 +2,25 @@
 
 import * as React from "react";
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { startScan, getScan, listScans, Scan } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Loader2, ArrowRight, ShieldCheck, Zap, Lock, ChevronLeft, CheckCircle2, XCircle } from "lucide-react";
+import { Loader2, ArrowRight, ShieldCheck, Zap, Lock, ChevronLeft, CheckCircle2, XCircle, Package, GitMerge, ShieldAlert, FileText } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 export default function NewProjectPage() {
   const router = useRouter();
-  const [githubUrl, setGithubUrl] = useState("");
+  const searchParams = useSearchParams();
+  const initialUrl = searchParams.get('url') || "";
+  const [githubUrl, setGithubUrl] = useState(initialUrl);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusText, setStatusText] = useState("");
   const [recentUrls, setRecentUrls] = useState<string[]>([]);
+  const [scanStep, setScanStep] = useState<number>(-1); // -1 = not scanning, 0-3 = step index
   
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -47,21 +50,32 @@ export default function NewProjectPage() {
     
     setLoading(true);
     setError(null);
-    setStatusText("Authenticating integration...");
+    setScanStep(0); // Discovering Packages
+    setStatusText("Discovering packages...");
+
+    // Advance steps on a timer to simulate progress
+    const stepTimers = [
+      setTimeout(() => setScanStep(1), 4000),  // Resolving Dependencies
+      setTimeout(() => setScanStep(2), 9000),  // Analyzing Vulnerabilities
+      setTimeout(() => setScanStep(3), 14000), // Generating SBOM
+    ];
 
     try {
       const projectId = "00000000-0000-0000-0000-000000000000";
       const { scan_id } = await startScan(githubUrl, projectId);
-      setStatusText("Scanning repository...");
 
       pollIntervalRef.current = setInterval(async () => {
         try {
           const result = await getScan(scan_id);
           if (result.scan.status === "done") {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+            stepTimers.forEach(clearTimeout);
+            setScanStep(4); // all done
             router.push(`/dashboard/scans/${scan_id}`);
           } else if (result.scan.status === "failed") {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+            stepTimers.forEach(clearTimeout);
+            setScanStep(-1);
             setError("Analysis failed. Please check if the repository is public and contains a valid manifest.");
             setLoading(false);
           }
@@ -71,6 +85,8 @@ export default function NewProjectPage() {
       }, 3000);
 
     } catch (err: any) {
+      stepTimers.forEach(clearTimeout);
+      setScanStep(-1);
       setError(err.message || "Failed to initiate scan.");
       setLoading(false);
     }
@@ -89,8 +105,105 @@ export default function NewProjectPage() {
     }
   };
 
+  // ── Scan steps definition ─────────────────────────────────────────────────
+  const SCAN_STEPS = [
+    { label: 'Discovering\nPackages',     Icon: Package },
+    { label: 'Resolving\nDependencies',   Icon: GitMerge },
+    { label: 'Analyzing\nVulnerabilities', Icon: ShieldAlert },
+    { label: 'Generating\nSBOM',          Icon: FileText },
+  ];
+
   return (
     <div className="max-w-5xl mx-auto py-10 px-6">
+      {/* ── Scanning overlay ─────────────────────────────────────────────── */}
+      {loading && scanStep >= 0 && (
+        <div className="fixed inset-0 z-50 bg-[#0a0b0d]/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
+          {/* Repo name */}
+          <div className="mb-12">
+            <p className="text-[10px] text-zinc-600 uppercase tracking-[0.2em] font-bold mb-2">Analyzing Repository</p>
+            <p className="text-sm font-semibold text-white tracking-tight">{githubUrl.replace('https://github.com/', '')}</p>
+          </div>
+
+          {/* Step stepper - Responsive: Vertical on mobile, Horizontal on desktop */}
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-0 w-full max-w-xs sm:max-w-none justify-center">
+            {SCAN_STEPS.map((step, i) => {
+              const isDone    = scanStep > i;
+              const isActive  = scanStep === i;
+              const isPending = scanStep < i;
+              return (
+                <React.Fragment key={step.label}>
+                  <div className="flex flex-row sm:flex-col items-center gap-4 sm:gap-0 sm:w-28">
+                    {/* Circle */}
+                    <div className="relative shrink-0">
+                      <div className={cn(
+                        "h-10 w-10 sm:h-12 sm:w-12 rounded-full flex items-center justify-center border-2 transition-all duration-500",
+                        isDone    && "border-[#22c55e] bg-[#22c55e]/15",
+                        isActive  && "border-[#22c55e] bg-[#22c55e]/10 shadow-[0_0_20px_rgba(34,197,94,0.3)]",
+                        isPending && "border-white/10 bg-white/[0.02]"
+                      )}>
+                        {isDone ? (
+                          <CheckCircle2 className="h-5 w-5 text-[#22c55e]" />
+                        ) : (
+                          <step.Icon className={cn(
+                            "h-5 w-5 transition-colors duration-300",
+                            isActive  && "text-[#22c55e]",
+                            isPending && "text-zinc-700"
+                          )} />
+                        )}
+                      </div>
+                      {isActive && (
+                        <span className="absolute inset-0 rounded-full border-2 border-[#22c55e]/40 animate-ping" />
+                      )}
+                    </div>
+
+                    {/* Label */}
+                    <div className="flex flex-col sm:items-center text-left sm:text-center">
+                      <p className={cn(
+                        "text-[10px] font-bold uppercase tracking-widest sm:mt-3 leading-tight transition-colors duration-300",
+                        isActive  && "text-[#22c55e]",
+                        isDone    && "text-zinc-400",
+                        isPending && "text-zinc-700"
+                      )}>
+                        {step.label.replace('\n', ' ')}
+                      </p>
+                      {isActive && (
+                        <p className="sm:hidden text-[9px] text-zinc-600 uppercase tracking-widest mt-1 animate-pulse">Processing…</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Connector line */}
+                  {i < SCAN_STEPS.length - 1 && (
+                    <>
+                      {/* Desktop connector (horizontal) */}
+                      <div className="hidden sm:flex items-center mt-6 w-8 shrink-0">
+                        <div className={cn(
+                          "h-[2px] w-full transition-all duration-700",
+                          isDone ? "bg-[#22c55e]" : "border-t-2 border-dashed border-white/10"
+                        )} />
+                      </div>
+                      {/* Mobile connector (vertical) */}
+                      <div className="sm:hidden w-[2px] h-6 mx-5 border-l-2 border-dashed border-white/10 shrink-0">
+                        <div className={cn(
+                          "h-full w-full transition-all duration-700",
+                          isDone && "bg-[#22c55e] border-none"
+                        )} />
+                      </div>
+                    </>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
+
+          {/* Desktop Sub-label */}
+          <p className="hidden sm:block text-[10px] text-zinc-600 uppercase tracking-[0.2em] font-bold animate-pulse mt-10">
+            {SCAN_STEPS[Math.min(scanStep, 3)]?.label.replace('\n', ' ')}…
+          </p>
+        </div>
+      )}
+
+
       <div className="mb-10">
         <Link 
           href="/dashboard" 
@@ -99,8 +212,8 @@ export default function NewProjectPage() {
           <ChevronLeft className="mr-1 h-3 w-3 transition-transform group-hover:-translate-x-0.5" />
           Back to Dashboard
         </Link>
-        <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Integrate Repository</h1>
-        <p className="text-zinc-500 text-sm">Connect a GitHub repository to begin supply chain analysis and compliance auditing.</p>
+        <h1 className="text-2xl font-bold tracking-tight text-white mb-0.5">Connect GitHub</h1>
+        <p className="text-[11px] text-zinc-500 uppercase tracking-widest font-bold">Connect a GitHub repository to begin supply chain analysis.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">

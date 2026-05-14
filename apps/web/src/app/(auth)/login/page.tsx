@@ -40,12 +40,12 @@ export default function LoginPage() {
   );
 
   return (
-    <div className="flex min-h-screen bg-[#0a0c10] text-[#f0f2f8] font-sans selection:bg-[#22c55e]/30 selection:text-[#22c55e]">
+    <div className="flex min-h-screen bg-[var(--lp-bg)] text-[var(--lp-text)] font-sans selection:bg-[var(--lp-green)]/30 selection:text-[var(--lp-green)]">
       {/* LEFT SIDE - TESTIMONIAL */}
-      <div className="hidden lg:flex w-1/2 bg-[#0a0c10] items-center justify-center p-12 border-r border-[#1e2230] relative overflow-hidden">
+      <div className="hidden lg:flex w-1/2 bg-[var(--lp-bg)] items-center justify-center p-12 border-r border-[var(--lp-border)] relative overflow-hidden">
         <div className="lp-grid-bg opacity-10"></div>
         <div className="max-w-md relative z-10">
-          <div className="text-[#22c55e] mb-8 opacity-20">
+          <div className="text-[var(--lp-green)] mb-8 opacity-20">
             <svg width="60" height="60" viewBox="0 0 24 24" fill="currentColor">
               <path d="M14.017 21L14.017 18C14.017 16.8954 14.9124 16 16.017 16H19.017C19.5693 16 20.017 15.5523 20.017 15V9C20.017 8.44772 19.5693 8 19.017 8H16.017C14.9124 8 14.017 7.10457 14.017 6V3L22.017 3V15C22.017 18.3137 19.3307 21 16.017 21H14.017ZM2.01697 21L2.01697 18C2.01697 16.8954 2.9124 16 4.01697 16H7.01697C7.56925 16 8.01697 15.5523 8.01697 15V9C8.01697 8.44772 7.56925 8 7.01697 8H4.01697C2.9124 8 2.01697 7.10457 2.01697 6V3L10.017 3V15C10.017 18.3137 7.33068 21 4.01697 21H2.01697Z" />
             </svg>
@@ -54,12 +54,12 @@ export default function LoginPage() {
             "Integrating SBOM.io into our CI/CD pipeline gave us immediate visibility into our software supply chain. The proactive vulnerability alerts are a game-changer."
           </blockquote>
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-[#1e2230] border border-[#252836] flex items-center justify-center">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#22c55e] to-[#3b82f6] opacity-50"></div>
+            <div className="w-12 h-12 rounded-full bg-[var(--lp-border)] border border-[var(--lp-border2)] flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[var(--lp-green)] to-[#3b82f6] opacity-50"></div>
             </div>
             <div>
               <div className="font-bold text-white">@security_pro</div>
-              <div className="text-sm text-[#4a5068]">Security Engineer</div>
+              <div className="text-sm text-[var(--lp-text3)]">Security Engineer</div>
             </div>
           </div>
         </div>
@@ -87,7 +87,7 @@ export default function LoginPage() {
 
           <div className="mb-10">
             <h2 className="text-3xl font-syne font-bold text-white mb-2">Get Started</h2>
-            <p className="text-[#8b91a8] text-base font-light">Secure your software supply chain with a single click.</p>
+            <p className="text-[var(--lp-text2)] text-base font-light">Secure your software supply chain with a single click.</p>
           </div>
 
           {error && (
@@ -101,7 +101,7 @@ export default function LoginPage() {
             <button 
               onClick={() => handleOAuthLogin('google')}
               disabled={loading !== null}
-              className="w-full flex items-center justify-center gap-3 py-4 px-4 bg-[#0f1117] border border-[#1e2230] rounded-xl text-sm font-bold text-white hover:border-[#22c55e]/30 hover:bg-[#12141c] transition-all group disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-3 py-4 px-4 bg-[var(--lp-card)] border border-[var(--lp-border)] rounded-xl text-sm font-bold text-white hover:border-[var(--lp-green)]/30 hover:bg-[#12141c] transition-all group disabled:opacity-50"
             >
               {loading === 'google' ? (
                 <div className="h-5 w-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
@@ -131,7 +131,7 @@ export default function LoginPage() {
             <button 
               onClick={() => handleOAuthLogin('github')}
               disabled={loading !== null}
-              className="w-full flex items-center justify-center gap-3 py-4 px-4 bg-[#0f1117] border border-[#1e2230] rounded-xl text-sm font-bold text-white hover:border-[#22c55e]/30 hover:bg-[#12141c] transition-all group disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-3 py-4 px-4 bg-[var(--lp-card)] border border-[var(--lp-border)] rounded-xl text-sm font-bold text-white hover:border-[var(--lp-green)]/30 hover:bg-[#12141c] transition-all group disabled:opacity-50"
             >
               {loading === 'github' ? (
                 <div className="h-5 w-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
@@ -142,17 +142,17 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <div className="mt-12 p-6 rounded-2xl bg-[#0f1117] border border-[#1e2230] relative overflow-hidden">
+          <div className="mt-12 p-6 rounded-2xl bg-[var(--lp-card)] border border-[var(--lp-border)] relative overflow-hidden">
              <div className="absolute top-0 right-0 p-4 opacity-10">
-                <ShieldCheck size={48} className="text-[#22c55e]" />
+                <ShieldCheck size={48} className="text-[var(--lp-green)]" />
              </div>
-             <p className="text-xs text-[#4a5068] leading-relaxed relative z-10">
+             <p className="text-xs text-[var(--lp-text3)] leading-relaxed relative z-10">
                Your security is our priority. We use industry-standard OAuth 2.0 to ensure your credentials never touch our servers.
              </p>
           </div>
 
-          <div className="mt-12 text-[10px] text-[#4a5068] leading-relaxed text-center">
-            By continuing, you agree to SBOM.io's <Link href="/terms" className="underline hover:text-[#8b91a8]">Terms of Service</Link> and <Link href="/privacy" className="underline hover:text-[#8b91a8]">Privacy Policy</Link>.
+          <div className="mt-12 text-[10px] text-[var(--lp-text3)] leading-relaxed text-center">
+            By continuing, you agree to SBOM.io's <Link href="/terms" className="underline hover:text-[var(--lp-text2)]">Terms of Service</Link> and <Link href="/privacy" className="underline hover:text-[var(--lp-text2)]">Privacy Policy</Link>.
           </div>
         </div>
       </div>

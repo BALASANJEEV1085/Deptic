@@ -6,9 +6,9 @@ import { ArrowLeft, Lock, EyeOff, ShieldCheck } from "lucide-react";
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-[#0a0c10] text-[#f0f2f8] font-sans selection:bg-[#22c55e]/30 selection:text-[#22c55e]">
+    <div className="min-h-screen bg-[var(--lp-bg)] text-[var(--lp-text)] font-sans selection:bg-[var(--lp-green)]/30 selection:text-[var(--lp-green)]">
       {/* NAV */}
-      <nav className="fixed top-0 left-0 right-0 z-[100] px-6 md:px-12 py-6 flex items-center justify-between border-b border-[#1e2230] bg-[#0a0c10]/90 backdrop-blur-xl">
+      <nav className="fixed top-0 left-0 right-0 z-[100] px-6 md:px-12 py-6 flex items-center justify-between border-b border-[var(--lp-border)] bg-[var(--lp-bg)]/90 backdrop-blur-xl">
         <Link href="/" className="flex items-center gap-3 font-syne font-bold text-xl text-white group">
           <div className="lp-logo-icon group-hover:scale-110 transition-transform">
             <svg width="18" height="18" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-black">
@@ -24,7 +24,7 @@ export default function PrivacyPage() {
           </div>
           SBOM.io
         </Link>
-        <Link href="/" className="text-sm font-medium text-[#8b91a8] hover:text-white transition-colors flex items-center gap-2">
+        <Link href="/" className="text-sm font-medium text-[var(--lp-text2)] hover:text-white transition-colors flex items-center gap-2">
           <ArrowLeft size={16} /> Back to home
         </Link>
       </nav>
@@ -33,16 +33,16 @@ export default function PrivacyPage() {
         <header className="mb-16">
           <div className="text-[#3b82f6] text-xs font-bold uppercase tracking-[0.2em] mb-4">Security First</div>
           <h1 className="font-syne text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-6">Privacy Policy</h1>
-          <p className="text-[#8b91a8] font-light">Last Updated: May 10, 2026</p>
+          <p className="text-[var(--lp-text2)] font-light">Last Updated: May 10, 2026</p>
         </header>
 
         <article className="prose prose-invert max-w-none space-y-12">
           <section>
             <h2 className="text-xl font-bold text-white mb-4">1. Data we collect</h2>
-            <p className="text-[#8b91a8] font-light leading-relaxed">
+            <p className="text-[var(--lp-text2)] font-light leading-relaxed">
               To provide our services, we collect minimal information:
             </p>
-            <ul className="list-disc list-inside mt-4 text-[#8b91a8] font-light space-y-2">
+            <ul className="list-disc list-inside mt-4 text-[var(--lp-text2)] font-light space-y-2">
               <li>Authentication data from GitHub (email and username).</li>
               <li>Public repository metadata when you initiate a scan.</li>
               <li>Dependency manifest files required to generate SBOMs.</li>
@@ -51,23 +51,23 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-xl font-bold text-white mb-4">2. How we use your data</h2>
-            <p className="text-[#8b91a8] font-light leading-relaxed">
+            <p className="text-[var(--lp-text2)] font-light leading-relaxed">
               Your source code is never stored on our permanent disks. We analyze manifest files in volatile memory to extract dependency trees and perform vulnerability matching against public databases (NVD, OSV).
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-bold text-white mb-4">3. Third-party disclosure</h2>
-            <p className="text-[#8b91a8] font-light leading-relaxed">
+            <p className="text-[var(--lp-text2)] font-light leading-relaxed">
               We do not sell, trade, or otherwise transfer your data to outside parties. Vulnerability scans are performed using local databases or anonymous API calls to security data providers.
             </p>
           </section>
 
-          <section className="bg-[#0f1117] border border-[#1e2230] rounded-xl p-8">
+          <section className="bg-[var(--lp-card)] border border-[var(--lp-border)] rounded-xl p-8">
             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
               <Lock className="text-[#3b82f6]" size={20} /> Data Encryption
             </h3>
-            <p className="text-sm text-[#8b91a8] font-light leading-relaxed">
+            <p className="text-sm text-[var(--lp-text2)] font-light leading-relaxed">
               All data transmitted between your browser and our servers is encrypted using TLS 1.3. Generated SBOMs are stored using AES-256 encryption at rest.
             </p>
           </section>

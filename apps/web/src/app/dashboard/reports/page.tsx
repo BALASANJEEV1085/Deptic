@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Search, Loader2, FileBarChart2, ShieldCheck, AlertTriangle, Download } from 'lucide-react';
-import { listScans, Scan, getCompliance, ComplianceResponse, shortId, relativeTime, ecosystemLabel, ecosystemColorClass, ntiaScoreColor, downloadPDFReport } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { listScans, Scan, getCompliance, ComplianceResponse, shortId, relativeTime, ecosystemLabel, ecosystemColorClass, downloadPDFReport } from '@/lib/api';
+import { cn, getComplianceStatus } from '@/lib/utils';
 
 type ReportRow = Scan & {
   compliance?: ComplianceResponse | null;
@@ -26,18 +26,33 @@ function NtiaScoreCell({ score, loading }: { score: number | undefined; loading:
   if (loading) return <Loader2 className="h-4 w-4 animate-spin text-zinc-600 mx-auto" />;
   if (score === undefined) return <span className="text-zinc-600 text-xs italic">N/A</span>;
 
+  const s = getComplianceStatus(score);
   const pct = Math.min(100, Math.max(0, score));
-  const color = ntiaScoreColor(score);
 
   return (
     <div className="flex flex-col items-center gap-1.5">
-      <span className={cn("text-lg font-extrabold leading-none", color)}>{score}</span>
-      {/* mini progress bar */}
-      <div className="w-16 h-1 bg-white/[0.04] rounded-full overflow-hidden">
-        <div
-          className={cn("h-full rounded-full", score === 100 ? 'bg-[#22c55e]' : score >= 60 ? 'bg-orange-500' : 'bg-red-500')}
-          style={{ width: `${pct}%` }}
-        />
+      <span className={cn(
+        "text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-widest",
+        s.color === 'green' ? "bg-[#22c55e]/10 text-[#22c55e] border-[#22c55e]/20" :
+        s.color === 'amber' ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
+        "bg-red-500/10 text-red-400 border-red-500/20"
+      )}>
+        {s.label}
+      </span>
+      <div className="flex items-center gap-1.5">
+        <span className={cn(
+          "text-[11px] font-bold",
+          s.color === 'green' ? "text-[#22c55e]" : s.color === 'amber' ? "text-amber-400" : "text-red-400"
+        )}>{score}</span>
+        {/* mini progress bar */}
+        <div className="w-12 h-0.5 bg-white/[0.04] rounded-full overflow-hidden">
+          <div
+            className={cn("h-full rounded-full",
+              s.color === 'green' ? 'bg-[#22c55e]' : s.color === 'amber' ? 'bg-amber-500' : 'bg-red-500'
+            )}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
       </div>
     </div>
   );
@@ -54,7 +69,7 @@ function ComplianceBadge({ compliant, loading }: { compliant: boolean | undefine
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[9px] font-extrabold uppercase tracking-widest bg-red-600 text-white border border-red-600">
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[9px] font-extrabold uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/20">
       <AlertTriangle className="h-3 w-3" /> Non-Compliant
     </span>
   );
@@ -110,8 +125,8 @@ export default function ReportsPage() {
   const filteredReports = reports.filter(r => {
     const repoName = (r.repo_name || r.id).toLowerCase();
     if (!repoName.includes(searchQuery.toLowerCase())) return false;
-    if (filter === 'compliant') return r.compliance?.ntia.compliant === true;
-    if (filter === 'non-compliant') return r.compliance && r.compliance.ntia.compliant === false;
+    if (filter === 'compliant') return (r.compliance?.ntia.score ?? 0) >= 95;
+    if (filter === 'non-compliant') return r.compliance != null && (r.compliance.ntia.score ?? 0) < 95;
     return true;
   });
 

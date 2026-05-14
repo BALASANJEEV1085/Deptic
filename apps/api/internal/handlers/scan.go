@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"sync"
@@ -110,6 +111,7 @@ func RegisterRoutes(api fiber.Router, database *sql.DB, redisClient *redis.Clien
 	api.Get("/vulnerabilities", h.HandleGetAllVulnerabilities)
 	api.Get("/projects", h.HandleListProjects)
 	api.Get("/projects/:projectID/scans", h.HandleListScans)
+	api.Get("/github/repos", h.HandleListGitHubRepos)
 	api.Get("/dashboard/stats", h.HandleGetDashboardStats)
 	api.Get("/sboms/:sbomID/download", h.HandleDownloadSBOM)
 	api.Post("/sboms/:sbomID/share", h.HandleCreateShareLink)
@@ -316,7 +318,28 @@ func (h *ScanHandler) HandleCreateScan(c *fiber.Ctx) error {
 			GeneratedAt: time.Now(),
 			RepoName:    repo,
 		}
-		ntiaResult := compliance.CheckNTIA(allPackages, sbomMeta)
+
+		_, dbComps, err := db.GetScanWithComponents(ctx, h.db, scanID)
+		var checkPackages []scanner.Package
+		if err == nil {
+			for _, c := range dbComps {
+				checkPackages = append(checkPackages, scanner.Package{
+					Name:        c.Name,
+					Version:     c.Version,
+					VersionSpec: c.VersionSpec,
+					License:     c.License,
+					Ecosystem:   c.Ecosystem,
+					Depth:       c.Depth,
+					ParentName:  c.ParentName,
+					SourcePath:  c.SourcePath,
+				})
+			}
+		} else {
+			checkPackages = allPackages
+		}
+
+		log.Printf("CheckNTIA input: %d components", len(checkPackages))
+		ntiaResult := compliance.CheckNTIA(checkPackages, sbomMeta)
 		euCompliant := compliance.CheckEUCRA(ntiaResult)
 
 		detailBytes, _ := json.Marshal(ntiaResult)
@@ -860,5 +883,41 @@ func (h *ScanHandler) HandleGetAllVulnerabilities(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"vulnerabilities": vulns,
+	})
+}
+
+// HandleListGitHubRepos handles GET /api/github/repos
+func (h *ScanHandler) HandleListGitHubRepos(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+
+	// Fetch GitHub OAuth token from Supabase auth.identities
+	var providerToken sql.NullString
+	err := h.db.QueryRowContext(c.Context(), `
+		SELECT identity_data->>'provider_token' 
+		FROM auth.identities 
+		WHERE user_id = $1 AND provider = 'github'
+		LIMIT 1
+	`, userID).Scan(&providerToken)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "GitHub not connected"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch GitHub token"})
+	}
+
+	githubToken := providerToken.String
+	ghClient := github.NewClient(githubToken)
+
+	fmt.Printf("Fetching repositories for user %s...\n", userID)
+	repos, err := ghClient.ListUserRepositories(c.Context())
+	if err != nil {
+		fmt.Printf("Error fetching GitHub repos: %v\n", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch repositories: " + err.Error()})
+	}
+	fmt.Printf("Successfully fetched %d repositories for user %s\n", len(repos), userID)
+
+	return c.JSON(fiber.Map{
+		"repositories": repos,
 	})
 }

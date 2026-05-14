@@ -71,9 +71,19 @@ func (h *ScanHandler) GetCompliance(c *fiber.Ctx) error {
 			fmt.Printf("Failed to self-heal compliance for %s: %v\n", scanID, err)
 		}
 		
+		var status string
+		if result.Score >= 95 {
+			status = "COMPLIANT"
+		} else if result.Score >= 75 {
+			status = "PARTIALLY COMPLIANT"
+		} else {
+			status = "NON-COMPLIANT"
+		}
+		
 		return c.JSON(fiber.Map{
 			"ntia":             result,
 			"eu_cra_compliant": euCompliant,
+			"status":           status,
 		})
 	}
 
@@ -82,8 +92,18 @@ func (h *ScanHandler) GetCompliance(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to parse compliance detail"})
 	}
 
+	var status string
+	if result.Score >= 95 {
+		status = "COMPLIANT"
+	} else if result.Score >= 75 {
+		status = "PARTIALLY COMPLIANT"
+	} else {
+		status = "NON-COMPLIANT"
+	}
+
 	return c.JSON(fiber.Map{
 		"ntia":             result,
 		"eu_cra_compliant": euCompliant,
+		"status":           status,
 	})
 }
