@@ -19,6 +19,7 @@ import (
 	"github.com/sbom-io/api/internal/compliance"
 	"github.com/sbom-io/api/internal/db"
 	"github.com/sbom-io/api/internal/github"
+	"github.com/sbom-io/api/internal/notify"
 	"github.com/sbom-io/api/internal/scanner"
 	"github.com/sbom-io/api/internal/vuln"
 )
@@ -96,17 +97,32 @@ type ScanHandler struct {
 // RegisterRoutes registers the scan endpoints to the provided Fiber router
 func RegisterRoutes(api fiber.Router, database *sql.DB, redisClient *redis.Client) {
 	h := &ScanHandler{db: database, rdb: redisClient}
+	ih := NewIntegrationsHandler(database)
 
 	// Public routes (no auth)
 	api.Get("/share/:token", h.HandleViewShareLink)
 
+	// CLI scan — authenticated by X-API-Key header only, NO JWT
+	api.Post("/scan-cli", h.ScanCLI)
+
 	// Apply JWT middleware to subsequent routes
 	api.Use(JWTAuthMiddleware())
 
+	// API Key management routes
+	api.Post("/keys", h.HandleCreateKey)
+	api.Get("/keys", h.HandleListKeys)
+	api.Delete("/keys/:keyID", h.HandleDeleteKey)
+
+	ih.RegisterRoutes(api)
+
 	api.Post("/scans", h.HandleCreateScan)
 	api.Get("/scans", h.HandleListAllScans)
+	api.Get("/scans/audit/:auditID", h.HandleResolveAuditID)
 	api.Get("/scans/:scanID", h.HandleGetScan)
 	api.Get("/scans/:scanID/vulnerabilities", h.HandleGetScanVulnerabilities)
+	api.Post("/scans/:scanID/fix-pr", h.HandleCreateFixPR)
+	api.Get("/scans/:scanID/fix-pr/status", h.HandleGetFixPRStatus)
+	api.Get("/scans/:scanID/fix-prs", h.HandleGetFixPRs)
 	api.Post("/scans/:scanID/sbom", h.HandleGenerateSBOM)
 	api.Get("/vulnerabilities", h.HandleGetAllVulnerabilities)
 	api.Get("/projects", h.HandleListProjects)
@@ -121,6 +137,7 @@ func RegisterRoutes(api fiber.Router, database *sql.DB, redisClient *redis.Clien
 	api.Get("/scans/:scanID/report/pdf", h.DownloadPDFReport)
 	api.Delete("/sboms/:sbomID/shares/:token", h.HandleRevokeShareLink)
 }
+
 
 func deriveRepoName(repoURL, id string) string {
 	if repoURL != "" {
@@ -305,9 +322,22 @@ func (h *ScanHandler) HandleCreateScan(c *fiber.Ctx) error {
 
 		// 4. Vulnerability Matcher
 		vulns, err := vuln.MatchVulnerabilities(ctx, h.db, scanID)
+		var criticalCves, highCves, mediumCves, lowCves int
 		if err == nil && len(vulns) > 0 {
 			if err := vuln.SaveComponentVulns(ctx, h.db, vulns); err != nil {
 				fmt.Printf("Failed to save vulnerabilities: %v\n", err)
+			}
+			for _, v := range vulns {
+				switch v.Severity {
+				case "CRITICAL":
+					criticalCves++
+				case "HIGH":
+					highCves++
+				case "MEDIUM":
+					mediumCves++
+				case "LOW":
+					lowCves++
+				}
 			}
 		}
 
@@ -350,6 +380,131 @@ func (h *ScanHandler) HandleCreateScan(c *fiber.Ctx) error {
 		// 6. Finalize scan status
 		_ = db.UpdateScanStatus(ctx, h.db, scanID, "done", ecosystemStr)
 		fmt.Printf("Scan done: %d components, ecosystems=%s\n", len(allPackages), ecosystemStr)
+
+		// 7. Send Notifications
+		var slackConfigJSON string
+		var slackEnabled bool
+		err = h.db.QueryRowContext(ctx, "SELECT config, enabled FROM integrations WHERE user_id = $1 AND type = 'slack'", userID).Scan(&slackConfigJSON, &slackEnabled)
+		if err == nil && slackEnabled && len(vulns) > 0 {
+			var cfg notify.SlackConfig
+			if err := json.Unmarshal([]byte(slackConfigJSON), &cfg); err == nil && cfg.WebhookURL != "" {
+				
+				// Sort vulns by severity before displaying
+				sortedVulns := make([]vuln.ComponentVuln, len(vulns))
+				copy(sortedVulns, vulns)
+				severityRank := map[string]int{"CRITICAL": 1, "HIGH": 2, "MEDIUM": 3, "LOW": 4}
+				for i := 0; i < len(sortedVulns)-1; i++ {
+					for j := i + 1; j < len(sortedVulns); j++ {
+						r1, ok1 := severityRank[sortedVulns[i].Severity]
+						r2, ok2 := severityRank[sortedVulns[j].Severity]
+						if !ok1 { r1 = 5 }
+						if !ok2 { r2 = 5 }
+						if r2 < r1 {
+							sortedVulns[i], sortedVulns[j] = sortedVulns[j], sortedVulns[i]
+						}
+					}
+				}
+
+				var threatDetails strings.Builder
+				threatDetails.WriteString("*Top Threats Found:*\n")
+				for i, v := range sortedVulns {
+					if i >= 5 {
+						threatDetails.WriteString(fmt.Sprintf("\n...and %d more\n", len(sortedVulns)-5))
+						break
+					}
+					var compName, compVersion string
+					h.db.QueryRowContext(ctx, "SELECT name, version FROM components WHERE id = $1", v.ComponentID).Scan(&compName, &compVersion)
+					threatDetails.WriteString(fmt.Sprintf("• `%s@%s` - %s (%s)\n", compName, compVersion, v.CVEID, v.Severity))
+				}
+
+				msg := notify.SlackMessage{
+					Blocks: []interface{}{
+						map[string]interface{}{"type": "header", "text": map[string]interface{}{"type": "plain_text", "text": "🚨 SBOM.io Security Alert"}},
+						map[string]interface{}{"type": "section", "fields": []interface{}{
+							map[string]interface{}{"type": "mrkdwn", "text": "*Repository:*\n" + repo},
+							map[string]interface{}{"type": "mrkdwn", "text": fmt.Sprintf("*Audit ID:*\n`%s`", scanID)},
+						}},
+						map[string]interface{}{"type": "section", "fields": []interface{}{
+							map[string]interface{}{"type": "mrkdwn", "text": fmt.Sprintf("*Critical:* %d", criticalCves)},
+							map[string]interface{}{"type": "mrkdwn", "text": fmt.Sprintf("*High:* %d", highCves)},
+							map[string]interface{}{"type": "mrkdwn", "text": fmt.Sprintf("*Medium:* %d", mediumCves)},
+							map[string]interface{}{"type": "mrkdwn", "text": fmt.Sprintf("*NTIA Score:* %d/100", ntiaResult.Score)},
+						}},
+						map[string]interface{}{"type": "section", "text": map[string]interface{}{"type": "mrkdwn", "text": threatDetails.String()}},
+						map[string]interface{}{"type": "actions", "elements": []interface{}{
+							map[string]interface{}{"type": "button", "text": map[string]interface{}{"type": "plain_text", "text": "View Report"}, "url": "https://sbom.io/dashboard/scans/" + scanID, "style": "primary"},
+							map[string]interface{}{"type": "button", "text": map[string]interface{}{"type": "plain_text", "text": "Fix with PR"}, "url": "https://sbom.io/dashboard/scans/" + scanID},
+						}},
+					},
+				}
+				notify.SendSlackNotification(ctx, cfg.WebhookURL, msg)
+			}
+		}
+
+		var jiraConfigJSON string
+		var jiraEnabled bool
+		err = h.db.QueryRowContext(ctx, "SELECT config, enabled FROM integrations WHERE user_id = $1 AND type = 'jira'", userID).Scan(&jiraConfigJSON, &jiraEnabled)
+		if err == nil && jiraEnabled && len(vulns) > 0 {
+			var cfg notify.JiraConfig
+			if err := json.Unmarshal([]byte(jiraConfigJSON), &cfg); err == nil && cfg.BaseURL != "" {
+				// Group by package
+				pkgVulns := make(map[string][]vuln.ComponentVuln)
+				for _, v := range vulns {
+					if v.Severity == "CRITICAL" || v.Severity == "HIGH" {
+						// Actually we need the component name
+						var compName string
+						h.db.QueryRowContext(ctx, "SELECT name FROM components WHERE id = $1", v.ComponentID).Scan(&compName)
+						if compName != "" {
+							pkgVulns[compName] = append(pkgVulns[compName], v)
+						}
+					}
+				}
+
+				for pkgName, pkgVs := range pkgVulns {
+					highestSev := "HIGH"
+					for _, v := range pkgVs {
+						if v.Severity == "CRITICAL" {
+							highestSev = "CRITICAL"
+						}
+					}
+
+					summary := fmt.Sprintf("[SBOM.io] %s CVE in %s — %s in %s", highestSev, repo, pkgVs[0].CVEID, pkgName)
+					content := fmt.Sprintf("SBOM.io detected vulnerabilities in %s (Audit ID: %s):\n", pkgName, scanID)
+					for _, v := range pkgVs {
+						content += fmt.Sprintf("- %s (%s): %s\n", v.CVEID, v.Severity, v.Summary)
+					}
+
+					issue := notify.JiraIssue{}
+					issue.Fields.Project = map[string]string{"key": cfg.ProjectKey}
+					issue.Fields.Summary = summary
+					issue.Fields.IssueType = map[string]string{"name": "Task"}
+					
+					issue.Fields.Labels = []string{"security", "sbom-io", "cve", strings.ToLower(highestSev)}
+					issue.Fields.Description = map[string]any{
+						"type": "doc", "version": 1,
+						"content": []map[string]any{
+							{
+								"type": "paragraph",
+								"content": []map[string]any{
+									{"type": "text", "text": content},
+								},
+							},
+						},
+					}
+
+					key, err := notify.CreateJiraTicket(ctx, cfg, issue)
+					if err != nil {
+						fmt.Printf("Failed to create Jira ticket for %s: %v\n", pkgName, err)
+					} else if key != "" {
+						fmt.Printf("Successfully created Jira ticket %s\n", key)
+						url := strings.TrimRight(cfg.BaseURL, "/") + "/browse/" + key
+						for _, v := range pkgVs {
+							h.db.ExecContext(ctx, "UPDATE component_vulnerabilities SET jira_ticket_key = $1, jira_ticket_url = $2 WHERE cve_id = $3 AND component_id = $4", key, url, v.CVEID, v.ComponentID)
+						}
+					}
+				}
+			}
+		}
 	}()
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
@@ -422,6 +577,12 @@ func (h *ScanHandler) HandleGetScan(c *fiber.Ctx) error {
 		}
 	}
 
+	var isOwner bool
+	userID, ok := c.Locals("user_id").(string)
+	if ok && userID != "" {
+		h.db.QueryRowContext(c.Context(), "SELECT EXISTS(SELECT 1 FROM projects WHERE id=$1 AND user_id=$2)", scan.ProjectID, userID).Scan(&isOwner)
+	}
+
 	return c.JSON(fiber.Map{
 		"scan":                scan,
 		"components":          components,
@@ -429,7 +590,27 @@ func (h *ScanHandler) HandleGetScan(c *fiber.Ctx) error {
 		"ecosystems":          ecosystemList,
 		"ecosystem_breakdown": breakdown,
 		"manifest_files":      manifestFiles,
+		"is_owner":            isOwner,
 	})
+}
+
+// HandleResolveAuditID handles GET /api/scans/audit/:auditID
+func (h *ScanHandler) HandleResolveAuditID(c *fiber.Ctx) error {
+	auditID := c.Params("auditID")
+	
+	var fullID string
+	err := h.db.QueryRowContext(c.Context(), `
+		SELECT id FROM scans WHERE id::text LIKE $1 || '%' LIMIT 1
+	`, auditID).Scan(&fullID)
+	
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Scan not found with this Audit ID"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Database error resolving Audit ID"})
+	}
+	
+	return c.JSON(fiber.Map{"scan_id": fullID})
 }
 
 // HandleListScans handles GET /api/projects/:projectID/scans
@@ -574,7 +755,7 @@ func (h *ScanHandler) HandleGetDashboardStats(c *fiber.Ctx) error {
 		JOIN projects p ON p.id = s.project_id
 		WHERE p.user_id = $1
 		ORDER BY s.created_at DESC
-		LIMIT 5
+		LIMIT 15
 	`, userID)
 	
 	if err == nil {
@@ -779,7 +960,19 @@ type ScanVulnResponse struct {
 		Medium   int `json:"medium"`
 		Low      int `json:"low"`
 	} `json:"summary"`
-	Vulnerabilities []VulnerabilityResponse `json:"vulnerabilities"`
+	Vulnerabilities []VulnerabilityResponse `json:"vulnerabilities,omitempty"`
+	Grouped         []GroupedVulnResponse   `json:"grouped,omitempty"`
+}
+
+type GroupedVulnResponse struct {
+	ComponentName    string   `json:"component_name"`
+	ComponentVersion string   `json:"component_version"`
+	Ecosystem        string   `json:"ecosystem"`
+	HighestSeverity  string   `json:"highest_severity"`
+	CVECount         int      `json:"cve_count"`
+	CVEs             []string `json:"cves"`
+	CVEsDetail       []map[string]string `json:"cves_detail"`
+	CleanVersion     string   `json:"clean_version"`
 }
 
 // HandleGetScanVulnerabilities handles GET /api/scans/:scanID/vulnerabilities
@@ -791,8 +984,10 @@ func (h *ScanHandler) HandleGetScanVulnerabilities(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get vulnerability summary"})
 	}
 
+	grouped := c.Query("grouped") == "true"
+
 	query := `
-		SELECT c.name, c.version, cv.cve_id, cv.severity, cv.summary, cv.fixed_version
+		SELECT c.name, c.version, c.ecosystem, cv.cve_id, cv.severity, cv.summary, cv.fixed_version
 		FROM component_vulnerabilities cv
 		JOIN components c ON c.id = cv.component_id
 		WHERE c.scan_id = $1
@@ -814,9 +1009,13 @@ func (h *ScanHandler) HandleGetScanVulnerabilities(c *fiber.Ctx) error {
 	var vulns []VulnerabilityResponse
 	for rows.Next() {
 		var v VulnerabilityResponse
-		if err := rows.Scan(&v.ComponentName, &v.ComponentVersion, &v.CVEID, &v.Severity, &v.Summary, &v.FixedVersion); err != nil {
+		var eco string
+		if err := rows.Scan(&v.ComponentName, &v.ComponentVersion, &eco, &v.CVEID, &v.Severity, &v.Summary, &v.FixedVersion); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to parse vulnerability row"})
 		}
+		// Temporarily store ecosystem in ProjectName or somewhere just to construct grouped
+		// or just use a local struct. We will group it manually.
+		v.ProjectName = eco 
 		vulns = append(vulns, v)
 	}
 
@@ -824,13 +1023,71 @@ func (h *ScanHandler) HandleGetScanVulnerabilities(c *fiber.Ctx) error {
 		vulns = []VulnerabilityResponse{}
 	}
 
-	res := ScanVulnResponse{
-		Vulnerabilities: vulns,
-	}
+	res := ScanVulnResponse{}
 	res.Summary.Critical = critical
 	res.Summary.High = high
 	res.Summary.Medium = medium
 	res.Summary.Low = low
+
+	if grouped {
+		groupMap := make(map[string]*GroupedVulnResponse)
+		var groupKeys []string
+		
+		sevRank := map[string]int{"CRITICAL": 1, "HIGH": 2, "MEDIUM": 3, "LOW": 4}
+
+		for _, v := range vulns {
+			key := v.ComponentName + "@" + v.ComponentVersion
+			if _, ok := groupMap[key]; !ok {
+				groupMap[key] = &GroupedVulnResponse{
+					ComponentName:    v.ComponentName,
+					ComponentVersion: v.ComponentVersion,
+					Ecosystem:        v.ProjectName,
+					HighestSeverity:  v.Severity,
+					CVEs:             []string{},
+					CVEsDetail:       []map[string]string{},
+				}
+				groupKeys = append(groupKeys, key)
+			}
+			
+			g := groupMap[key]
+			
+			// Update highest severity
+			curRank := sevRank[v.Severity]
+			if curRank == 0 { curRank = 5 }
+			highestRank := sevRank[g.HighestSeverity]
+			if highestRank == 0 { highestRank = 5 }
+			
+			if curRank < highestRank {
+				g.HighestSeverity = v.Severity
+			}
+			
+			g.CVEs = append(g.CVEs, v.CVEID)
+			g.CVEsDetail = append(g.CVEsDetail, map[string]string{
+				"id": v.CVEID,
+				"severity": v.Severity,
+				"summary": v.Summary,
+			})
+			g.CVECount++
+			
+			// We just keep one fixed version if it's there
+			if v.FixedVersion != "" && g.CleanVersion == "" {
+				g.CleanVersion = v.FixedVersion
+			}
+		}
+		
+		for _, k := range groupKeys {
+			res.Grouped = append(res.Grouped, *groupMap[k])
+		}
+		if res.Grouped == nil {
+			res.Grouped = []GroupedVulnResponse{}
+		}
+	} else {
+		// Clean up ProjectName abuse
+		for i := range vulns {
+			vulns[i].ProjectName = ""
+		}
+		res.Vulnerabilities = vulns
+	}
 
 	return c.JSON(res)
 }
@@ -890,23 +1147,32 @@ func (h *ScanHandler) HandleGetAllVulnerabilities(c *fiber.Ctx) error {
 func (h *ScanHandler) HandleListGitHubRepos(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 
-	// Fetch GitHub OAuth token from Supabase auth.identities
-	var providerToken sql.NullString
-	err := h.db.QueryRowContext(c.Context(), `
-		SELECT identity_data->>'provider_token' 
-		FROM auth.identities 
-		WHERE user_id = $1 AND provider = 'github'
-		LIMIT 1
-	`, userID).Scan(&providerToken)
+	// Prefer fresh token passed from the frontend session (avoids stale DB token)
+	githubToken := c.Get("X-GitHub-Token")
 
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "GitHub not connected"})
+	if githubToken == "" {
+		// Fallback: fetch from Supabase auth.identities
+		var providerToken sql.NullString
+		dbErr := h.db.QueryRowContext(c.Context(), `
+			SELECT identity_data->>'provider_token' 
+			FROM auth.identities 
+			WHERE user_id = $1 AND provider = 'github'
+			LIMIT 1
+		`, userID).Scan(&providerToken)
+
+		if dbErr != nil {
+			if dbErr == sql.ErrNoRows {
+				return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "GitHub not connected"})
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch GitHub token"})
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch GitHub token"})
+		githubToken = providerToken.String
 	}
 
-	githubToken := providerToken.String
+	if githubToken == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "GitHub not connected"})
+	}
+
 	ghClient := github.NewClient(githubToken)
 
 	fmt.Printf("Fetching repositories for user %s...\n", userID)

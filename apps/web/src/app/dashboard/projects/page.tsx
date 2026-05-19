@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Search, Loader2, Lock, Globe, Star, GitBranch, AlertCircle, RefreshCw, ArrowUpDown, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { listGitHubRepos } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -198,6 +199,7 @@ export default function ProjectsPage() {
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
   const [status, setStatus] = useState<'loading' | 'connected' | 'not_connected' | 'error'>('loading');
   const [connectingOAuth, setConnectingOAuth] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState<FilterTab>('all');
@@ -207,37 +209,40 @@ export default function ProjectsPage() {
   const fetchRepos = useCallback(async () => {
     setStatus('loading');
     setError(null);
-    const supabase = createClient();
     try {
+      const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.provider_token;
-      if (!token) { setStatus('not_connected'); return; }
+      if (!session) { setStatus('not_connected'); return; }
 
-      const resp = await fetch(
-        'https://api.github.com/user/repos?sort=pushed&per_page=100&visibility=all',
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/vnd.github+json',
-            'X-GitHub-Api-Version': '2022-11-28',
-          },
-        }
-      );
-      if (resp.status === 401) { setStatus('not_connected'); return; }
-      if (!resp.ok) {
-        const b = await resp.json().catch(() => ({}));
-        throw new Error(b.message || `GitHub API error ${resp.status}`);
-      }
-      const data: GitHubRepo[] = await resp.json();
-      setRepos(data);
+      const data = await listGitHubRepos();
+      setRepos(data.repositories as GitHubRepo[]);
       setStatus('connected');
     } catch (e: any) {
-      setError(e.message || 'Unknown error');
-      setStatus('error');
+      if (e.message && (e.message.includes("GitHub not connected") || e.message.includes("401") || e.message.includes("Bad credentials"))) {
+        setStatus('not_connected');
+      } else {
+        setError(e.message || 'Unknown error');
+        setStatus('error');
+      }
     }
   }, []);
 
   useEffect(() => { fetchRepos(); }, [fetchRepos]);
+
+  // Force re-auth with full repo scope (for private repos)
+  const handleReconnectWithFullAccess = useCallback(async () => {
+    setReconnecting(true);
+    const supabase = createClient();
+    const { error: e } = await supabase.auth.signInWithOAuth({
+      provider: 'github',
+      options: {
+        redirectTo: `${window.location.origin}/dashboard/projects`,
+        scopes: 'repo read:user read:org',
+        queryParams: { prompt: 'consent' }, // Force GitHub to re-show permission screen
+      },
+    });
+    if (e) { setError(e.message); setReconnecting(false); }
+  }, []);
 
   const handleConnect = useCallback(async () => {
     setConnectingOAuth(true);
@@ -246,7 +251,8 @@ export default function ProjectsPage() {
       provider: 'github',
       options: {
         redirectTo: `${window.location.origin}/dashboard/projects`,
-        scopes: 'repo read:user',
+        scopes: 'repo read:user read:org',
+        queryParams: { prompt: 'consent' },
       },
     });
     if (e) { setError(e.message); setConnectingOAuth(false); }
@@ -293,12 +299,24 @@ export default function ProjectsPage() {
           </p>
         </div>
         {status === 'connected' && (
-          <button
-            onClick={fetchRepos}
-            className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.07] px-3 py-1.5 rounded-lg transition-all"
-          >
-            <RefreshCw className="h-3 w-3" /> Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={fetchRepos}
+              className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.07] px-3 py-1.5 rounded-lg transition-all"
+            >
+              <RefreshCw className="h-3 w-3" /> Refresh
+            </button>
+            {repos.filter(r => r.private).length === 0 && repos.length > 0 && (
+              <button
+                onClick={handleReconnectWithFullAccess}
+                disabled={reconnecting}
+                className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-amber-400 hover:text-amber-300 bg-amber-400/[0.06] hover:bg-amber-400/[0.12] border border-amber-400/20 hover:border-amber-400/40 px-3 py-1.5 rounded-lg transition-all"
+              >
+                {reconnecting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Lock className="h-3 w-3" />}
+                Grant Private Access
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -333,6 +351,27 @@ export default function ProjectsPage() {
       {/* ── Connected: toolbar + table ── */}
       {status === 'connected' && (
         <div>
+          {/* Private repos missing banner */}
+          {repos.filter(r => r.private).length === 0 && repos.length > 0 && (
+            <div className="flex items-center justify-between gap-4 my-4 px-4 py-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.04]">
+              <div className="flex items-center gap-3">
+                <Lock className="h-4 w-4 text-amber-400 shrink-0" />
+                <div>
+                  <p className="text-[12px] font-semibold text-amber-300">Private repositories not visible</p>
+                  <p className="text-[10px] text-amber-400/70 mt-0.5">Your current GitHub authorization only includes public repos. Click to grant private repo access.</p>
+                </div>
+              </div>
+              <button
+                onClick={handleReconnectWithFullAccess}
+                disabled={reconnecting}
+                className="shrink-0 inline-flex items-center gap-2 bg-amber-400 hover:bg-amber-300 disabled:opacity-60 text-black text-[9px] font-bold uppercase tracking-widest px-4 py-2 rounded-lg transition-all whitespace-nowrap"
+              >
+                {reconnecting ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                Reconnect with Full Access
+              </button>
+            </div>
+          )}
+
           {/* Toolbar */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 py-4 border-b border-white/[0.04]">
             {/* Tabs */}

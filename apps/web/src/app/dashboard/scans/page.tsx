@@ -1,57 +1,103 @@
 "use client";
 
-import { useEffect, useState, useMemo } from 'react';
-import Link from 'next/link';
-import { Search, Loader2, ScanSearch, Copy, Check, ChevronDown } from 'lucide-react';
-import { listScans, Scan, ecosystemLabel, ecosystemColorClass, relativeTime, shortId, ntiaScoreColor } from '@/lib/api';
-import { cn, getComplianceStatus } from '@/lib/utils';
+import { useEffect, useState, useMemo } from "react";
+import Link from "next/link";
+import { Search, ScanSearch, Copy, Check, ChevronDown } from "lucide-react";
+import {
+  listScans,
+  Scan,
+  ecosystemLabel,
+  relativeTime,
+  shortId,
+  downloadPDFReport,
+} from "@/lib/api";
+import { cn, getComplianceStatus } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { downloadPDFReport } from '@/lib/api';
+} from "@/components/ui/dropdown-menu";
+
+/* ── Helpers ──────────────────────────────────────────────────────────── */
+function StatusDot({ status }: { status: string }) {
+  const color =
+    status === "done" ? "#22c55e" : status === "failed" ? "#ef4444" : "#f59e0b";
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 13,
+        color,
+      }}
+    >
+      <span
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: "50%",
+          background: color,
+          flexShrink: 0,
+        }}
+        className={status === "running" ? "status-dot-running" : ""}
+      />
+      {status === "done" ? "Done" : status === "failed" ? "Failed" : "Running"}
+    </span>
+  );
+}
 
 function EcoBadge({ eco, status }: { eco: string; status?: string }) {
   return (
-    <span className={cn(
-      "inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border",
-      ecosystemColorClass(eco)
-    )}>
+    <span
+      style={{
+        background: "#16191f",
+        color: "#6b7280",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 11,
+        fontWeight: 500,
+        padding: "2px 8px",
+        borderRadius: 4,
+        border: "1px solid #1e2230",
+        display: "inline-block",
+      }}
+    >
       {ecosystemLabel(eco, status)}
     </span>
   );
 }
 
-function StatusPill({ status }: { status: string }) {
-  if (status === 'done') return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20">
-      <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]" />Done
-    </span>
-  );
-  if (status === 'failed') return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/20">
-      <span className="h-1.5 w-1.5 rounded-full bg-red-500" />Failed
-    </span>
-  );
-  return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/20">
-      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />Running
-    </span>
-  );
-}
-
-function VulnBadges({ crit, high, med, low }: { crit: number; high: number; med: number; low: number }) {
+function SeverityCompact({
+  crit, high, med, low,
+}: {
+  crit: number; high: number; med: number; low: number;
+}) {
   const total = crit + high + med + low;
-  if (total === 0) return <span className="text-[10px] text-zinc-600">—</span>;
+  if (total === 0)
+    return (
+      <span
+        style={{ fontFamily: "DM Mono, monospace", fontSize: 12, color: "#374151" }}
+      >
+        —
+      </span>
+    );
+  const parts: string[] = [];
+  if (crit > 0) parts.push(`${crit}C`);
+  if (high > 0) parts.push(`${high}H`);
+  if (med > 0)  parts.push(`${med}M`);
+  if (low > 0)  parts.push(`${low}L`);
   return (
-    <div className="flex flex-wrap gap-1">
-      {crit > 0 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-500/15 text-red-400">{crit} CRIT</span>}
-      {high > 0 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-400">{high} HIGH</span>}
-      {med  > 0 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">{med} MED</span>}
-      {low  > 0 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-700/60 text-zinc-400">{low} LOW</span>}
-    </div>
+    <span
+      style={{
+        fontFamily: "DM Mono, monospace",
+        fontSize: 12,
+        color: crit > 0 ? "#ef4444" : high > 0 ? "#f97316" : "#f59e0b",
+      }}
+    >
+      {parts.join(" ")}
+    </span>
   );
 }
 
@@ -64,208 +110,430 @@ function CopyId({ id }: { id: string }) {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <span className="group/copy flex items-center gap-1">
-      <span className="font-mono text-[10px] text-zinc-600">{shortId(id)}</span>
-      <button onClick={copy} className="opacity-0 group-hover/copy:opacity-100 transition-opacity ml-0.5">
-        {copied
-          ? <Check className="h-3 w-3 text-[#22c55e]" />
-          : <Copy className="h-3 w-3 text-zinc-600 hover:text-zinc-400" />}
+    <span
+      style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+      className="group/copy"
+    >
+      <span
+        style={{ fontFamily: "DM Mono, monospace", fontSize: 10, color: "#374151" }}
+      >
+        {shortId(id)}
+      </span>
+      <button
+        onClick={copy}
+        style={{
+          opacity: 0,
+          color: "#374151",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          padding: 0,
+          display: "flex",
+        }}
+        className="group-hover/copy:opacity-100 transition-opacity"
+      >
+        {copied ? (
+          <Check size={10} color="#22c55e" />
+        ) : (
+          <Copy size={10} />
+        )}
       </button>
     </span>
   );
 }
 
+function NtiaCell({ score, status }: { score?: number; status: string }) {
+  if (status !== "done")
+    return (
+      <span style={{ fontFamily: "DM Mono, monospace", fontSize: 12, color: "#374151" }}>
+        —
+      </span>
+    );
+  if (score === undefined)
+    return (
+      <span style={{ fontFamily: "DM Mono, monospace", fontSize: 12, color: "#374151" }}>
+        N/A
+      </span>
+    );
+  const s = getComplianceStatus(score);
+  const color =
+    s.color === "green" ? "#22c55e" : s.color === "amber" ? "#f59e0b" : "#ef4444";
+  return (
+    <span
+      style={{
+        fontFamily: "DM Mono, monospace",
+        fontSize: 12,
+        fontWeight: 500,
+        color,
+      }}
+    >
+      {score}%
+    </span>
+  );
+}
+
+/* ── Skeleton ── */
 function SkeletonRow() {
   return (
-    <tr className="border-b border-white/[0.04]">
-      {[1,2,3,4,5,6,7,8].map(i => (
-        <td key={i} className="px-4 py-4">
-          <div className="h-3 bg-white/[0.04] rounded animate-pulse" style={{ width: `${50 + Math.random() * 40}%` }} />
+    <tr>
+      {[140, 80, 70, 60, 90, 60, 80, 50].map((w, i) => (
+        <td key={i} style={{ padding: "0 16px", height: 44 }}>
+          <div
+            className="skeleton"
+            style={{
+              height: 10,
+              width: w,
+              background: "#16191f",
+              borderRadius: 4,
+            }}
+          />
         </td>
       ))}
     </tr>
   );
 }
 
+/* ── FilterDropdown ── */
+function FilterDropdown({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: string[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "0 12px",
+          height: 34,
+          background: "#0e1015",
+          border: "1px solid #16191f",
+          borderRadius: 6,
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 13,
+          color: "#6b7280",
+          cursor: "pointer",
+          minWidth: 130,
+          justifyContent: "space-between",
+          outline: "none",
+          transition: "border-color 0.15s ease",
+        }}
+      >
+        {value === "All" ? label : value}
+        <ChevronDown size={13} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        style={{
+          background: "#0e1015",
+          border: "1px solid #16191f",
+          padding: 4,
+          minWidth: 130,
+        }}
+      >
+        {options.map((o) => (
+          <DropdownMenuItem
+            key={o}
+            onClick={() => onChange(o)}
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 13,
+              color: value === o ? "#22c55e" : "#c9d1e0",
+              padding: "6px 10px",
+              cursor: "pointer",
+              borderRadius: 4,
+            }}
+          >
+            {o}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/* ── Page ──────────────────────────────────────────────────────────────── */
 export default function ScansPage() {
   const [scans, setScans] = useState<Scan[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [ecoFilter, setEcoFilter] = useState('All');
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [ecoFilter, setEcoFilter] = useState("All");
 
   useEffect(() => {
     listScans()
-      .then(res => { setScans(res.scans || []); setLoading(false); })
-      .catch(err => { console.error(err); setLoading(false); });
+      .then((res) => {
+        setScans(res.scans || []);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        setLoading(false);
+      });
   }, []);
 
-  const filtered = useMemo(() => {
-    return scans.filter(s => {
-      const name = (s.repo_name || s.id).toLowerCase();
-      if (!name.includes(search.toLowerCase())) return false;
-      if (statusFilter !== 'All' && s.status !== statusFilter.toLowerCase()) return false;
-      if (ecoFilter !== 'All' && (s.ecosystem || 'unknown').toLowerCase() !== ecoFilter.toLowerCase()) return false;
-      return true;
-    });
-  }, [scans, search, statusFilter, ecoFilter]);
+  const ecosystems = useMemo(
+    () => ["All", ...Array.from(new Set(scans.map((s) => s.ecosystem || "unknown")))],
+    [scans]
+  );
 
-  const ecosystems = ['All', ...Array.from(new Set(scans.map(s => s.ecosystem || 'unknown')))];
+  const filtered = useMemo(
+    () =>
+      scans.filter((s) => {
+        const name = (s.repo_name || s.id).toLowerCase();
+        if (!name.includes(search.toLowerCase())) return false;
+        if (statusFilter !== "All" && s.status !== statusFilter.toLowerCase())
+          return false;
+        if (
+          ecoFilter !== "All" &&
+          (s.ecosystem || "unknown").toLowerCase() !== ecoFilter.toLowerCase()
+        )
+          return false;
+        return true;
+      }),
+    [scans, search, statusFilter, ecoFilter]
+  );
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-10">
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-white/[0.04] pb-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white mb-0.5">Scan History</h1>
-          <p className="text-[11px] text-zinc-500">All SBOM scans across your repositories.</p>
-        </div>
+      <div>
+        <h1
+          style={{
+            fontFamily: "var(--font-syne, Syne, sans-serif)",
+            fontSize: 24,
+            fontWeight: 700,
+            letterSpacing: "-0.5px",
+            color: "#e8ecf4",
+            margin: "0 0 4px",
+          }}
+        >
+          Scan History
+        </h1>
+        <p
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 14,
+            color: "#6b7280",
+            margin: 0,
+          }}
+        >
+          All SBOM scans across your repositories.
+        </p>
       </div>
 
-      {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-2.5">
+      {/* Filters */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         {/* Search */}
-        <div className="relative flex-1 min-w-[180px] max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-600" />
+        <div style={{ position: "relative", flex: 1, minWidth: 200, maxWidth: 320 }}>
+          <Search
+            size={14}
+            style={{
+              position: "absolute",
+              left: 10,
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "#374151",
+              pointerEvents: "none",
+            }}
+          />
           <input
             type="text"
-            placeholder="Search by repository..."
+            placeholder="Search repository…"
             value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-1.5 bg-white/[0.02] border border-white/[0.08] rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-[#22c55e]/40 transition-colors"
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              width: "100%",
+              height: 34,
+              paddingLeft: 34,
+              paddingRight: 12,
+              background: "#0e1015",
+              border: "1px solid #16191f",
+              borderRadius: 6,
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 13,
+              color: "#e8ecf4",
+              outline: "none",
+              transition: "border-color 0.15s ease",
+            }}
+            onFocus={(e) => (e.target.style.borderColor = "#22c55e")}
+            onBlur={(e) => (e.target.style.borderColor = "#16191f")}
           />
         </div>
 
-        {/* Status filter */}
-        <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-2 px-3 py-1.5 bg-white/[0.02] border border-white/[0.08] rounded-lg text-[10px] font-bold text-zinc-400 hover:bg-white/[0.04] transition-colors focus:outline-none min-w-[120px] justify-between">
-            {statusFilter === 'All' ? 'All Statuses' : statusFilter}
-            <ChevronDown className="h-3 w-3 text-zinc-600" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="bg-[#0d0e10] border-white/10 text-zinc-300 p-1 min-w-[120px]">
-            {['All', 'done', 'failed', 'running'].map(s => (
-              <DropdownMenuItem key={s} onClick={() => setStatusFilter(s)} className={cn("text-[11px] cursor-pointer focus:bg-white/5 rounded capitalize", statusFilter === s && "text-[#22c55e]")}>
-                {s === 'All' ? 'All Statuses' : s}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <FilterDropdown
+          label="All Statuses"
+          options={["All", "done", "failed", "running"]}
+          value={statusFilter}
+          onChange={setStatusFilter}
+        />
+        <FilterDropdown
+          label="All Ecosystems"
+          options={ecosystems}
+          value={ecoFilter}
+          onChange={setEcoFilter}
+        />
 
-        {/* Ecosystem filter */}
-        <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-2 px-3 py-1.5 bg-white/[0.02] border border-white/[0.08] rounded-lg text-[10px] font-bold text-zinc-400 hover:bg-white/[0.04] transition-colors focus:outline-none min-w-[120px] justify-between">
-            {ecoFilter === 'All' ? 'All Ecosystems' : ecoFilter}
-            <ChevronDown className="h-3 w-3 text-zinc-600" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="bg-[#0d0e10] border-white/10 text-zinc-300 p-1 min-w-[120px]">
-            {ecosystems.map(e => (
-              <DropdownMenuItem key={e} onClick={() => setEcoFilter(e)} className={cn("text-[11px] cursor-pointer focus:bg-white/5 rounded capitalize", ecoFilter === e && "text-[#22c55e]")}>
-                {e === 'All' ? 'All Ecosystems' : e}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <span className="text-[10px] text-zinc-600 ml-auto">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
+        <span
+          style={{
+            fontFamily: "DM Mono, monospace",
+            fontSize: 11,
+            color: "#374151",
+            marginLeft: "auto",
+          }}
+        >
+          {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+        </span>
       </div>
 
       {/* Table */}
-      <div className="border border-white/[0.05] rounded-xl overflow-hidden bg-card shadow-2xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className="bg-white/[0.02] border-b border-white/[0.05]">
+      <div
+        style={{
+          background: "#0e1015",
+          border: "1px solid #16191f",
+          borderRadius: 8,
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ overflowX: "auto" }}>
+          <table className="ds-table">
+            <thead>
               <tr>
-                <th className="px-4 py-3 font-bold text-[9px] uppercase tracking-widest text-zinc-500">Repository</th>
-                <th className="px-4 py-3 font-bold text-[9px] uppercase tracking-widest text-zinc-500">Ecosystem</th>
-                <th className="px-4 py-3 font-bold text-[9px] uppercase tracking-widest text-zinc-500">Status</th>
-                <th className="px-4 py-3 font-bold text-[9px] uppercase tracking-widest text-zinc-500">Components</th>
-                <th className="px-4 py-3 font-bold text-[9px] uppercase tracking-widest text-zinc-500">Vulnerabilities</th>
-                <th className="px-4 py-3 font-bold text-[9px] uppercase tracking-widest text-zinc-500 text-center">NTIA</th>
-                <th className="px-4 py-3 font-bold text-[9px] uppercase tracking-widest text-zinc-500">Date</th>
-                <th className="px-4 py-3 font-bold text-[9px] uppercase tracking-widest text-zinc-500 text-right">Actions</th>
+                <th>Repository</th>
+                <th>Ecosystem</th>
+                <th>Status</th>
+                <th>Components</th>
+                <th>Severity</th>
+                <th>NTIA</th>
+                <th>Date</th>
+                <th style={{ textAlign: "right" }}>Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/[0.04]">
+            <tbody>
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-16 text-center">
-                    <ScanSearch className="h-9 w-9 text-zinc-700 mx-auto mb-2" />
-                    <p className="text-zinc-600 text-xs">No scans found{search ? ` for "${search}"` : ''}.</p>
+                  <td
+                    colSpan={8}
+                    style={{
+                      textAlign: "center",
+                      padding: "64px 16px",
+                      color: "#374151",
+                    }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+                      <ScanSearch size={32} color="#1e2230" />
+                      <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13 }}>
+                        {search ? `No scans matching "${search}"` : "No scans found."}
+                      </span>
+                    </div>
                   </td>
                 </tr>
               ) : (
                 filtered.map((scan) => (
-                  <tr key={scan.id} className="group hover:bg-white/[0.02] transition-colors">
-                    <td className="px-4 py-3">
-                      <p className="font-semibold text-zinc-200 text-[13px] leading-tight mb-0.5">{scan.repo_name || '—'}</p>
-                      <CopyId id={scan.id} />
+                  <tr key={scan.id}>
+                    <td>
+                      <div>
+                        <p
+                          style={{
+                            fontFamily: "DM Sans, sans-serif",
+                            fontSize: 13,
+                            fontWeight: 500,
+                            color: "#e8ecf4",
+                            margin: "0 0 2px",
+                          }}
+                        >
+                          {scan.repo_name || "—"}
+                        </p>
+                        <CopyId id={scan.id} />
+                      </div>
                     </td>
-                    <td className="px-4 py-3"><EcoBadge eco={scan.ecosystem || ''} status={scan.status} /></td>
-                    <td className="px-4 py-3"><StatusPill status={scan.status} /></td>
-                    <td className="px-4 py-3">
-                      <span className="text-[13px] font-semibold text-zinc-300">{(scan.component_count ?? 0).toLocaleString()}</span>
+                    <td>
+                      <EcoBadge eco={scan.ecosystem || ""} status={scan.status} />
                     </td>
-                    <td className="px-4 py-3">
-                      <VulnBadges
+                    <td>
+                      <StatusDot status={scan.status} />
+                    </td>
+                    <td>
+                      <span
+                        style={{
+                          fontFamily: "DM Mono, monospace",
+                          fontSize: 13,
+                          color: "#c9d1e0",
+                        }}
+                      >
+                        {(scan.component_count ?? 0).toLocaleString()}
+                      </span>
+                    </td>
+                    <td>
+                      <SeverityCompact
                         crit={scan.critical_cves ?? 0}
                         high={scan.high_cves ?? 0}
                         med={scan.medium_cves ?? 0}
                         low={scan.low_cves ?? 0}
                       />
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      {scan.status === 'done' ? (() => {
-                        const s = getComplianceStatus(scan.ntia_score ?? 0);
-                        return (
-                          <span className={cn(
-                            "inline-block text-[8px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-widest",
-                            s.color === 'green' ? "bg-[#22c55e]/10 text-[#22c55e] border-[#22c55e]/20" :
-                            s.color === 'amber' ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
-                            "bg-red-500/10 text-red-400 border-red-500/20"
-                          )}>
-                            {s.label}
-                          </span>
-                        );
-                      })() : <span className="text-[10px] text-zinc-600">—</span>}
+                    <td>
+                      <NtiaCell score={scan.ntia_score} status={scan.status} />
                     </td>
-                    <td className="px-4 py-3">
+                    <td>
                       <span
-                        className="text-[11px] text-zinc-400"
+                        style={{
+                          fontFamily: "DM Mono, monospace",
+                          fontSize: 12,
+                          color: "#6b7280",
+                        }}
                         title={new Date(scan.created_at).toLocaleString()}
                       >
                         {relativeTime(scan.created_at)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
+                    <td style={{ textAlign: "right" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "flex-end",
+                          gap: 12,
+                        }}
+                      >
                         <Link
                           href={`/dashboard/scans/${scan.id}`}
-                          className="text-[9px] font-bold uppercase tracking-widest text-[#22c55e] hover:text-[#16a34a] border border-[#22c55e]/30 hover:border-[#22c55e]/60 px-2 py-0.5 rounded transition-all"
+                          style={{
+                            fontFamily: "DM Sans, sans-serif",
+                            fontSize: 13,
+                            fontWeight: 500,
+                            color: "#22c55e",
+                            textDecoration: "none",
+                          }}
                         >
-                          View
+                          View →
                         </Link>
-                        {scan.status === 'done' && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300 border border-white/10 hover:border-white/20 px-2 py-0.5 rounded transition-all flex items-center gap-1 focus:outline-none">
-                              ↓ <ChevronDown className="h-2.5 w-2.5" />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="bg-[#0d0e10] border-white/10 text-zinc-300 p-1 min-w-[130px]">
-                              <DropdownMenuItem
-                                className="text-[11px] cursor-pointer focus:bg-white/5 rounded"
-                                onClick={() => downloadPDFReport(scan.id)}
-                              >
-                                Download PDF
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-[11px] cursor-pointer focus:bg-white/5 rounded"
-                                onClick={() => window.location.href = `/dashboard/scans/${scan.id}?tab=sbom`}
-                              >
-                                Export SBOM
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                        {scan.status === "done" && (
+                          <button
+                            onClick={() => downloadPDFReport(scan.id)}
+                            style={{
+                              fontFamily: "DM Sans, sans-serif",
+                              fontSize: 13,
+                              fontWeight: 500,
+                              color: "#6b7280",
+                              background: "none",
+                              border: "none",
+                              cursor: "pointer",
+                              padding: 0,
+                              transition: "color 0.15s ease",
+                            }}
+                          >
+                            PDF
+                          </button>
                         )}
                       </div>
                     </td>

@@ -2,8 +2,10 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
-import { getScan, GetScanResponse, getScanVulnerabilities, ScanVulnerabilitiesResponse, generateSBOM, createShareLink, getCompliance, ComplianceResponse, downloadPDFReport, shortId } from "@/lib/api";
+import { getScan, GetScanResponse, getScanVulnerabilities, ScanVulnerabilitiesResponse, generateSBOM, createShareLink, getCompliance, ComplianceResponse, downloadPDFReport, shortId, createFixPR, getFixPRs, FixPR, getFixPRStatus, FixPRStatus } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -58,6 +60,12 @@ export default function ScanResultsPage() {
   const [activeEcosystem, setActiveEcosystem] = useState<string>('All');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [expandedElements, setExpandedElements] = useState<Record<string, boolean>>({});
+
+  const [fixModalOpen, setFixModalOpen] = useState(false);
+  const [fixLoading, setFixLoading] = useState(false);
+  const [fixError, setFixError] = useState<string | null>(null);
+  const [fixStatus, setFixStatus] = useState<FixPRStatus | null>(null);
+  const [createdPRs, setCreatedPRs] = useState<FixPR[]>([]);
 
   // Share modal state
   const [showShareModal, setShowShareModal] = useState(false);
@@ -138,13 +146,19 @@ export default function ScanResultsPage() {
   };
 
   useEffect(() => {
+    if (activeTab === 'vulnerabilities' && scanId) {
+      getFixPRs(scanId as string).then(res => setCreatedPRs(res.prs || [])).catch(console.error);
+    }
+  }, [activeTab, scanId]);
+
+  useEffect(() => {
     if (!scanId) return;
     
     Promise.all([
       getScan(scanId),
-      getScanVulnerabilities(scanId).catch(err => {
+      getScanVulnerabilities(scanId, true).catch(err => {
         console.error("Failed to load vulns", err);
-        return { summary: { critical: 0, high: 0, medium: 0, low: 0 }, vulnerabilities: [] };
+        return { summary: { critical: 0, high: 0, medium: 0, low: 0 }, grouped: [] };
       }),
       getCompliance(scanId).catch(err => {
         console.error("Failed to load compliance", err);
@@ -273,7 +287,7 @@ export default function ScanResultsPage() {
           { label: 'Direct Library', value: directDepsCount, icon: Layers, border: 'border-l-[#22c55e]', text: 'text-white' },
           { label: 'Transitive', value: transitiveDepsCount, icon: Layers, border: 'border-l-[#8b5cf6]', text: 'text-white' },
           { label: 'License Spread', value: uniqueLicensesCount, icon: ShieldCheck, border: 'border-l-[#eab308]', text: 'text-white' },
-          { label: 'Active Threats', value: vulnData?.summary.critical || 0, icon: ShieldAlert, border: 'border-l-[#ef4444]', text: vulnData?.summary.critical ? 'text-red-500' : 'text-white' },
+          { label: 'Active Threats', value: vulnData ? (vulnData.summary.critical + vulnData.summary.high + vulnData.summary.medium + vulnData.summary.low) : 0, icon: ShieldAlert, border: 'border-l-[#ef4444]', text: vulnData?.summary.critical || vulnData?.summary.high ? 'text-red-500' : 'text-white' },
         ].map((stat, i) => (
           <div key={i} className={cn("group relative rounded-xl border border-white/[0.04] border-l-4 bg-white/[0.01] p-4 transition-all hover:bg-white/[0.02]", stat.border)}>
             <div className="flex items-center gap-2 mb-3">
@@ -351,12 +365,75 @@ export default function ScanResultsPage() {
 
       {activeTab === 'vulnerabilities' && vulnData && (
         <div className="space-y-4">
+          {(() => {
+            const fixableVulns = vulnData.grouped?.filter(v => v.clean_version) || [];
+            const isGitHubRepo = data?.scan?.repo_url?.includes('github.com') ?? false;
+            const hasFixableVulns = fixableVulns.length > 0 && isGitHubRepo && data?.is_owner;
+
+            const fixedPackageNames = new Set<string>();
+            createdPRs.forEach(pr => {
+              if (pr.package_names) {
+                pr.package_names.forEach(name => fixedPackageNames.add(name));
+              }
+            });
+
+            const handleOpenFixModal = () => {
+              setFixError(null);
+              setFixStatus(null);
+              setFixModalOpen(true);
+            };
+
+            const handleCreatePR = async () => {
+              setFixLoading(true);
+              setFixError(null);
+              try {
+                // Kick off the background job
+                await createFixPR(scanId as string, {});
+                
+                // Start polling
+                const pollInterval = setInterval(async () => {
+                  try {
+                    const status = await getFixPRStatus(scanId as string);
+                    setFixStatus(status);
+                    
+                    if (status.completed || status.error) {
+                      clearInterval(pollInterval);
+                      setFixLoading(false);
+                      if (status.error) setFixError(status.error);
+                      if (status.completed && status.pr_url) {
+                        getFixPRs(scanId as string).then(res => setCreatedPRs(res.prs || [])).catch(console.error);
+                      }
+                    }
+                  } catch (pollErr) {
+                    clearInterval(pollInterval);
+                    setFixLoading(false);
+                    setFixError("Failed to check status. The PR might still be processing.");
+                  }
+                }, 2000);
+              } catch (e: any) {
+                setFixError(e.message);
+                setFixLoading(false);
+              }
+            };
+
+            return (
+              <>
           <div className="flex items-center justify-between px-1">
-            <h2 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] flex items-center gap-2">
-              <ShieldAlert className="h-3.5 w-3.5 text-red-500" />
-              Security Findings
-            </h2>
-            <div className="flex gap-1.5">
+            <div className="flex items-center gap-4">
+              <h2 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                <ShieldAlert className="h-3.5 w-3.5 text-red-500" />
+                Security Findings
+              </h2>
+              {hasFixableVulns && (
+                <Button 
+                  onClick={handleOpenFixModal}
+                  className="bg-[#22c55e] hover:bg-[#22c55e]/90 text-black font-bold h-9 text-xs"
+                >
+                  ⚡ Fix All with PR
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-1.5 flex-wrap justify-end">
               <div className="px-2.5 py-1 bg-red-500/5 rounded-full flex items-center gap-1.5 border border-red-500/10">
                 <div className="h-1 w-1 rounded-full bg-red-500" />
                 <span className="text-[8px] font-bold text-red-400 uppercase tracking-widest">{vulnData.summary.critical} Critical</span>
@@ -364,6 +441,14 @@ export default function ScanResultsPage() {
               <div className="px-2.5 py-1 bg-orange-500/5 rounded-full flex items-center gap-1.5 border border-orange-500/10">
                 <div className="h-1 w-1 rounded-full bg-orange-500" />
                 <span className="text-[8px] font-bold text-orange-400 uppercase tracking-widest">{vulnData.summary.high} High</span>
+              </div>
+              <div className="px-2.5 py-1 bg-yellow-500/5 rounded-full flex items-center gap-1.5 border border-yellow-500/10">
+                <div className="h-1 w-1 rounded-full bg-yellow-500" />
+                <span className="text-[8px] font-bold text-yellow-400 uppercase tracking-widest">{vulnData.summary.medium} Medium</span>
+              </div>
+              <div className="px-2.5 py-1 bg-zinc-500/5 rounded-full flex items-center gap-1.5 border border-zinc-500/10">
+                <div className="h-1 w-1 rounded-full bg-zinc-500" />
+                <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest">{vulnData.summary.low} Low</span>
               </div>
             </div>
           </div>
@@ -384,50 +469,131 @@ export default function ScanResultsPage() {
                 <TableHeader className="bg-white/[0.01]">
                   <TableRow className="border-white/[0.04]">
                     <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-4 font-bold py-3">Component</TableHead>
+                    <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-4 font-bold py-3">Version</TableHead>
                     <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-4 font-bold py-3">Reference</TableHead>
                     <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-4 font-bold text-center py-3">Severity</TableHead>
                     <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-4 font-bold py-3">Mitigation</TableHead>
+                    <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-4 text-center font-bold py-3">Details</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {vulnData.vulnerabilities.map((v, i) => (
-                    <TableRow key={i} className="border-white/[0.04] hover:bg-white/[0.005] transition-colors">
-                      <TableCell className="px-4 py-3">
-                        <p className="font-bold text-zinc-100 text-xs mb-0.5">{v.component_name}</p>
-                        <p className="text-[9px] text-zinc-600 font-mono italic">v{v.component_version}</p>
-                      </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <span className="text-[10px] font-mono text-[#22c55e] bg-[#22c55e]/5 px-2 py-0.5 rounded border border-[#22c55e]/10">{v.cve_id}</span>
-                      </TableCell>
-                      <TableCell className="px-4 py-3 text-center">
-                         <Badge 
-                           variant="outline" 
-                           className={cn(
-                             "text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-widest border-0",
-                             v.severity === 'CRITICAL' ? 'bg-red-500/10 text-red-400' :
-                             v.severity === 'HIGH' ? 'bg-orange-500/10 text-orange-400' :
-                             'bg-zinc-800 text-zinc-500'
-                           )}
-                         >
-                           {v.severity}
-                         </Badge>
-                      </TableCell>
-                      <TableCell className="px-4 py-3">
-                        {v.fixed_version ? (
-                          <div className="flex items-center gap-1.5 text-[#22c55e]">
-                             <CheckCircle2 className="h-3 w-3" />
-                             <span className="text-[10px] font-bold">Patch to {v.fixed_version} available</span>
-                          </div>
-                        ) : (
-                          <span className="text-zinc-600 text-[9px] uppercase font-bold tracking-widest">Awaiting Fix</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
+                  {vulnData.grouped?.map((v, i) => (
+                    <GroupedVulnRow key={i} v={v} fixedPackageNames={fixedPackageNames} />
                   ))}
                 </TableBody>
               </Table>
             </div>
           )}
+          
+          {createdPRs.length > 0 && (
+            <div className="mt-8 space-y-4">
+              <h2 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] px-1">Fix PRs Created</h2>
+              <div className="rounded-xl border border-white/[0.04] bg-[#0c0d0e] overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-white/[0.01]">
+                    <TableRow className="border-white/[0.04]">
+                      <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-4 font-bold py-3">PR</TableHead>
+                      <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-4 font-bold py-3">Title</TableHead>
+                      <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-4 font-bold py-3">Status</TableHead>
+                      <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-4 font-bold py-3">Created</TableHead>
+                      <TableHead className="text-zinc-500 text-[9px] uppercase tracking-widest px-4 font-bold text-right py-3"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {createdPRs.map(pr => (
+                      <TableRow key={pr.id} className="border-white/[0.04]">
+                        <TableCell className="px-4 py-3 font-mono text-[10px] text-zinc-400">#{pr.pr_number}</TableCell>
+                        <TableCell className="px-4 py-3 text-xs font-bold text-zinc-200">{pr.pr_title}</TableCell>
+                        <TableCell className="px-4 py-3">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{pr.status}</span>
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-[10px] text-zinc-500">{new Date(pr.created_at).toLocaleString()}</TableCell>
+                        <TableCell className="px-4 py-3 text-right">
+                          <a href={pr.pr_url} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-blue-400 hover:text-blue-300">
+                            View on GitHub →
+                          </a>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+
+          <Dialog open={fixModalOpen} onOpenChange={setFixModalOpen}>
+            <DialogContent className="bg-[#0c0d0e] border-white/[0.1] text-zinc-300 sm:max-w-[450px]">
+              <DialogHeader>
+                <DialogTitle className="text-zinc-100">Fix All Vulnerabilities</DialogTitle>
+                <DialogDescription className="text-zinc-500 text-xs mt-1">
+                  SBOM.io will analyze all dependencies, resolve them to clean versions, and open a GitHub Pull Request.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="py-4 space-y-4">
+                {fixStatus?.completed && fixStatus?.pr_url ? (
+                  <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex flex-col items-center justify-center gap-3 text-center">
+                    <CheckCircle2 className="h-10 w-10 text-emerald-500 mb-1" />
+                    <div>
+                      <p className="text-base font-bold text-emerald-400 mb-1">Pull Request created successfully</p>
+                      <a href={fixStatus.pr_url} target="_blank" rel="noreferrer" className="text-sm font-bold text-blue-400 hover:text-blue-300 underline underline-offset-2">
+                        View PR #{fixStatus.pr_number} on GitHub →
+                      </a>
+                    </div>
+                  </div>
+                ) : fixLoading || fixStatus ? (
+                  <div className="space-y-6">
+                    <div className="flex flex-col items-center justify-center py-6 text-center">
+                      <div className="relative mb-4">
+                        <Loader2 className="h-10 w-10 animate-spin text-[#22c55e] opacity-20" />
+                        <Loader2 className="h-10 w-10 animate-spin text-[#22c55e] absolute inset-0 animation-delay-150" />
+                      </div>
+                      <p className="text-sm font-bold text-zinc-200">{fixStatus?.message || "Starting fix job..."}</p>
+                      <p className="text-[10px] uppercase tracking-widest text-zinc-500 mt-2 font-bold">{fixStatus?.stage || "initializing"}</p>
+                    </div>
+                    
+                    <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
+                      <div 
+                        className="bg-[#22c55e] h-1.5 rounded-full transition-all duration-500 ease-out" 
+                        style={{ width: `${fixStatus?.progress || 0}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-amber-500/10 border border-amber-500/20 text-amber-500/80 p-4 rounded-xl flex gap-3 items-start">
+                    <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0" />
+                    <p className="text-xs leading-relaxed">
+                      <strong>Are you sure?</strong> This action will create a branch and open a PR in your GitHub repository. It will automatically patch all vulnerable packages to their safest available versions.
+                    </p>
+                  </div>
+                )}
+
+                {fixError && (
+                  <div className="text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex gap-2">
+                    <X className="h-4 w-4 shrink-0" />
+                    {fixError}
+                  </div>
+                )}
+              </div>
+
+              {(!fixStatus?.completed && !fixLoading) && (
+                <DialogFooter className="mt-2">
+                  <Button variant="ghost" onClick={() => setFixModalOpen(false)} className="text-xs font-bold">
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleCreatePR} 
+                    className="bg-[#22c55e] hover:bg-[#22c55e]/90 text-black font-bold text-xs px-6"
+                  >
+                    Start Fix Job
+                  </Button>
+                </DialogFooter>
+              )}
+            </DialogContent>
+          </Dialog>
+          </>
+          );
+          })()}
         </div>
       )}
 
@@ -685,10 +851,10 @@ export default function ScanResultsPage() {
                         value={shareExpires}
                         onChange={(e) => setShareExpires(Number(e.target.value))}
                       >
-                        <option value={30}>30 Days</option>
-                        <option value={60}>60 Days</option>
-                        <option value={90}>90 Days</option>
-                        <option value={180}>180 Days</option>
+                        <option className="bg-[#0c0d0e] text-zinc-300" value={30}>30 Days</option>
+                        <option className="bg-[#0c0d0e] text-zinc-300" value={60}>60 Days</option>
+                        <option className="bg-[#0c0d0e] text-zinc-300" value={90}>90 Days</option>
+                        <option className="bg-[#0c0d0e] text-zinc-300" value={180}>180 Days</option>
                       </select>
                       <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-600 group-focus-within:text-[#22c55e] pointer-events-none transition-colors" />
                     </div>
@@ -740,5 +906,97 @@ export default function ScanResultsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function GroupedVulnRow({ v, fixedPackageNames }: { v: any, fixedPackageNames: Set<string> }) {
+  const [expanded, setExpanded] = useState(false);
+  const multipleCVEs = v.cve_count > 1;
+
+  return (
+    <>
+      <TableRow className={cn("border-white/[0.04] hover:bg-white/[0.005] transition-colors", expanded && "bg-white/[0.01]")}>
+        <TableCell className="px-4 py-3">
+          <p className="font-bold text-zinc-100 text-xs mb-0.5">{v.component_name}</p>
+        </TableCell>
+        <TableCell className="px-4 py-3">
+          <code className="text-[10px] text-zinc-400 bg-[#0f1117] border border-[#1e2230] px-1.5 py-0.5 rounded font-mono font-bold">v{v.component_version}</code>
+        </TableCell>
+        <TableCell className="px-4 py-3">
+          <div className="flex flex-col gap-1.5 items-start">
+            <span className="text-[10px] font-mono text-[#22c55e] bg-[#22c55e]/5 px-2 py-0.5 rounded border border-[#22c55e]/10">
+              {v.cves?.[0]}
+            </span>
+            {multipleCVEs && (
+              <button 
+                onClick={() => setExpanded(!expanded)}
+                className="text-[9px] font-bold text-blue-400 hover:text-blue-300 bg-blue-400/10 px-1.5 py-0.5 rounded uppercase tracking-widest flex items-center gap-1 transition-colors"
+              >
+                +{v.cve_count - 1} more {expanded ? "▲" : "▼"}
+              </button>
+            )}
+          </div>
+        </TableCell>
+        <TableCell className="px-4 py-3 text-center">
+            <Badge 
+              variant="outline" 
+              className={cn(
+                "text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-widest border-0",
+                v.highest_severity === "CRITICAL" ? "bg-red-500/10 text-red-400" :
+                v.highest_severity === "HIGH" ? "bg-orange-500/10 text-orange-400" :
+                "bg-zinc-800 text-zinc-500"
+              )}
+            >
+              {v.highest_severity}
+            </Badge>
+        </TableCell>
+        <TableCell className="px-4 py-3">
+          {v.clean_version ? (
+            <div className="flex items-center gap-3 text-[#22c55e]">
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3 w-3" />
+                  <span className="text-[10px] font-bold">Patch to {v.clean_version} available</span>
+                </div>
+                {fixedPackageNames.has(v.component_name) ? (
+                  <span className="text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded transition-colors uppercase tracking-widest">
+                    Fixed in PR
+                  </span>
+                ) : null}
+            </div>
+          ) : (
+            <span className="text-zinc-600 text-[9px] uppercase font-bold tracking-widest">Awaiting Fix</span>
+          )}
+        </TableCell>
+        <TableCell className="px-4 py-3 max-w-[250px]">
+          <p className="text-[10px] text-zinc-400 truncate" title={v.cves_detail?.[0]?.summary || ""}>
+            {v.cves_detail?.[0]?.summary || "No description available"}
+          </p>
+        </TableCell>
+      </TableRow>
+      
+      {expanded && multipleCVEs && (
+        <TableRow className="border-b border-white/[0.04] bg-white/[0.005]">
+          <TableCell colSpan={6} className="p-0">
+            <div className="pl-8 py-3 pr-4 space-y-2 max-h-[250px] overflow-y-auto">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 mb-2">Additional Vulnerabilities</p>
+              {v.cves_detail?.slice(1).map((detail: any, idx: number) => (
+                <div key={idx} className="flex items-center gap-4 py-1.5 border-l-2 border-white/10 pl-3">
+                  <span className="text-[10px] font-mono text-zinc-300 w-32">{detail.id}</span>
+                  <span className={cn(
+                    "text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-widest",
+                    detail.severity === "CRITICAL" ? "text-red-400 bg-red-400/10" :
+                    detail.severity === "HIGH" ? "text-orange-400 bg-orange-400/10" :
+                    "text-zinc-400 bg-zinc-800"
+                  )}>
+                    {detail.severity}
+                  </span>
+                  <span className="text-[10px] text-zinc-500 flex-1 truncate">{detail.summary}</span>
+                </div>
+              ))}
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
   );
 }

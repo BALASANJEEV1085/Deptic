@@ -44,12 +44,18 @@ type FileEntry struct {
 
 // Repository represents a GitHub repository
 type Repository struct {
-	ID          int64  `json:"id"`
-	Name        string `json:"name"`
-	FullName    string `json:"full_name"`
-	HTMLURL     string `json:"html_url"`
-	Description string `json:"description"`
-	Private     bool   `json:"private"`
+	ID              int64  `json:"id"`
+	Name            string `json:"name"`
+	FullName        string `json:"full_name"`
+	HTMLURL         string `json:"html_url"`
+	Description     string `json:"description"`
+	Private         bool   `json:"private"`
+	StargazersCount int    `json:"stargazers_count"`
+	Language        string `json:"language"`
+	DefaultBranch   string `json:"default_branch"`
+	PushedAt        string `json:"pushed_at"`
+	UpdatedAt       string `json:"updated_at"`
+	Fork            bool   `json:"fork"`
 }
 
 type ManifestFile struct {
@@ -339,29 +345,56 @@ func (c *Client) ListFiles(ctx context.Context, owner, repo, path string) ([]Fil
 
 // ListUserRepositories fetches all repositories accessible by the authenticated user
 func (c *Client) ListUserRepositories(ctx context.Context) ([]Repository, error) {
+	var allRepos []Repository
 	apiURL := "https://api.github.com/user/repos?sort=updated&per_page=100&visibility=all"
-	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
+
+	for {
+		req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+		if err != nil {
+			return nil, fmt.Errorf("creating request: %w", err)
+		}
+
+		resp, err := c.doRequest(ctx, req)
+		if err != nil {
+			return nil, fmt.Errorf("executing request: %w", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			return nil, fmt.Errorf("github api error %d: %s", resp.StatusCode, string(body))
+		}
+
+		var repos []Repository
+		if err := json.NewDecoder(resp.Body).Decode(&repos); err != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("decoding response: %w", err)
+		}
+		resp.Body.Close()
+
+		allRepos = append(allRepos, repos...)
+
+		// Handle pagination via Link header
+		linkHeader := resp.Header.Get("Link")
+		nextURL := ""
+		if linkHeader != "" {
+			links := strings.Split(linkHeader, ",")
+			for _, link := range links {
+				parts := strings.Split(link, ";")
+				if len(parts) == 2 && strings.TrimSpace(parts[1]) == `rel="next"` {
+					nextURL = strings.Trim(strings.TrimSpace(parts[0]), "<>")
+					break
+				}
+			}
+		}
+
+		if nextURL == "" || len(allRepos) >= 1000 { // limit to 1000 for safety
+			break
+		}
+		apiURL = nextURL
 	}
 
-	resp, err := c.doRequest(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("executing request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("github api error %d: %s", resp.StatusCode, string(body))
-	}
-
-	var repos []Repository
-	if err := json.NewDecoder(resp.Body).Decode(&repos); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
-	}
-
-	return repos, nil
+	return allRepos, nil
 }
 
 // ParseRepoURL parses a GitHub repository URL and extracts the owner and repo name

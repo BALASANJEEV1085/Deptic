@@ -31,15 +31,16 @@ type packageJSON struct {
 	Version         string            `json:"version"`
 	Dependencies    map[string]string `json:"dependencies"`
 	DevDependencies map[string]string `json:"devDependencies"`
+	Overrides       map[string]string `json:"overrides"`
 }
 
 // ParsePackageJSON parses the package.json content to extract its dependencies
-func ParsePackageJSON(data []byte) (name, version string, deps map[string]string, devDeps map[string]string, err error) {
+func ParsePackageJSON(data []byte) (name, version string, deps map[string]string, devDeps map[string]string, overrides map[string]string, err error) {
 	var pj packageJSON
 	if err := json.Unmarshal(data, &pj); err != nil {
-		return "", "", nil, nil, err
+		return "", "", nil, nil, nil, err
 	}
-	return pj.Name, pj.Version, pj.Dependencies, pj.DevDependencies, nil
+	return pj.Name, pj.Version, pj.Dependencies, pj.DevDependencies, pj.Overrides, nil
 }
 
 type npmRegistryResponse struct {
@@ -135,7 +136,7 @@ func ResolveVersion(ctx context.Context, redisClient *redis.Client, pkgName, ver
 }
 
 // ResolveDependencies recursively resolves a map of dependencies up to maxDepth
-func ResolveDependencies(ctx context.Context, redisClient *redis.Client, deps map[string]string, maxDepth int) ([]Package, error) {
+func ResolveDependencies(ctx context.Context, redisClient *redis.Client, deps map[string]string, maxDepth int, overrides map[string]string) ([]Package, error) {
 	var mu sync.Mutex
 	// pkgKey -> index in results slice, so we can promote depth
 	indexMap := make(map[string]int)
@@ -153,6 +154,11 @@ func ResolveDependencies(ctx context.Context, redisClient *redis.Client, deps ma
 		}
 
 		for name, spec := range depMap {
+			if overrides != nil {
+				if overrideSpec, exists := overrides[name]; exists {
+					spec = overrideSpec
+				}
+			}
 			name := name
 			spec := spec
 			depth := depth
@@ -230,7 +236,7 @@ func ResolveDependencies(ctx context.Context, redisClient *redis.Client, deps ma
 
 // ScanNPM orchestrates the parsing of package.json and resolving of direct/transitive dependencies
 func ScanNPM(ctx context.Context, redisClient *redis.Client, packageJSONBytes []byte) ([]Package, error) {
-	_, _, deps, devDeps, err := ParsePackageJSON(packageJSONBytes)
+	_, _, deps, devDeps, overrides, err := ParsePackageJSON(packageJSONBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse package.json: %w", err)
 	}
@@ -243,5 +249,5 @@ func ScanNPM(ctx context.Context, redisClient *redis.Client, packageJSONBytes []
 		allDeps[k] = v
 	}
 
-	return ResolveDependencies(ctx, redisClient, allDeps, 2) // depth 2: direct + 2 levels transitive
+	return ResolveDependencies(ctx, redisClient, allDeps, 2, overrides) // depth 2: direct + 2 levels transitive
 }

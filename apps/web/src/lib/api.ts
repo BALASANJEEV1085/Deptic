@@ -86,6 +86,7 @@ export interface GetScanResponse {
   ecosystems: string[];
   ecosystem_breakdown: Record<string, { count: number; direct: number; transitive: number }>;
   manifest_files: { path: string; ecosystem: string }[];
+  is_owner?: boolean;
 }
 
 export interface StartScanResponse {
@@ -124,6 +125,16 @@ export async function startScan(githubUrl: string, projectId: string): Promise<S
     throw new Error(err.error || 'Failed to start scan');
   }
   
+  return response.json();
+}
+
+export async function resolveAuditId(auditId: string): Promise<{ scan_id: string }> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/scans/audit/${auditId}`, { headers });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || 'Failed to resolve Audit ID');
+  }
   return response.json();
 }
 
@@ -220,6 +231,23 @@ export interface Vulnerability {
   fixed_version: string;
 }
 
+export interface VulnDetail {
+  id: string;
+  severity: string;
+  summary: string;
+}
+
+export interface GroupedVulnResponse {
+  component_name: string;
+  component_version: string;
+  ecosystem: string;
+  highest_severity: string;
+  cve_count: number;
+  cves: string[];
+  cves_detail: VulnDetail[];
+  clean_version: string;
+}
+
 export interface ScanVulnerabilitiesResponse {
   summary: {
     critical: number;
@@ -227,16 +255,18 @@ export interface ScanVulnerabilitiesResponse {
     medium: number;
     low: number;
   };
-  vulnerabilities: Vulnerability[];
+  vulnerabilities?: Vulnerability[];
+  grouped?: GroupedVulnResponse[];
 }
 
 export interface AllVulnerabilitiesResponse {
   vulnerabilities: Vulnerability[];
 }
 
-export async function getScanVulnerabilities(scanId: string): Promise<ScanVulnerabilitiesResponse> {
+export async function getScanVulnerabilities(scanId: string, grouped = false): Promise<ScanVulnerabilitiesResponse> {
   const headers = await getAuthHeaders();
-  const response = await fetch(`${API_URL}/scans/${scanId}/vulnerabilities`, { headers });
+  const url = grouped ? `${API_URL}/scans/${scanId}/vulnerabilities?grouped=true` : `${API_URL}/scans/${scanId}/vulnerabilities`;
+  const response = await fetch(url, { headers });
   if (!response.ok) {
     throw new Error('Failed to fetch scan vulnerabilities');
   }
@@ -370,11 +400,96 @@ export async function downloadPDFReport(scanId: string): Promise<void> {
 }
 
 export async function listGitHubRepos(): Promise<{ repositories: GitHubRepository[] }> {
-  const headers = await getAuthHeaders();
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+
+  const authHeaders = await getAuthHeaders();
+
+  // Pass the live provider_token (GitHub OAuth) so backend doesn't use the stale DB token
+  const headers: Record<string, string> = { ...authHeaders };
+  if (session?.provider_token) {
+    headers['X-GitHub-Token'] = session.provider_token;
+  }
+
   const response = await fetch(`${API_URL}/github/repos`, { headers });
   if (!response.ok) {
     const err = await response.json().catch(() => ({ error: response.statusText }));
     throw new Error(err.error || 'Failed to fetch GitHub repositories');
+  }
+  return response.json();
+}
+
+export interface FixPRRequest {
+  vulnerabilities: {
+    package_name: string;
+    current_version: string;
+    fixed_version: string;
+    cve_id: string;
+    ecosystem: string;
+  }[];
+}
+
+export interface FixPRResponse {
+  pr_url: string;
+  pr_number: number;
+  message: string;
+}
+
+export interface FixPRStatus {
+  stage: string;
+  progress: number;
+  message: string;
+  pr_url?: string;
+  pr_number?: number;
+  error?: string;
+  completed: boolean;
+}
+
+export interface FixPR {
+  id: string;
+  pr_url: string;
+  pr_number: number;
+  pr_title: string;
+  status: string;
+  created_at: string;
+  packages_fixed: number;
+  package_names?: string[];
+}
+
+export async function createFixPR(scanId: string, req: FixPRRequest): Promise<FixPRResponse> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/scans/${scanId}/fix-pr`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(req),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || 'Failed to create PR');
+  }
+  return response.json();
+}
+
+export async function getFixPRStatus(scanId: string): Promise<FixPRStatus> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/scans/${scanId}/fix-pr/status`, { headers });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || 'Failed to get PR status');
+  }
+  return response.json();
+}
+
+export async function getFixPRs(scanId: string): Promise<{ prs: FixPR[] }> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/scans/${scanId}/fix-prs`, {
+    headers,
+    cache: 'no-store'
+  });
+  
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || 'Failed to fetch PRs');
   }
   return response.json();
 }

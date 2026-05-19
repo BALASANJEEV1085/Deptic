@@ -145,7 +145,7 @@ func GetScanWithComponents(ctx context.Context, db *sql.DB, scanID string) (scan
 	err = db.QueryRowContext(ctx, `
 		SELECT id, project_id, status, COALESCE(repo_url, ''), COALESCE(ecosystem, ''), 
 		       COALESCE(compliance_score, 0), ntia_compliant, eu_cra_compliant, created_at 
-		FROM scans WHERE id = $1`, scanID).
+		FROM scans WHERE id::text LIKE $1 || '%' LIMIT 1`, scanID).
 		Scan(&scan.ID, &scan.ProjectID, &scan.Status, &scan.RepoURL, &scan.Ecosystem, 
 			&scan.ComplianceScore, &scan.NTIACompliant, &scan.EUCRACompliant, &scan.CreatedAt)
 	if err != nil {
@@ -159,7 +159,7 @@ func GetScanWithComponents(ctx context.Context, db *sql.DB, scanID string) (scan
 		SELECT id, scan_id, name, version, version_spec, license, ecosystem, depth, parent_name, COALESCE(source_path, ''), created_at
 		FROM components
 		WHERE scan_id = $1
-		ORDER BY depth ASC, name ASC`, scanID)
+		ORDER BY depth ASC, name ASC`, scan.ID)
 	if err != nil {
 		return scan, nil, fmt.Errorf("fetching components: %w", err)
 	}

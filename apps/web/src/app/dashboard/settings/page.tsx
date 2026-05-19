@@ -12,15 +12,17 @@ import { ProfileSection } from './_components/profile-section'
 import { NotificationsSection } from './_components/notifications-section'
 import { SecuritySection } from './_components/security-section'
 import { ApiAccessSection } from './_components/api-section'
+import { IntegrationsSection } from './_components/integrations-section'
 import { BillingSection } from './_components/billing-section'
 
-type SectionId = 'profile' | 'notifications' | 'security' | 'api' | 'billing'
+type SectionId = 'profile' | 'notifications' | 'security' | 'api' | 'integrations' | 'billing'
 
 const TABS: { id: SectionId; label: string; icon: React.ElementType }[] = [
   { id: 'profile',       label: 'Profile',         icon: UserIcon   },
   { id: 'notifications', label: 'Notifications',   icon: Bell       },
   { id: 'security',      label: 'Security & Auth',  icon: ShieldCheck },
   { id: 'api',           label: 'API Access',       icon: Key        },
+  { id: 'integrations',  label: 'Integrations',     icon: Zap        },
   { id: 'billing',       label: 'Billing & Plan',   icon: CreditCard },
 ]
 
@@ -29,6 +31,7 @@ const SECTION_TITLES: Record<SectionId, { title: string; desc: string }> = {
   notifications: { title: 'Notifications',   desc: 'Control which alerts land in your inbox.' },
   security:      { title: 'Security & Auth', desc: 'Passwords, connected providers, and active sessions.' },
   api:           { title: 'API Access',      desc: 'Generate and manage API keys for programmatic access.' },
+  integrations:  { title: 'Integrations',    desc: 'Connect Slack and Jira for automated alerts and ticketing.' },
   billing:       { title: 'Billing & Plan',  desc: 'Your current subscription, usage, and plan options.' },
 }
 
@@ -141,6 +144,7 @@ export default function SettingsPage() {
             {active === 'notifications' && <NotificationsSection user={user} loading={loading} />}
             {active === 'security'      && <SecuritySection      user={user} loading={loading} />}
             {active === 'api'           && <ApiAccessSection     user={user} loading={loading} />}
+            {active === 'integrations'  && <IntegrationsSection  user={user} loading={loading} />}
             {active === 'billing'       && <BillingSection       user={user} loading={loading} />}
           </main>
         </div>

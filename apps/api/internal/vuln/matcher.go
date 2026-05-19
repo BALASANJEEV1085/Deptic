@@ -11,14 +11,18 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/sbom-io/api/internal/scanner"
 )
 
 type ComponentVuln struct {
-	ComponentID  string
-	CVEID        string
-	Severity     string // CRITICAL/HIGH/MEDIUM/LOW
-	Summary      string
-	FixedVersion string
+	ComponentID      string
+	ComponentName    string
+	ComponentVersion string
+	CVEID            string
+	Severity         string // CRITICAL/HIGH/MEDIUM/LOW
+	Summary          string
+	FixedVersion     string
 }
 
 type osvRequest struct {
@@ -44,6 +48,7 @@ type osvResponse struct {
 				Type   string `json:"type"`
 				Events []map[string]string `json:"events"`
 			} `json:"ranges"`
+			Versions []string `json:"versions"`
 		} `json:"affected"`
 		DatabaseSpecific map[string]interface{} `json:"database_specific"`
 	} `json:"vulns"`
@@ -287,4 +292,39 @@ func GetScanVulnSummary(ctx context.Context, db *sql.DB, scanID string) (critica
 		}
 	}
 	return critical, high, medium, low, nil
+}
+
+// MatchVulnerabilitiesInMemory matches vulnerabilities for in-memory packages
+// without requiring DB-persisted components (used by CLI scan).
+func MatchVulnerabilitiesInMemory(ctx context.Context, pkgs []scanner.Package) []ComponentVuln {
+	var results []ComponentVuln
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 20)
+
+	for _, p := range pkgs {
+		p := p
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			vulns, err := QueryOSV(ctx, p.Name, p.Version, p.Ecosystem)
+			if err != nil {
+				return
+			}
+			if len(vulns) > 0 {
+				mu.Lock()
+				for _, v := range vulns {
+					v.ComponentName = p.Name
+					v.ComponentVersion = p.Version
+					results = append(results, v)
+				}
+				mu.Unlock()
+			}
+		}()
+	}
+	wg.Wait()
+	return results
 }

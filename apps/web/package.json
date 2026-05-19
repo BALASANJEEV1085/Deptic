@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
+    "@dotlottie/react-player": "^1.6.19",
+    "@lottiefiles/dotlottie-react": "^0.19.3",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
     "class-variance-authority": "^0.7.1",
