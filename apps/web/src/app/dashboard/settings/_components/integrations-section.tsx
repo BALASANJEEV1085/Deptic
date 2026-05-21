@@ -257,7 +257,7 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
             <div className="flex items-start justify-between">
               <div>
                 <CardTitle className="text-lg font-bold flex items-center gap-3 text-white">
-                  <img src="https://w7.pngwing.com/pngs/399/659/png-transparent-jira-hd-logo-thumbnail.png" alt="Jira" className="w-6 h-6 rounded" />
+                  <img src="https://cdn.worldvectorlogo.com/logos/jira-3.svg" alt="Jira" className="w-6 h-6 rounded" />
                   Jira Software
                 </CardTitle>
                 <CardDescription className="text-zinc-400 text-xs mt-1.5 leading-relaxed">

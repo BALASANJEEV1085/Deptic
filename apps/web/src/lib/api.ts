@@ -94,6 +94,36 @@ export interface StartScanResponse {
   status: string;
 }
 
+// ── Workspace types ────────────────────────────────────────────────────────
+export interface Workspace {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  plan: string;
+  logo_url?: string;
+  created_at: string;
+  role?: string;        // current user's role in this workspace
+  member_count?: number;
+}
+
+export interface WorkspaceMember {
+  user_id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  joined_at: string;
+}
+
+export interface WorkspaceInvitation {
+  id: string;
+  email: string;
+  role: string;
+  invited_by: string;
+  expires_at: string;
+  created_at: string;
+}
+
 async function getAuthHeaders() {
   const supabase = createClient();
   const { data: { session } } = await supabase.auth.getSession();
@@ -102,10 +132,19 @@ async function getAuthHeaders() {
     throw new Error('No authenticated session found');
   }
   
-  return {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${session.access_token}`
   };
+
+  if (typeof window !== 'undefined') {
+    const wsID = localStorage.getItem('sbom_active_workspace_id');
+    if (wsID) {
+      headers['X-Workspace-ID'] = wsID;
+    }
+  }
+
+  return headers;
 }
 
 export async function startScan(githubUrl: string, projectId: string): Promise<StartScanResponse> {
@@ -492,4 +531,145 @@ export async function getFixPRs(scanId: string): Promise<{ prs: FixPR[] }> {
     throw new Error(err.error || 'Failed to fetch PRs');
   }
   return response.json();
+}
+
+// ── Workspace API ──────────────────────────────────────────────────────────
+
+export async function listWorkspaces(): Promise<{ workspaces: Workspace[] }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces`, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error('Failed to list workspaces');
+  return res.json();
+}
+
+export async function createWorkspace(data: { name: string; slug: string; description?: string }): Promise<Workspace> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to create workspace');
+  }
+  return res.json();
+}
+
+export async function getWorkspace(id: string): Promise<Workspace> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces/${id}`, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error('Failed to fetch workspace');
+  return res.json();
+}
+
+export async function updateWorkspace(id: string, data: { name?: string; description?: string }): Promise<Workspace> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces/${id}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to update workspace');
+  }
+  return res.json();
+}
+
+export async function deleteWorkspace(id: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces/${id}`, { method: 'DELETE', headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to delete workspace');
+  }
+}
+
+export async function listWorkspaceMembers(workspaceId: string): Promise<{ members: WorkspaceMember[] }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces/${workspaceId}/members`, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error('Failed to list members');
+  return res.json();
+}
+
+export async function updateMemberRole(workspaceId: string, memberId: string, role: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces/${workspaceId}/members/${memberId}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ role }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to update member role');
+  }
+}
+
+export async function removeMember(workspaceId: string, memberId: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces/${workspaceId}/members/${memberId}`, {
+    method: 'DELETE',
+    headers,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to remove member');
+  }
+}
+
+export async function inviteMember(workspaceId: string, data: { email: string; role: string }): Promise<{ success: boolean; token: string }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces/${workspaceId}/invite`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to create invitation');
+  }
+  return res.json();
+}
+
+export async function listInvitations(workspaceId: string): Promise<{ invitations: WorkspaceInvitation[] }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces/${workspaceId}/invitations`, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error('Failed to list invitations');
+  return res.json();
+}
+
+export async function cancelInvitation(workspaceId: string, invitationId: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces/${workspaceId}/invitations/${invitationId}`, {
+    method: 'DELETE',
+    headers,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to cancel invitation');
+  }
+}
+
+export async function getInvitationPublic(token: string): Promise<{ workspace_name: string; email: string; invited_by_name: string }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/invite/${token}`, { headers, cache: 'no-store' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to fetch invitation details');
+  }
+  return res.json();
+}
+
+export async function acceptInvitation(token: string): Promise<{ workspace_id: string }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/invite/${token}/accept`, {
+    method: 'POST',
+    headers,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to accept invitation');
+  }
+  return res.json();
 }

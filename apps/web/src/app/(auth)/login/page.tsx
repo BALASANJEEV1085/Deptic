@@ -17,19 +17,26 @@ export default function LoginPage() {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        router.push('/dashboard');
+        const next = searchParams.get('next') || '/dashboard';
+        router.push(next);
       }
     };
     checkUser();
-  }, [supabase, router]);
+  }, [supabase, router, searchParams]);
 
   const handleOAuthLogin = async (provider: 'github' | 'google') => {
     setLoading(provider);
+    const next = searchParams.get('next') || '/dashboard';
+    const options: any = {
+      redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+    };
+    if (provider === 'github') {
+      options.scopes = 'repo read:user read:org';
+      options.queryParams = { prompt: 'consent' };
+    }
     await supabase.auth.signInWithOAuth({
       provider,
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
-      },
+      options,
     });
   };
 

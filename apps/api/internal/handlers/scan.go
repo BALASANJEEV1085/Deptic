@@ -22,10 +22,11 @@ import (
 	"github.com/sbom-io/api/internal/notify"
 	"github.com/sbom-io/api/internal/scanner"
 	"github.com/sbom-io/api/internal/vuln"
+	"github.com/sbom-io/api/internal/workspace"
 )
 
 // JWTAuthMiddleware validates Supabase JWTs using the JWKS endpoint (supports ES256)
-func JWTAuthMiddleware() fiber.Handler {
+func JWTAuthMiddleware(database *sql.DB) fiber.Handler {
 	supabaseURL := os.Getenv("SUPABASE_URL")
 	// Supabase JWKS lives under /auth/v1/, NOT root /.well-known/
 	jwksURL := supabaseURL + "/auth/v1/.well-known/jwks.json"
@@ -84,6 +85,13 @@ func JWTAuthMiddleware() fiber.Handler {
 		}
 
 		c.Locals("user_id", sub)
+
+		// Auto-ensure personal workspace
+		email, _ := claims["email"].(string)
+		if err := EnsurePersonalWorkspace(c.Context(), database, sub, email); err != nil {
+			fmt.Printf("EnsurePersonalWorkspace error: %v\n", err)
+		}
+
 		return c.Next()
 	}
 }
@@ -98,15 +106,23 @@ type ScanHandler struct {
 func RegisterRoutes(api fiber.Router, database *sql.DB, redisClient *redis.Client) {
 	h := &ScanHandler{db: database, rdb: redisClient}
 	ih := NewIntegrationsHandler(database)
+	wh := NewWorkspaceHandler(database)
 
 	// Public routes (no auth)
 	api.Get("/share/:token", h.HandleViewShareLink)
+	api.Get("/invite/:token", wh.HandleGetInvitationPublic)
 
 	// CLI scan — authenticated by X-API-Key header only, NO JWT
 	api.Post("/scan-cli", h.ScanCLI)
 
 	// Apply JWT middleware to subsequent routes
-	api.Use(JWTAuthMiddleware())
+	api.Use(JWTAuthMiddleware(database))
+
+	// Invitation accept route (JWT-protected)
+	api.Post("/invite/:token/accept", wh.HandleAcceptInvitation)
+
+	// Register Workspace routes
+	wh.RegisterRoutes(api)
 
 	// API Key management routes
 	api.Post("/keys", h.HandleCreateKey)
@@ -191,16 +207,42 @@ func (h *ScanHandler) HandleCreateScan(c *fiber.Ctx) error {
 
 	githubToken := providerToken.String
 
-	// Create or fetch the user's default project to satisfy the FK constraint
-	projectID, err := db.CreateOrGetDefaultProject(c.Context(), h.db, userID)
+	wsID, err := workspace.VerifyWorkspaceAccess(c, h.db, workspace.PermCreateScan)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create project: " + err.Error()})
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// Create or fetch the workspace or user default project to satisfy the FK constraint
+	var projectID string
+	if wsID != "" {
+		err = h.db.QueryRowContext(c.Context(), "SELECT id FROM projects WHERE workspace_id = $1 LIMIT 1", wsID).Scan(&projectID)
+		if err != nil {
+			// Create default project for workspace if missing
+			err = h.db.QueryRowContext(c.Context(), `
+				INSERT INTO projects (id, user_id, name, workspace_id, created_at)
+				VALUES (gen_random_uuid(), $1, 'Default Project', $2, now())
+				RETURNING id
+			`, userID, wsID).Scan(&projectID)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to resolve workspace project: " + err.Error()})
+			}
+		}
+	} else {
+		projectID, err = db.CreateOrGetDefaultProject(c.Context(), h.db, userID)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create project: " + err.Error()})
+		}
 	}
 
 	// Create scan record in database
 	scanID, err := db.CreateScan(c.Context(), h.db, projectID, req.GithubURL)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create scan record"})
+	}
+
+	// Store workspace_id on scans if workspace is active
+	if wsID != "" {
+		_, _ = h.db.ExecContext(c.Context(), "UPDATE scans SET workspace_id = $1 WHERE id = $2", wsID, scanID)
 	}
 
 	// Launch scan in background
@@ -661,74 +703,89 @@ func (h *ScanHandler) HandleListScans(c *fiber.Ctx) error {
 func (h *ScanHandler) HandleGetDashboardStats(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 
+	wsID, err := workspace.VerifyWorkspaceAccess(c, h.db, workspace.PermViewScan)
+	if err != nil {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	var targetFilter string
+	var targetID string
+	if wsID != "" {
+		targetFilter = "p.workspace_id"
+		targetID = wsID
+	} else {
+		targetFilter = "p.user_id"
+		targetID = userID
+	}
+
 	var totalProjects, totalScans, totalComponents int
 	var criticalCves, highCves, mediumCves, lowCves int
 
-	h.db.QueryRowContext(c.Context(), "SELECT count(*) FROM projects WHERE user_id = $1", userID).Scan(&totalProjects)
+	h.db.QueryRowContext(c.Context(), fmt.Sprintf("SELECT count(*) FROM projects p WHERE %s = $1", targetFilter), targetID).Scan(&totalProjects)
 	
-	h.db.QueryRowContext(c.Context(), `
-		SELECT count(*) FROM scans s JOIN projects p ON s.project_id = p.id WHERE p.user_id = $1
-	`, userID).Scan(&totalScans)
+	h.db.QueryRowContext(c.Context(), fmt.Sprintf(`
+		SELECT count(*) FROM scans s JOIN projects p ON s.project_id = p.id WHERE %s = $1
+	`, targetFilter), targetID).Scan(&totalScans)
 
-	h.db.QueryRowContext(c.Context(), `
-		SELECT count(*) FROM components c JOIN scans s ON c.scan_id = s.id JOIN projects p ON s.project_id = p.id WHERE p.user_id = $1
-	`, userID).Scan(&totalComponents)
+	h.db.QueryRowContext(c.Context(), fmt.Sprintf(`
+		SELECT count(*) FROM components c JOIN scans s ON c.scan_id = s.id JOIN projects p ON s.project_id = p.id WHERE %s = $1
+	`, targetFilter), targetID).Scan(&totalComponents)
 
-	h.db.QueryRowContext(c.Context(), `
+	h.db.QueryRowContext(c.Context(), fmt.Sprintf(`
 		SELECT count(*) FROM component_vulnerabilities cv
 		JOIN components c ON cv.component_id = c.id
 		JOIN scans s ON c.scan_id = s.id
 		JOIN projects p ON s.project_id = p.id
-		WHERE p.user_id = $1 AND cv.severity = 'CRITICAL'
-	`, userID).Scan(&criticalCves)
+		WHERE %s = $1 AND cv.severity = 'CRITICAL'
+	`, targetFilter), targetID).Scan(&criticalCves)
 
-	h.db.QueryRowContext(c.Context(), `
+	h.db.QueryRowContext(c.Context(), fmt.Sprintf(`
 		SELECT count(*) FROM component_vulnerabilities cv
 		JOIN components c ON cv.component_id = c.id
 		JOIN scans s ON c.scan_id = s.id
 		JOIN projects p ON s.project_id = p.id
-		WHERE p.user_id = $1 AND cv.severity = 'HIGH'
-	`, userID).Scan(&highCves)
+		WHERE %s = $1 AND cv.severity = 'HIGH'
+	`, targetFilter), targetID).Scan(&highCves)
 
-	h.db.QueryRowContext(c.Context(), `
+	h.db.QueryRowContext(c.Context(), fmt.Sprintf(`
 		SELECT count(*) FROM component_vulnerabilities cv
 		JOIN components c ON cv.component_id = c.id
 		JOIN scans s ON c.scan_id = s.id
 		JOIN projects p ON s.project_id = p.id
-		WHERE p.user_id = $1 AND cv.severity = 'MEDIUM'
-	`, userID).Scan(&mediumCves)
+		WHERE %s = $1 AND cv.severity = 'MEDIUM'
+	`, targetFilter), targetID).Scan(&mediumCves)
 
-	h.db.QueryRowContext(c.Context(), `
+	h.db.QueryRowContext(c.Context(), fmt.Sprintf(`
 		SELECT count(*) FROM component_vulnerabilities cv
 		JOIN components c ON cv.component_id = c.id
 		JOIN scans s ON c.scan_id = s.id
 		JOIN projects p ON s.project_id = p.id
-		WHERE p.user_id = $1 AND cv.severity = 'LOW'
-	`, userID).Scan(&lowCves)
+		WHERE %s = $1 AND cv.severity = 'LOW'
+	`, targetFilter), targetID).Scan(&lowCves)
 
 	var cleanProjects int
-	h.db.QueryRowContext(c.Context(), `
+	h.db.QueryRowContext(c.Context(), fmt.Sprintf(`
 		SELECT count(DISTINCT p.id)
 		FROM projects p
-		WHERE p.user_id = $1 AND p.id NOT IN (
+		WHERE %s = $1 AND p.id NOT IN (
 			SELECT DISTINCT s.project_id
 			FROM scans s
 			JOIN components c ON s.id = c.scan_id
 			JOIN component_vulnerabilities cv ON c.id = cv.component_id
 			WHERE cv.severity IN ('CRITICAL', 'HIGH')
 		)
-	`, userID).Scan(&cleanProjects)
+	`, targetFilter), targetID).Scan(&cleanProjects)
 
 	var compliant, nonCompliant int
-	h.db.QueryRowContext(c.Context(), `
+	h.db.QueryRowContext(c.Context(), fmt.Sprintf(`
 		SELECT 
 			COUNT(*) FILTER (WHERE ntia_compliant = true),
 			COUNT(*) FILTER (WHERE ntia_compliant = false OR ntia_compliant IS NULL)
 		FROM scans s
 		JOIN projects p ON s.project_id = p.id
-		WHERE p.user_id = $1
+		WHERE %s = $1
 		  AND s.status = 'done'
-	`, userID).Scan(&compliant, &nonCompliant)
+	`, targetFilter), targetID).Scan(&compliant, &nonCompliant)
 
 	stats := fiber.Map{
 		"total_projects":       totalProjects,
@@ -745,7 +802,7 @@ func (h *ScanHandler) HandleGetDashboardStats(c *fiber.Ctx) error {
 	}
 
 	// Fetch recent 5 scans with counts and metadata in one go
-	rows, err := h.db.QueryContext(c.Context(), `
+	rows, err := h.db.QueryContext(c.Context(), fmt.Sprintf(`
 		SELECT 
 			s.id, s.status, s.created_at, COALESCE(s.repo_url, ''), COALESCE(s.ecosystem, 'unknown'),
 			COALESCE(s.compliance_score, 0),
@@ -753,10 +810,10 @@ func (h *ScanHandler) HandleGetDashboardStats(c *fiber.Ctx) error {
 			(SELECT COUNT(*) FROM component_vulnerabilities cv JOIN components c ON cv.component_id = c.id WHERE c.scan_id = s.id AND cv.severity = 'CRITICAL') as critical_cves
 		FROM scans s
 		JOIN projects p ON p.id = s.project_id
-		WHERE p.user_id = $1
+		WHERE %s = $1
 		ORDER BY s.created_at DESC
 		LIMIT 15
-	`, userID)
+	`, targetFilter), targetID)
 	
 	if err == nil {
 		defer rows.Close()
@@ -791,15 +848,33 @@ func (h *ScanHandler) HandleGetDashboardStats(c *fiber.Ctx) error {
 func (h *ScanHandler) HandleListAllScans(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 
-	rows, err := h.db.QueryContext(c.Context(), `
-		SELECT s.id, s.project_id, s.status, s.created_at,
-		       COALESCE(s.repo_url, ''), COALESCE(s.ecosystem, ''),
-		       COALESCE(s.compliance_score, 0)
-		FROM scans s
-		JOIN projects p ON s.project_id = p.id
-		WHERE p.user_id = $1
-		ORDER BY s.created_at DESC
-	`, userID)
+	wsID, err := workspace.VerifyWorkspaceAccess(c, h.db, workspace.PermViewScan)
+	if err != nil {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	var rows *sql.Rows
+	if wsID != "" {
+		rows, err = h.db.QueryContext(c.Context(), `
+			SELECT s.id, s.project_id, s.status, s.created_at,
+			       COALESCE(s.repo_url, ''), COALESCE(s.ecosystem, ''),
+			       COALESCE(s.compliance_score, 0)
+			FROM scans s
+			JOIN projects p ON s.project_id = p.id
+			WHERE p.workspace_id = $1
+			ORDER BY s.created_at DESC
+		`, wsID)
+	} else {
+		rows, err = h.db.QueryContext(c.Context(), `
+			SELECT s.id, s.project_id, s.status, s.created_at,
+			       COALESCE(s.repo_url, ''), COALESCE(s.ecosystem, ''),
+			       COALESCE(s.compliance_score, 0)
+			FROM scans s
+			JOIN projects p ON s.project_id = p.id
+			WHERE p.user_id = $1
+			ORDER BY s.created_at DESC
+		`, userID)
+	}
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to query scans"})
@@ -871,16 +946,34 @@ func (h *ScanHandler) HandleListAllScans(c *fiber.Ctx) error {
 func (h *ScanHandler) HandleListProjects(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 
-	// Get the latest scan per github_url for this user
-	rows, err := h.db.QueryContext(c.Context(), `
-		SELECT DISTINCT ON (s.repo_url)
-			s.id, s.repo_url, COALESCE(s.ecosystem,''), s.status, s.created_at,
-			COALESCE(s.compliance_score,0)
-		FROM scans s
-		JOIN projects p ON s.project_id = p.id
-		WHERE p.user_id = $1 AND s.repo_url IS NOT NULL AND s.repo_url != ''
-		ORDER BY s.repo_url, s.created_at DESC
-	`, userID)
+	wsID, err := workspace.VerifyWorkspaceAccess(c, h.db, workspace.PermViewScan)
+	if err != nil {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	var rows *sql.Rows
+	if wsID != "" {
+		rows, err = h.db.QueryContext(c.Context(), `
+			SELECT DISTINCT ON (s.repo_url)
+				s.id, s.repo_url, COALESCE(s.ecosystem,''), s.status, s.created_at,
+				COALESCE(s.compliance_score,0)
+			FROM scans s
+			JOIN projects p ON s.project_id = p.id
+			WHERE p.workspace_id = $1 AND s.repo_url IS NOT NULL AND s.repo_url != ''
+			ORDER BY s.repo_url, s.created_at DESC
+		`, wsID)
+	} else {
+		rows, err = h.db.QueryContext(c.Context(), `
+			SELECT DISTINCT ON (s.repo_url)
+				s.id, s.repo_url, COALESCE(s.ecosystem,''), s.status, s.created_at,
+				COALESCE(s.compliance_score,0)
+			FROM scans s
+			JOIN projects p ON s.project_id = p.id
+			WHERE p.user_id = $1 AND s.repo_url IS NOT NULL AND s.repo_url != ''
+			ORDER BY s.repo_url, s.created_at DESC
+		`, userID)
+	}
+
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to query projects"})
 	}
@@ -1096,21 +1189,46 @@ func (h *ScanHandler) HandleGetScanVulnerabilities(c *fiber.Ctx) error {
 func (h *ScanHandler) HandleGetAllVulnerabilities(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 
-	query := `
-		SELECT COALESCE(s.repo_url,''), s.id, c.name, c.version, cv.cve_id, cv.severity, cv.summary, cv.fixed_version
-		FROM component_vulnerabilities cv
-		JOIN components c ON c.id = cv.component_id
-		JOIN scans s ON c.scan_id = s.id
-		JOIN projects p ON s.project_id = p.id
-		WHERE p.user_id = $1
-		ORDER BY
-			CASE cv.severity
-				WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 WHEN 'LOW' THEN 4 ELSE 5
-			END ASC,
-			s.created_at DESC
-		LIMIT 500
-	`
-	rows, err := h.db.QueryContext(c.Context(), query, userID)
+	wsID, err := workspace.VerifyWorkspaceAccess(c, h.db, workspace.PermViewScan)
+	if err != nil {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	var rows *sql.Rows
+	if wsID != "" {
+		query := `
+			SELECT COALESCE(s.repo_url,''), s.id, c.name, c.version, cv.cve_id, cv.severity, cv.summary, cv.fixed_version
+			FROM component_vulnerabilities cv
+			JOIN components c ON c.id = cv.component_id
+			JOIN scans s ON c.scan_id = s.id
+			JOIN projects p ON s.project_id = p.id
+			WHERE p.workspace_id = $1
+			ORDER BY
+				CASE cv.severity
+					WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 WHEN 'LOW' THEN 4 ELSE 5
+				END ASC,
+				s.created_at DESC
+			LIMIT 500
+		`
+		rows, err = h.db.QueryContext(c.Context(), query, wsID)
+	} else {
+		query := `
+			SELECT COALESCE(s.repo_url,''), s.id, c.name, c.version, cv.cve_id, cv.severity, cv.summary, cv.fixed_version
+			FROM component_vulnerabilities cv
+			JOIN components c ON c.id = cv.component_id
+			JOIN scans s ON c.scan_id = s.id
+			JOIN projects p ON s.project_id = p.id
+			WHERE p.user_id = $1
+			ORDER BY
+				CASE cv.severity
+					WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 WHEN 'LOW' THEN 4 ELSE 5
+				END ASC,
+				s.created_at DESC
+			LIMIT 500
+		`
+		rows, err = h.db.QueryContext(c.Context(), query, userID)
+	}
+
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to query vulnerabilities"})
 	}

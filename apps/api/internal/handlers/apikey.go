@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -20,6 +21,7 @@ import (
 	"github.com/sbom-io/api/internal/scanner"
 	"github.com/sbom-io/api/internal/storage"
 	"github.com/sbom-io/api/internal/vuln"
+	"github.com/sbom-io/api/internal/workspace"
 )
 
 const keyAlphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -54,6 +56,11 @@ type createKeyRequest struct {
 func (h *ScanHandler) HandleCreateKey(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 
+	wsID, err := workspace.VerifyWorkspaceAccess(c, h.db, workspace.PermCreateAPIKey)
+	if err != nil {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": err.Error()})
+	}
+
 	var req createKeyRequest
 	if err := c.BodyParser(&req); err != nil || strings.TrimSpace(req.Name) == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name is required"})
@@ -69,11 +76,20 @@ func (h *ScanHandler) HandleCreateKey(c *fiber.Ctx) error {
 	keyPrefix := rawKey[:12] // "sbomio_xxxxx"
 
 	var id string
-	err = h.db.QueryRowContext(c.Context(), `
-		INSERT INTO api_keys (user_id, name, key_hash, key_prefix)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id
-	`, userID, strings.TrimSpace(req.Name), keyHash, keyPrefix).Scan(&id)
+	if wsID != "" {
+		err = h.db.QueryRowContext(c.Context(), `
+			INSERT INTO api_keys (user_id, workspace_id, name, key_hash, key_prefix)
+			VALUES ($1, $2, $3, $4, $5)
+			RETURNING id
+		`, userID, wsID, strings.TrimSpace(req.Name), keyHash, keyPrefix).Scan(&id)
+	} else {
+		err = h.db.QueryRowContext(c.Context(), `
+			INSERT INTO api_keys (user_id, name, key_hash, key_prefix)
+			VALUES ($1, $2, $3, $4)
+			RETURNING id
+		`, userID, strings.TrimSpace(req.Name), keyHash, keyPrefix).Scan(&id)
+	}
+
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to store key: " + err.Error()})
 	}
@@ -101,14 +117,32 @@ type apiKeyRow struct {
 func (h *ScanHandler) HandleListKeys(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 
-	rows, err := h.db.QueryContext(c.Context(), `
-		SELECT id, name, key_prefix, used,
-		       to_char(used_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
-		       to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
-		FROM api_keys
-		WHERE user_id = $1
-		ORDER BY created_at DESC
-	`, userID)
+	wsID, err := workspace.VerifyWorkspaceAccess(c, h.db, workspace.PermViewScan)
+	if err != nil {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	var rows *sql.Rows
+	if wsID != "" {
+		rows, err = h.db.QueryContext(c.Context(), `
+			SELECT id, name, key_prefix, used,
+			       to_char(used_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+			       to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+			FROM api_keys
+			WHERE workspace_id = $1
+			ORDER BY created_at DESC
+		`, wsID)
+	} else {
+		rows, err = h.db.QueryContext(c.Context(), `
+			SELECT id, name, key_prefix, used,
+			       to_char(used_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+			       to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+			FROM api_keys
+			WHERE user_id = $1 AND workspace_id IS NULL
+			ORDER BY created_at DESC
+		`, userID)
+	}
+
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to query keys"})
 	}
@@ -138,9 +172,22 @@ func (h *ScanHandler) HandleDeleteKey(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 	keyID := c.Params("keyID")
 
-	res, err := h.db.ExecContext(c.Context(), `
-		DELETE FROM api_keys WHERE id = $1 AND user_id = $2
-	`, keyID, userID)
+	wsID, err := workspace.VerifyWorkspaceAccess(c, h.db, workspace.PermCreateAPIKey)
+	if err != nil {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	var res sql.Result
+	if wsID != "" {
+		res, err = h.db.ExecContext(c.Context(), `
+			DELETE FROM api_keys WHERE id = $1 AND workspace_id = $2
+		`, keyID, wsID)
+	} else {
+		res, err = h.db.ExecContext(c.Context(), `
+			DELETE FROM api_keys WHERE id = $1 AND user_id = $2 AND workspace_id IS NULL
+		`, keyID, userID)
+	}
+
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to delete key"})
 	}

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
-import { User as UserIcon, Bell, ShieldCheck, Key, CreditCard, Zap } from 'lucide-react'
+import { User as UserIcon, Bell, ShieldCheck, Key, CreditCard, Zap, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -14,11 +14,13 @@ import { SecuritySection } from './_components/security-section'
 import { ApiAccessSection } from './_components/api-section'
 import { IntegrationsSection } from './_components/integrations-section'
 import { BillingSection } from './_components/billing-section'
+import { WorkspaceSettingsSection } from './_components/workspace-section'
 
-type SectionId = 'profile' | 'notifications' | 'security' | 'api' | 'integrations' | 'billing'
+type SectionId = 'profile' | 'workspace' | 'notifications' | 'security' | 'api' | 'integrations' | 'billing'
 
 const TABS: { id: SectionId; label: string; icon: React.ElementType }[] = [
   { id: 'profile',       label: 'Profile',         icon: UserIcon   },
+  { id: 'workspace',     label: 'Workspace',       icon: Users      },
   { id: 'notifications', label: 'Notifications',   icon: Bell       },
   { id: 'security',      label: 'Security & Auth',  icon: ShieldCheck },
   { id: 'api',           label: 'API Access',       icon: Key        },
@@ -28,6 +30,7 @@ const TABS: { id: SectionId; label: string; icon: React.ElementType }[] = [
 
 const SECTION_TITLES: Record<SectionId, { title: string; desc: string }> = {
   profile:       { title: 'Profile',         desc: 'Manage your personal information and appearance.' },
+  workspace:     { title: 'Workspace Settings', desc: 'Collaborators, team permissions, and workspace configuration.' },
   notifications: { title: 'Notifications',   desc: 'Control which alerts land in your inbox.' },
   security:      { title: 'Security & Auth', desc: 'Passwords, connected providers, and active sessions.' },
   api:           { title: 'API Access',      desc: 'Generate and manage API keys for programmatic access.' },
@@ -141,6 +144,7 @@ export default function SettingsPage() {
 
             {/* Section content */}
             {active === 'profile'       && <ProfileSection       user={user} loading={loading} />}
+            {active === 'workspace'     && <WorkspaceSettingsSection />}
             {active === 'notifications' && <NotificationsSection user={user} loading={loading} />}
             {active === 'security'      && <SecuritySection      user={user} loading={loading} />}
             {active === 'api'           && <ApiAccessSection     user={user} loading={loading} />}

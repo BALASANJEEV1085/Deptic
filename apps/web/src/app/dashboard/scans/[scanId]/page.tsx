@@ -388,7 +388,15 @@ export default function ScanResultsPage() {
               setFixError(null);
               try {
                 // Kick off the background job
-                await createFixPR(scanId as string, {});
+                await createFixPR(scanId as string, {
+                  vulnerabilities: fixableVulns.map(v => ({
+                    package_name: v.component_name,
+                    current_version: v.component_version,
+                    fixed_version: v.clean_version,
+                    cve_id: v.cves?.[0] || '',
+                    ecosystem: v.ecosystem
+                  }))
+                });
                 
                 // Start polling
                 const pollInterval = setInterval(async () => {

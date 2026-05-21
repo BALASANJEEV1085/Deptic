@@ -19,6 +19,8 @@ import {
   LogOut, ScanSearch, PlusCircle, Search, Loader2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { WorkspaceSwitcher } from '@/components/workspace-switcher'
+import { useWorkspace } from '@/lib/contexts/workspace-context'
 
 const MAIN_NAV = [
   { name: 'Dashboard',       href: '/dashboard',                    icon: LayoutDashboard },
@@ -63,6 +65,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
   const [searchAuditId, setSearchAuditId] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
+  const { activeWorkspace } = useWorkspace()
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user))
@@ -134,8 +137,15 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
         </span>
       </div>
 
+      {/* ── Workspace Switcher ────────────────────────────────────────── */}
+      <div style={{ padding: '8px 4px 0' }}>
+        <WorkspaceSwitcher />
+      </div>
+
+      <div style={{ height: 1, background: '#16191f', margin: '0 12px' }} />
+
       {/* ── Initiate Scan shortcut ────────────────────────────────────── */}
-      <div style={{ padding: '12px 12px 4px' }}>
+      <div style={{ padding: '8px 12px 4px' }}>
         <Link
           href="/dashboard/projects/new"
           onClick={onClose}
@@ -376,7 +386,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                   whiteSpace: 'nowrap',
                 }}
               >
-                Personal Workspace
+                {activeWorkspace?.name || 'Personal Workspace'}
               </p>
             </div>
           </DropdownMenuTrigger>
