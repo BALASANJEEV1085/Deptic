@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useWorkspace } from "@/lib/contexts/workspace-context";
 import {
   getDashboardStats,
   DashboardStats,
@@ -108,10 +109,12 @@ function StatCard({
 
 /* ── Page ─────────────────────────────────────────────────────────────── */
 export default function DashboardPage() {
+  const { activeWorkspace } = useWorkspace();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     getDashboardStats()
       .then((data) => {
         setStats(data);
@@ -121,7 +124,7 @@ export default function DashboardPage() {
         console.error("Failed to load stats", err);
         setLoading(false);
       });
-  }, []);
+  }, [activeWorkspace?.id]);
 
   if (loading) {
     return (

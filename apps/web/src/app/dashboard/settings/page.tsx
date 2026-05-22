@@ -3,9 +3,8 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
-import { User as UserIcon, Bell, ShieldCheck, Key, CreditCard, Zap, Users } from 'lucide-react'
+import { User as UserIcon, Bell, ShieldCheck, Key, Users, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
 
 import { ToastContainer, useToastEmitter } from './_components/shared'
 import { ProfileSection } from './_components/profile-section'
@@ -13,10 +12,10 @@ import { NotificationsSection } from './_components/notifications-section'
 import { SecuritySection } from './_components/security-section'
 import { ApiAccessSection } from './_components/api-section'
 import { IntegrationsSection } from './_components/integrations-section'
-import { BillingSection } from './_components/billing-section'
 import { WorkspaceSettingsSection } from './_components/workspace-section'
+import { useWorkspace } from '@/lib/contexts/workspace-context'
 
-type SectionId = 'profile' | 'workspace' | 'notifications' | 'security' | 'api' | 'integrations' | 'billing'
+type SectionId = 'profile' | 'workspace' | 'notifications' | 'security' | 'api' | 'integrations'
 
 const TABS: { id: SectionId; label: string; icon: React.ElementType }[] = [
   { id: 'profile',       label: 'Profile',         icon: UserIcon   },
@@ -25,7 +24,6 @@ const TABS: { id: SectionId; label: string; icon: React.ElementType }[] = [
   { id: 'security',      label: 'Security & Auth',  icon: ShieldCheck },
   { id: 'api',           label: 'API Access',       icon: Key        },
   { id: 'integrations',  label: 'Integrations',     icon: Zap        },
-  { id: 'billing',       label: 'Billing & Plan',   icon: CreditCard },
 ]
 
 const SECTION_TITLES: Record<SectionId, { title: string; desc: string }> = {
@@ -35,10 +33,12 @@ const SECTION_TITLES: Record<SectionId, { title: string; desc: string }> = {
   security:      { title: 'Security & Auth', desc: 'Passwords, connected providers, and active sessions.' },
   api:           { title: 'API Access',      desc: 'Generate and manage API keys for programmatic access.' },
   integrations:  { title: 'Integrations',    desc: 'Connect Slack and Jira for automated alerts and ticketing.' },
-  billing:       { title: 'Billing & Plan',  desc: 'Your current subscription, usage, and plan options.' },
 }
 
 export default function SettingsPage() {
+  const { activeWorkspace } = useWorkspace()
+  const isPersonal = activeWorkspace ? (activeWorkspace.is_personal === true || activeWorkspace.description === 'Default Personal Workspace') : true
+
   const [user, setUser]       = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [active, setActive]   = useState<SectionId>('profile')
@@ -51,6 +51,19 @@ export default function SettingsPage() {
       setLoading(false)
     })
   }, [supabase])
+
+  useEffect(() => {
+    if (!isPersonal && active !== 'workspace' && active !== 'integrations') {
+      setActive('workspace')
+    }
+  }, [isPersonal, active])
+
+  const filteredTabs = TABS.filter(tab => {
+    if (!isPersonal) {
+      return tab.id === 'workspace' || tab.id === 'integrations'
+    }
+    return true
+  })
 
   const { title, desc } = SECTION_TITLES[active]
 
@@ -69,7 +82,7 @@ export default function SettingsPage() {
 
         {/* ── Mobile tab bar ────────────────────────────────────── */}
         <div className="flex lg:hidden overflow-x-auto gap-1 pb-4 mb-6 scrollbar-hide border-b border-border">
-          {TABS.map(({ id, label, icon: Icon }) => (
+          {filteredTabs.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setActive(id)}
@@ -92,7 +105,7 @@ export default function SettingsPage() {
           {/* ── Sidebar ─────────────────────────────────────────── */}
           <aside className="hidden lg:flex flex-col gap-1 w-[240px] shrink-0">
             <nav className="space-y-0.5">
-              {TABS.map(({ id, label, icon: Icon }) => (
+              {filteredTabs.map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
                   onClick={() => setActive(id)}
@@ -116,22 +129,7 @@ export default function SettingsPage() {
               ))}
             </nav>
 
-            {/* Upgrade card */}
-            <div className="mt-6 p-4 rounded-xl border border-[#22c55e]/10 bg-gradient-to-br from-[#22c55e]/10 to-[#22c55e]/5">
-              <div className="flex items-center gap-2 mb-2">
-                <Zap className="h-3.5 w-3.5 text-[#22c55e]" />
-                <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#22c55e]">Upgrade</span>
-              </div>
-              <p className="text-[11px] text-zinc-400 leading-relaxed mb-3">
-                Unlock unlimited scans, API access, and enterprise compliance reporting.
-              </p>
-              <Button
-                onClick={() => setActive('billing')}
-                className="w-full h-8 bg-[#22c55e] hover:bg-[#22c55e]/90 text-black font-bold text-[11px]"
-              >
-                View Plans
-              </Button>
-            </div>
+
           </aside>
 
           {/* ── Content area ────────────────────────────────────── */}
@@ -149,7 +147,6 @@ export default function SettingsPage() {
             {active === 'security'      && <SecuritySection      user={user} loading={loading} />}
             {active === 'api'           && <ApiAccessSection     user={user} loading={loading} />}
             {active === 'integrations'  && <IntegrationsSection  user={user} loading={loading} />}
-            {active === 'billing'       && <BillingSection       user={user} loading={loading} />}
           </main>
         </div>
       </div>

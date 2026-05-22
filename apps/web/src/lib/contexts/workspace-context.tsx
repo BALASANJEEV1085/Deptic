@@ -36,7 +36,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           return
         }
       }
-      // Default to personal workspace (first one)
+      // Default to personal workspace if available
+      const personal = list.find(w => w.is_personal)
+      if (personal) {
+        setActiveWorkspaceState(personal)
+        if (typeof window !== 'undefined') localStorage.setItem(LS_KEY, personal.id)
+        return
+      }
+      // Fallback to first one
       if (list.length > 0) {
         setActiveWorkspaceState(list[0])
         if (typeof window !== 'undefined') {
@@ -67,6 +74,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const createNew = useCallback(async (name: string, slug: string, description?: string) => {
     const ws = await createWorkspace({ name, slug, description })
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(LS_KEY, ws.id)
+    }
     await refresh()
     setActiveWorkspace(ws)
     return ws

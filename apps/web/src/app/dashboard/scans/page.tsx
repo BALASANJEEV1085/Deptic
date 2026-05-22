@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { useWorkspace } from "@/lib/contexts/workspace-context";
 import Link from "next/link";
 import { Search, ScanSearch, Copy, Check, ChevronDown } from "lucide-react";
 import {
@@ -261,6 +262,7 @@ function FilterDropdown({
 
 /* ── Page ──────────────────────────────────────────────────────────────── */
 export default function ScansPage() {
+  const { activeWorkspace } = useWorkspace();
   const [scans, setScans] = useState<Scan[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -268,6 +270,7 @@ export default function ScansPage() {
   const [ecoFilter, setEcoFilter] = useState("All");
 
   useEffect(() => {
+    setLoading(true);
     listScans()
       .then((res) => {
         setScans(res.scans || []);
@@ -277,7 +280,7 @@ export default function ScansPage() {
         console.error(err);
         setLoading(false);
       });
-  }, []);
+  }, [activeWorkspace?.id]);
 
   const ecosystems = useMemo(
     () => ["All", ...Array.from(new Set(scans.map((s) => s.ecosystem || "unknown")))],

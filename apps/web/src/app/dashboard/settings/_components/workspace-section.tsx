@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useWorkspace } from '@/lib/contexts/workspace-context'
+import { createClient } from '@/lib/supabase/client'
 import {
   type WorkspaceMember,
   type WorkspaceInvitation,
@@ -14,11 +15,14 @@ import {
   updateWorkspace,
   deleteWorkspace
 } from '@/lib/api'
-import { Loader2, Plus, Trash2, ShieldAlert, Check, X, Users, Mail, Settings, UserMinus, Shield } from 'lucide-react'
+import { showToast } from './shared'
+import { Loader2, Plus, Trash2, ShieldAlert, Check, X, Users, Mail, Settings, UserMinus, Shield, UserX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export function WorkspaceSettingsSection() {
   const { activeWorkspace, refresh: refreshWorkspaces, setActiveWorkspace } = useWorkspace()
+  const supabase = createClient()
+
   const [members, setMembers] = useState<WorkspaceMember[]>([])
   const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([])
   const [loading, setLoading] = useState(true)
@@ -28,14 +32,21 @@ export function WorkspaceSettingsSection() {
   const [inviteRole, setInviteRole] = useState('member')
   const [updatingDetails, setUpdatingDetails] = useState(false)
   const [inviting, setInviting] = useState(false)
-  const [message, setMessage] = useState('')
-  const [error, setError] = useState('')
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [removingId, setRemovingId] = useState<string | null>(null)
 
-  const isPersonal = activeWorkspace?.plan === 'personal'
+  const isPersonal = activeWorkspace?.is_personal === true || activeWorkspace?.description === 'Default Personal Workspace'
   const userRole = activeWorkspace?.role || 'viewer'
   const isOwner = userRole === 'owner'
   const isAdmin = userRole === 'admin'
   const canManage = isOwner || isAdmin
+
+  // Fetch current user id once
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setCurrentUserId(user.id)
+    })
+  }, [supabase])
 
   const loadWorkspaceData = useCallback(async () => {
     if (!activeWorkspace || isPersonal) {
@@ -53,7 +64,7 @@ export function WorkspaceSettingsSection() {
       setName(activeWorkspace.name)
       setDescription(activeWorkspace.description || '')
     } catch (err: any) {
-      setError('Failed to load workspace data. Please check your connection.')
+      showToast('Failed to load workspace data. Please check your connection.', 'error')
       console.error('Failed to load workspace data', err)
     } finally {
       setLoading(false)
@@ -68,17 +79,15 @@ export function WorkspaceSettingsSection() {
     e.preventDefault()
     if (!activeWorkspace || !name.trim()) return
     setUpdatingDetails(true)
-    setMessage('')
-    setError('')
     try {
       await updateWorkspace(activeWorkspace.id, {
         name: name.trim(),
         description: description.trim() || undefined
       })
-      setMessage('Workspace settings updated successfully!')
+      showToast('Workspace settings updated successfully!')
       await refreshWorkspaces()
     } catch (err: any) {
-      setError(err.message || 'Failed to update workspace')
+      showToast(err.message || 'Failed to update workspace', 'error')
     } finally {
       setUpdatingDetails(false)
     }
@@ -87,34 +96,48 @@ export function WorkspaceSettingsSection() {
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!activeWorkspace || !inviteEmail.trim()) return
+
+    // Frontend pre-check: already a member?
+    const emailLower = inviteEmail.trim().toLowerCase()
+    const alreadyMember = members.some(m => (m.email || '').toLowerCase() === emailLower)
+    if (alreadyMember) {
+      showToast('This user is already a member of this workspace.', 'error')
+      return
+    }
+
+    // Frontend pre-check: already has pending invitation?
+    const alreadyInvited = invitations.some(i => (i.email || '').toLowerCase() === emailLower)
+    if (alreadyInvited) {
+      showToast('An active invitation has already been sent to this email.', 'error')
+      return
+    }
+
     setInviting(true)
-    setMessage('')
-    setError('')
     try {
       const res = await inviteMember(activeWorkspace.id, {
         email: inviteEmail.trim(),
         role: inviteRole
       })
-      
+
       setInviteEmail('')
-      
+
       if (res && res.token) {
         const inviteLink = `${window.location.origin}/invite/${res.token}`
         try {
           await navigator.clipboard.writeText(inviteLink)
-          setMessage(`Invitation link copied to clipboard: ${inviteLink}`)
-        } catch (clipboardErr) {
-          setMessage(`Invitation created successfully. Link: ${inviteLink}`)
+          showToast(`Invitation link copied to clipboard! Share it with ${inviteEmail.trim()}`)
+        } catch {
+          showToast(`Invitation created. Link: ${inviteLink}`)
         }
       } else {
-        setMessage(`Invitation sent to ${inviteEmail}`)
+        showToast(`Invitation sent to ${inviteEmail.trim()}`)
       }
 
-      // Reload invitations
+      // Reload invitations list
       const invitesData = await listInvitations(activeWorkspace.id)
       setInvitations(invitesData.invitations || [])
     } catch (err: any) {
-      setError(err.message || 'Failed to send invitation')
+      showToast(err.message || 'Failed to send invitation', 'error')
     } finally {
       setInviting(false)
     }
@@ -125,20 +148,23 @@ export function WorkspaceSettingsSection() {
     try {
       await updateMemberRole(activeWorkspace.id, memberId, newRole)
       await loadWorkspaceData()
-      setMessage('Member role updated')
+      showToast('Member role updated successfully')
     } catch (err: any) {
-      setError(err.message || 'Failed to update member role')
+      showToast(err.message || 'Failed to update member role', 'error')
     }
   }
 
-  const handleRemoveMember = async (memberId: string) => {
-    if (!activeWorkspace || !confirm('Are you sure you want to remove this member?')) return
+  const handleRemoveMember = async (memberId: string, memberName: string) => {
+    if (!activeWorkspace) return
+    setRemovingId(memberId)
     try {
       await removeMember(activeWorkspace.id, memberId)
       await loadWorkspaceData()
-      setMessage('Member removed successfully')
+      showToast(`${memberName} has been removed from the workspace`)
     } catch (err: any) {
-      setError(err.message || 'Failed to remove member')
+      showToast(err.message || 'Failed to remove member', 'error')
+    } finally {
+      setRemovingId(null)
     }
   }
 
@@ -148,21 +174,26 @@ export function WorkspaceSettingsSection() {
       await cancelInvitation(activeWorkspace.id, inviteId)
       const invitesData = await listInvitations(activeWorkspace.id)
       setInvitations(invitesData.invitations || [])
-      setMessage('Invitation cancelled')
+      showToast('Invitation cancelled')
     } catch (err: any) {
-      setError(err.message || 'Failed to cancel invitation')
+      showToast(err.message || 'Failed to cancel invitation', 'error')
     }
   }
 
   const handleDeleteWorkspace = async () => {
-    if (!activeWorkspace || !confirm('WARNING: Are you sure you want to delete this workspace? This will permanently delete all scans, projects, and memberships. This action cannot be undone.')) return
+    if (!activeWorkspace) return
+    // Use a confirmation dialog-style alert
+    const confirmed = window.confirm(
+      `WARNING: Are you sure you want to delete "${activeWorkspace.name}"?\n\nThis will permanently delete all scans, projects, and memberships. This action cannot be undone.`
+    )
+    if (!confirmed) return
     try {
       await deleteWorkspace(activeWorkspace.id)
       setActiveWorkspace(null)
       await refreshWorkspaces()
       window.location.href = '/dashboard'
     } catch (err: any) {
-      setError(err.message || 'Failed to delete workspace')
+      showToast(err.message || 'Failed to delete workspace', 'error')
     }
   }
 
@@ -200,18 +231,6 @@ export function WorkspaceSettingsSection() {
 
   return (
     <div className="space-y-8">
-      {/* Messages */}
-      {message && (
-        <div className="p-3.5 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-medium">
-          {message}
-        </div>
-      )}
-      {error && (
-        <div className="p-3.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium">
-          {error}
-        </div>
-      )}
-
       {/* General Settings */}
       <section className="p-6 rounded-xl border border-border bg-[#0e1015]">
         <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
@@ -225,7 +244,7 @@ export function WorkspaceSettingsSection() {
               value={name}
               onChange={e => setName(e.target.value)}
               disabled={!canManage}
-              className="w-full box-sizing-border-box bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-[#22c55e] disabled:opacity-50"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-[#22c55e] disabled:opacity-50"
             />
           </div>
           <div className="grid gap-2">
@@ -235,7 +254,7 @@ export function WorkspaceSettingsSection() {
               onChange={e => setDescription(e.target.value)}
               disabled={!canManage}
               rows={2}
-              className="w-full box-sizing-border-box bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground resize-none focus:outline-none focus:border-[#22c55e] disabled:opacity-50"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground resize-none focus:outline-none focus:border-[#22c55e] disabled:opacity-50"
             />
           </div>
           {canManage && (
@@ -257,58 +276,78 @@ export function WorkspaceSettingsSection() {
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Users className="h-4 w-4 text-[#22c55e]" />
             Team Members
+            <span className="ml-1 text-[10px] font-bold bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20 px-1.5 py-0.5 rounded">
+              {members.length}
+            </span>
           </h3>
           <p className="text-[11px] text-zinc-500 mt-1">Manage team access and roles.</p>
         </div>
 
         {/* Member list */}
         <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
-          {members.map(member => (
-            <div key={member.user_id} className="flex items-center justify-between p-3.5 bg-background/30">
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-xs text-[#22c55e]">
-                  {(member.full_name || member.email).charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <h4 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    {member.full_name || member.email}
-                    {member.role === 'owner' && (
-                      <span className="text-[9px] bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                        Owner
-                      </span>
-                    )}
-                  </h4>
-                  <p className="text-[10px] text-zinc-500 mt-0.5">{member.email}</p>
-                </div>
-              </div>
+          {members.length === 0 ? (
+            <div className="p-4 text-center text-xs text-zinc-500">No members found.</div>
+          ) : (
+            members.map(member => {
+              const isMe = member.user_id === currentUserId
+              const memberIsOwner = member.role === 'owner'
+              // Admins cannot remove/edit other admins; only owners can
+              const canEditThis = canManage && !memberIsOwner && !(isAdmin && member.role === 'admin')
+              const displayName = member.name || member.email || 'Unknown'
 
-              {/* Actions */}
-              <div className="flex items-center gap-2">
-                {canManage && member.role !== 'owner' ? (
-                  <>
-                    <select
-                      value={member.role}
-                      onChange={e => handleRoleChange(member.user_id, e.target.value)}
-                      className="bg-background border border-border rounded px-2 py-1 text-[11px] text-zinc-400 outline-none"
-                    >
-                      <option value="admin">Admin</option>
-                      <option value="member">Member</option>
-                      <option value="viewer">Viewer</option>
-                    </select>
-                    <button
-                      onClick={() => handleRemoveMember(member.user_id)}
-                      className="p-1 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded transition"
-                      title="Remove member"
-                    >
-                      <UserMinus className="h-4 w-4" />
-                    </button>
-                  </>
-                ) : (
-                  <span className="text-[11px] text-zinc-500 capitalize">{member.role}</span>
-                )}
-              </div>
-            </div>
-          ))}
+              return (
+                <div key={member.user_id} className="flex items-center justify-between p-3.5 bg-background/30">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-xs text-[#22c55e]">
+                      {displayName.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                        {displayName}
+                        {isMe && (
+                          <span className="text-[9px] bg-zinc-800 text-zinc-400 border border-zinc-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">You</span>
+                        )}
+                        {memberIsOwner && (
+                          <span className="text-[9px] bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Owner</span>
+                        )}
+                      </h4>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">{member.email}</p>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2">
+                    {canEditThis ? (
+                      <>
+                        <select
+                          value={member.role}
+                          onChange={e => handleRoleChange(member.user_id, e.target.value)}
+                          className="bg-background border border-border rounded px-2 py-1 text-[11px] text-zinc-400 outline-none"
+                        >
+                          <option value="admin">Admin</option>
+                          <option value="member">Member</option>
+                          <option value="viewer">Viewer</option>
+                        </select>
+                        <button
+                          onClick={() => handleRemoveMember(member.user_id, displayName)}
+                          disabled={removingId === member.user_id}
+                          className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded transition disabled:opacity-50"
+                          title="Remove member"
+                        >
+                          {removingId === member.user_id
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <UserX className="h-3.5 w-3.5" />
+                          }
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-[11px] text-zinc-500 capitalize">{member.role}</span>
+                    )}
+                  </div>
+                </div>
+              )
+            })
+          )}
         </div>
 
         {/* Invite Form */}
@@ -323,7 +362,7 @@ export function WorkspaceSettingsSection() {
                   placeholder="collaborator@company.com"
                   value={inviteEmail}
                   onChange={e => setInviteEmail(e.target.value)}
-                  className="w-full box-sizing-border-box bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-xs text-foreground focus:outline-none focus:border-[#22c55e]"
+                  className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-xs text-foreground focus:outline-none focus:border-[#22c55e]"
                 />
               </div>
               <div className="flex gap-2">
@@ -355,7 +394,7 @@ export function WorkspaceSettingsSection() {
         <section className="p-6 rounded-xl border border-border bg-[#0e1015] space-y-4">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Pending Invitations</h3>
-            <p className="text-[11px] text-zinc-500 mt-1">Invited members who haven't accepted yet.</p>
+            <p className="text-[11px] text-zinc-500 mt-1">Invited members who haven&apos;t accepted yet.</p>
           </div>
           <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
             {invitations.map(invite => (

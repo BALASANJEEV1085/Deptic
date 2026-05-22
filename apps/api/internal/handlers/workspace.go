@@ -217,6 +217,8 @@ func (h *WorkspaceHandler) HandleCreateWorkspace(c *fiber.Ctx) error {
 		"description": req.Description,
 		"plan":        "free",
 		"role":        "owner",
+		"is_personal": false,
+		"created_at":  time.Now().UTC().Format(time.RFC3339),
 	})
 }
 
@@ -228,11 +230,13 @@ func (h *WorkspaceHandler) HandleListWorkspaces(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 
 	rows, err := h.db.QueryContext(c.Context(), `
-		SELECT w.id, w.name, w.slug, w.description, COALESCE(w.avatar_url, ''), w.plan, wm.role, w.created_at
+		SELECT w.id, w.name, w.slug, w.description, COALESCE(w.avatar_url, ''), w.plan, wm.role, w.created_at,
+		       (w.description = 'Default Personal Workspace') AS is_personal,
+		       (SELECT COUNT(*) FROM workspace_members WHERE workspace_id = w.id) AS member_count
 		FROM workspaces w
 		JOIN workspace_members wm ON w.id = wm.workspace_id
 		WHERE wm.user_id = $1 AND w.deleted_at IS NULL
-		ORDER BY w.created_at ASC
+		ORDER BY is_personal DESC, w.created_at ASC
 	`, userID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch workspaces"})
@@ -242,16 +246,20 @@ func (h *WorkspaceHandler) HandleListWorkspaces(c *fiber.Ctx) error {
 	var list []fiber.Map
 	for rows.Next() {
 		var id, name, slug, desc, avatar, plan, role, createdAt string
-		if err := rows.Scan(&id, &name, &slug, &desc, &avatar, &plan, &role, &createdAt); err == nil {
+		var isPersonal bool
+		var memberCount int
+		if err := rows.Scan(&id, &name, &slug, &desc, &avatar, &plan, &role, &createdAt, &isPersonal, &memberCount); err == nil {
 			list = append(list, fiber.Map{
-				"id":          id,
-				"name":        name,
-				"slug":        slug,
-				"description": desc,
-				"avatar_url":  avatar,
-				"plan":        plan,
-				"role":        role,
-				"created_at":  createdAt,
+				"id":           id,
+				"name":         name,
+				"slug":         slug,
+				"description":  desc,
+				"avatar_url":   avatar,
+				"plan":         plan,
+				"role":         role,
+				"created_at":   createdAt,
+				"is_personal":  isPersonal,
+				"member_count": memberCount,
 			})
 		}
 	}
@@ -405,7 +413,7 @@ func (h *WorkspaceHandler) HandleListMembers(c *fiber.Ctx) error {
 		members = []fiber.Map{}
 	}
 
-	return c.JSON(members)
+	return c.JSON(fiber.Map{"members": members})
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -607,9 +615,34 @@ func (h *WorkspaceHandler) HandleCreateInvitation(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fmt.Sprintf("Member limit of %d reached on your current plan", maxMembers)})
 	}
 
+	// Verify if the email is already a member of this workspace
+	var isMember bool
+	err := h.db.QueryRowContext(c.Context(), `
+		SELECT EXISTS(
+			SELECT 1 FROM workspace_members wm
+			JOIN auth.users u ON wm.user_id = u.id
+			WHERE wm.workspace_id = $1 AND u.email = $2
+		)
+	`, wsID, req.Email).Scan(&isMember)
+	if err == nil && isMember {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "User with this email is already a member of this workspace"})
+	}
+
+	// Verify if there is already an active pending invitation for this email
+	var isInvited bool
+	err = h.db.QueryRowContext(c.Context(), `
+		SELECT EXISTS(
+			SELECT 1 FROM workspace_invitations
+			WHERE workspace_id = $1 AND email = $2 AND accepted = FALSE AND expires_at > NOW()
+		)
+	`, wsID, req.Email).Scan(&isInvited)
+	if err == nil && isInvited {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "An active invitation has already been sent to this email"})
+	}
+
 	token := "ws_inv_" + randString(25) // 32-char safe token
 
-	_, err := h.db.ExecContext(c.Context(), `
+	_, err = h.db.ExecContext(c.Context(), `
 		INSERT INTO workspace_invitations (workspace_id, email, role, token, invited_by, expires_at)
 		VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '7 days')
 	`, wsID, req.Email, req.Role, token, userID)
@@ -673,7 +706,7 @@ func (h *WorkspaceHandler) HandleListInvitations(c *fiber.Ctx) error {
 		list = []fiber.Map{}
 	}
 
-	return c.JSON(list)
+	return c.JSON(fiber.Map{"invitations": list})
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -706,35 +739,31 @@ func (h *WorkspaceHandler) HandleCancelInvitation(c *fiber.Ctx) error {
 func (h *WorkspaceHandler) HandleGetInvitationPublic(c *fiber.Ctx) error {
 	token := c.Params("token")
 
-	var wsName, inviterName, role string
+	var wsName, inviterName, email, role string
 	var expiresAt time.Time
-	var accepted bool
 
 	err := h.db.QueryRowContext(c.Context(), `
-		SELECT w.name, COALESCE(u.raw_user_meta_data->>'name', u.email) as inviter, i.role, i.expires_at, i.accepted
+		SELECT w.name, COALESCE(u.raw_user_meta_data->>'name', u.email) as inviter_name, i.email, i.role, i.expires_at
 		FROM workspace_invitations i
 		JOIN workspaces w ON i.workspace_id = w.id
 		JOIN auth.users u ON i.invited_by = u.id
 		WHERE i.token = $1
-	`, token).Scan(&wsName, &inviterName, &role, &expiresAt, &accepted)
+	`, token).Scan(&wsName, &inviterName, &email, &role, &expiresAt)
 
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Invalid invitation token"})
 	}
 
-	if accepted {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invitation already accepted"})
-	}
-
 	if time.Now().After(expiresAt) {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invitation expired"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invitation has expired"})
 	}
 
 	return c.JSON(fiber.Map{
-		"workspace_name": wsName,
-		"inviter":        inviterName,
-		"role":           role,
-		"expires_at":     expiresAt,
+		"workspace_name":  wsName,
+		"invited_by_name": inviterName,
+		"email":           email,
+		"role":            role,
+		"expires_at":      expiresAt,
 	})
 }
 
@@ -748,22 +777,17 @@ func (h *WorkspaceHandler) HandleAcceptInvitation(c *fiber.Ctx) error {
 
 	var wsID, role string
 	var expiresAt time.Time
-	var accepted bool
 	err := h.db.QueryRowContext(c.Context(), `
-		SELECT workspace_id, role, expires_at, accepted
+		SELECT workspace_id, role, expires_at
 		FROM workspace_invitations WHERE token = $1
-	`, token).Scan(&wsID, &role, &expiresAt, &accepted)
+	`, token).Scan(&wsID, &role, &expiresAt)
 
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Invalid invitation token"})
 	}
 
-	if accepted {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invitation already accepted"})
-	}
-
 	if time.Now().After(expiresAt) {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invitation expired"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invitation has expired"})
 	}
 
 	tx, err := h.db.BeginTx(c.Context(), nil)
@@ -772,7 +796,7 @@ func (h *WorkspaceHandler) HandleAcceptInvitation(c *fiber.Ctx) error {
 	}
 	defer tx.Rollback()
 
-	// Insert member
+	// Insert or update member (idempotent - link is reusable)
 	_, err = tx.ExecContext(c.Context(), `
 		INSERT INTO workspace_members (workspace_id, user_id, role)
 		VALUES ($1, $2, $3)
@@ -780,12 +804,6 @@ func (h *WorkspaceHandler) HandleAcceptInvitation(c *fiber.Ctx) error {
 	`, wsID, userID, role)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to join workspace: " + err.Error()})
-	}
-
-	// Mark invitation accepted
-	_, err = tx.ExecContext(c.Context(), "UPDATE workspace_invitations SET accepted = TRUE WHERE token = $1", token)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to mark invitation as accepted"})
 	}
 
 	// Log activity

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Search, Loader2, Lock, Globe, Star, GitBranch, AlertCircle, RefreshCw, ArrowUpDown, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useWorkspace } from "@/lib/contexts/workspace-context";
 import { createClient } from '@/lib/supabase/client';
 import { listGitHubRepos } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -196,6 +197,7 @@ type FilterTab = 'all' | 'public' | 'private' | 'forked';
 type SortKey = 'pushed' | 'name' | 'stars';
 
 export default function ProjectsPage() {
+  const { activeWorkspace } = useWorkspace();
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
   const [status, setStatus] = useState<'loading' | 'connected' | 'not_connected' | 'error'>('loading');
   const [connectingOAuth, setConnectingOAuth] = useState(false);
@@ -226,7 +228,7 @@ export default function ProjectsPage() {
     }
   }, []);
 
-  useEffect(() => { fetchRepos(); }, [fetchRepos]);
+  useEffect(() => { fetchRepos(); }, [fetchRepos, activeWorkspace?.id]);
 
 
   const handleConnect = useCallback(async () => {

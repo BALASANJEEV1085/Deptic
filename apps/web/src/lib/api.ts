@@ -105,12 +105,14 @@ export interface Workspace {
   created_at: string;
   role?: string;        // current user's role in this workspace
   member_count?: number;
+  is_personal?: boolean; // true for the user's default personal workspace
 }
 
 export interface WorkspaceMember {
   user_id: string;
   email: string;
-  full_name: string;
+  full_name: string;    // mapped from "name" in backend response
+  name?: string;        // raw name field from backend
   role: string;
   joined_at: string;
 }
@@ -651,7 +653,7 @@ export async function cancelInvitation(workspaceId: string, invitationId: string
   }
 }
 
-export async function getInvitationPublic(token: string): Promise<{ workspace_name: string; email: string; invited_by_name: string }> {
+export async function getInvitationPublic(token: string): Promise<{ workspace_name: string; email: string; invited_by_name: string; role: string }> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_URL}/invite/${token}`, { headers, cache: 'no-store' });
   if (!res.ok) {

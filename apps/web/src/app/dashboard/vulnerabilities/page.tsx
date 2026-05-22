@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { useWorkspace } from "@/lib/contexts/workspace-context";
 import { getAllVulnerabilities, Vulnerability, shortId } from "@/lib/api";
 import { ShieldCheck, ChevronDown, ExternalLink } from "lucide-react";
 import Link from "next/link";
@@ -39,12 +40,14 @@ function SkeletonRow() {
 
 /* ── Page ─────────────────────────────────────────────────────────────── */
 export default function VulnerabilitiesPage() {
+  const { activeWorkspace } = useWorkspace();
   const [vulns, setVulns] = useState<Vulnerability[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [severityFilter, setSeverityFilter] = useState("All");
 
   useEffect(() => {
+    setLoading(true);
     getAllVulnerabilities()
       .then((res) => {
         setVulns(res.vulnerabilities || []);
@@ -54,7 +57,7 @@ export default function VulnerabilitiesPage() {
         setError(err.message);
         setLoading(false);
       });
-  }, []);
+  }, [activeWorkspace?.id]);
 
   const summary = useMemo(() => {
     if (!vulns) return { critical: 0, high: 0, medium: 0, low: 0, total: 0 };

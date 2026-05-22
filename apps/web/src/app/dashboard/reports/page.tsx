@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Search, Loader2, FileBarChart2 } from "lucide-react";
+import { useWorkspace } from "@/lib/contexts/workspace-context";
 import {
   listScans,
   Scan,
@@ -163,6 +164,7 @@ function SkeletonRow() {
 
 /* ── Page ─────────────────────────────────────────────────────────────── */
 export default function ReportsPage() {
+  const { activeWorkspace } = useWorkspace();
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -170,6 +172,7 @@ export default function ReportsPage() {
   const [pdfLoading, setPdfLoading] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
+    setLoading(true);
     listScans().then(async (res) => {
       const rows: ReportRow[] = res.scans.map((s) => ({ ...s, compLoading: true }));
       setReports(rows);
@@ -203,7 +206,7 @@ export default function ReportsPage() {
       console.error(err);
       setLoading(false);
     });
-  }, []);
+  }, [activeWorkspace?.id]);
 
   const handlePDF = async (id: string) => {
     setPdfLoading((p) => ({ ...p, [id]: true }));

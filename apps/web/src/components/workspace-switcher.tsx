@@ -207,7 +207,7 @@ export function WorkspaceSwitcher() {
     )
   }
 
-  const isPersonal = !activeWorkspace?.slug || activeWorkspace?.plan === 'personal'
+  const isPersonal = activeWorkspace?.is_personal === true || !activeWorkspace?.slug || activeWorkspace?.description === 'Default Personal Workspace'
 
   return (
     <>
@@ -304,7 +304,7 @@ export function WorkspaceSwitcher() {
                         fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#4a5068',
                         margin: 0, marginTop: 1, textTransform: 'capitalize',
                       }}>
-                        {ws.role || 'member'} · {ws.plan}
+                        {ws.is_personal ? 'Personal' : (ws.role || 'member')}
                       </p>
                     </div>
                     {isActive && <Check size={11} color="#22c55e" />}
