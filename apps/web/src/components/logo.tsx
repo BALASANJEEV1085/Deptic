@@ -14,7 +14,7 @@ export function Logo({ className, size = 32 }: LogoProps) {
       viewBox="0 0 120 120" 
       fill="none" 
       xmlns="http://www.w3.org/2000/svg"
-      className={cn("text-white", className)}
+      className={cn("text-foreground", className)}
     >
       {/* Connections between cubes */}
       <path d="M60 30L90 60" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />

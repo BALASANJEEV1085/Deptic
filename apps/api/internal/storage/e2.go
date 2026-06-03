@@ -132,6 +132,6 @@ func DeleteFile(
 	return nil
 }
 
-func BuildSBOMKey(scanID, filename string) string {
-	return fmt.Sprintf("sboms/%s/%s", scanID, filename)
+func BuildDEPTICKey(scanID, filename string) string {
+	return fmt.Sprintf("deptics/%s/%s", scanID, filename)
 }

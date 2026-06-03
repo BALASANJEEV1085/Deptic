@@ -20,7 +20,7 @@ const SCAN_STEPS = [
   { label: "Detect",  desc: "Discovering packages",      Icon: Package },
   { label: "Scan",   desc: "Resolving dependencies",     Icon: GitMerge },
   { label: "Analyze", desc: "Checking vulnerabilities",  Icon: ShieldAlert },
-  { label: "Report", desc: "Generating SBOM",            Icon: FileText },
+  { label: "Report", desc: "Generating DEPTIC",            Icon: FileText },
 ] as const;
 
 /* ── Step indicator ─────────────────────────────────────────────────────── */
@@ -59,22 +59,22 @@ function StepIndicators({ scanStep }: { scanStep: number }) {
                   alignItems: "center",
                   justifyContent: "center",
                   background: isDone
-                    ? "rgba(34,197,94,0.15)"
+                    ? "rgba(255, 255, 255,0.15)"
                     : isActive
-                    ? "rgba(34,197,94,0.08)"
+                    ? "rgba(255, 255, 255,0.08)"
                     : "#0e1015",
                   border: `2px solid ${
-                    isDone || isActive ? "#22c55e" : "#16191f"
+                    isDone || isActive ? "#ffffff" : "#16191f"
                   }`,
                   transition: "all 0.3s ease",
                 }}
               >
                 {isDone ? (
-                  <CheckCircle2 size={14} color="#22c55e" />
+                  <CheckCircle2 size={14} color="#ffffff" />
                 ) : (
                   <step.Icon
                     size={12}
-                    color={isActive ? "#22c55e" : "#374151"}
+                    color={isActive ? "#ffffff" : "#374151"}
                   />
                 )}
               </div>
@@ -87,7 +87,7 @@ function StepIndicators({ scanStep }: { scanStep: number }) {
                   color: isDone
                     ? "#6b7280"
                     : isActive
-                    ? "#22c55e"
+                    ? "#ffffff"
                     : "#374151",
                   transition: "color 0.3s ease",
                 }}
@@ -102,7 +102,7 @@ function StepIndicators({ scanStep }: { scanStep: number }) {
                 style={{
                   width: 40,
                   height: 2,
-                  background: isDone ? "#22c55e" : "#16191f",
+                  background: isDone ? "#ffffff" : "#16191f",
                   marginBottom: 18,
                   transition: "background 0.3s ease",
                 }}
@@ -125,7 +125,9 @@ export default function NewProjectPage() {
   const [error, setError] = useState<string | null>(null);
   const [recentUrls, setRecentUrls] = useState<string[]>([]);
   const [scanStep, setScanStep] = useState<number>(-1);
+  const [elapsedTime, setElapsedTime] = useState(0);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     listScans()
@@ -139,6 +141,7 @@ export default function NewProjectPage() {
 
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
   }, []);
 
@@ -155,12 +158,12 @@ export default function NewProjectPage() {
     setLoading(true);
     setError(null);
     setScanStep(0);
+    setElapsedTime(0);
 
-    const stepTimers = [
-      setTimeout(() => setScanStep(1), 4000),
-      setTimeout(() => setScanStep(2), 9000),
-      setTimeout(() => setScanStep(3), 14000),
-    ];
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    timerIntervalRef.current = setInterval(() => {
+      setElapsedTime((prev) => prev + 1);
+    }, 1000);
 
     try {
       const projectId = "00000000-0000-0000-0000-000000000000";
@@ -169,14 +172,20 @@ export default function NewProjectPage() {
       pollIntervalRef.current = setInterval(async () => {
         try {
           const result = await getScan(scan_id);
-          if (result.scan.status === "done") {
+          const status = result.scan?.status as string;
+          
+          if (status === "detecting") setScanStep(0);
+          else if (status === "scanning") setScanStep(1);
+          else if (status === "analyzing") setScanStep(2);
+          else if (status === "reporting") setScanStep(3);
+          else if (status === "done") {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-            stepTimers.forEach(clearTimeout);
+            if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             setScanStep(4);
             router.push(`/dashboard/scans/${scan_id}`);
-          } else if (result.scan.status === "failed") {
+          } else if (status === "failed") {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-            stepTimers.forEach(clearTimeout);
+            if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             setScanStep(-1);
             setError(
               "Analysis failed. Please check if the repository is public and contains a valid manifest."
@@ -188,7 +197,7 @@ export default function NewProjectPage() {
         }
       }, 3000);
     } catch (err: any) {
-      stepTimers.forEach(clearTimeout);
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       setScanStep(-1);
       setError(err.message || "Failed to initiate scan.");
       setLoading(false);
@@ -219,163 +228,7 @@ export default function NewProjectPage() {
         padding: "40px 20px",
       }}
     >
-      {/* Scanning overlay */}
-      {loading && scanStep >= 0 && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 50,
-            background: "rgba(9,11,15,0.96)",
-            backdropFilter: "blur(8px)",
-            display: "flex",
-            flexDirection: "column" as const,
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-          }}
-        >
-          <p
-            style={{
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: 11,
-              fontWeight: 600,
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-              color: "#374151",
-              marginBottom: 4,
-            }}
-          >
-            Analyzing Repository
-          </p>
-          <p
-            style={{
-              fontFamily: "DM Mono, monospace",
-              fontSize: 14,
-              color: "#e8ecf4",
-              marginBottom: 8,
-            }}
-          >
-            {githubUrl.replace("https://github.com/", "")}
-          </p>
 
-          {/* Full step stepper */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 0,
-            }}
-          >
-            {SCAN_STEPS.map((step, i) => {
-              const isDone = scanStep > i;
-              const isActive = scanStep === i;
-              return (
-                <React.Fragment key={step.label}>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column" as const,
-                      alignItems: "center",
-                      gap: 8,
-                      width: 100,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 48,
-                        height: 48,
-                        borderRadius: "50%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        background: isDone
-                          ? "rgba(34,197,94,0.15)"
-                          : isActive
-                          ? "rgba(34,197,94,0.08)"
-                          : "#0e1015",
-                        border: `2px solid ${
-                          isDone || isActive ? "#22c55e" : "#16191f"
-                        }`,
-                        transition: "all 0.5s ease",
-                        boxShadow:
-                          isActive
-                            ? "0 0 20px rgba(34,197,94,0.2)"
-                            : "none",
-                      }}
-                    >
-                      {isDone ? (
-                        <CheckCircle2 size={20} color="#22c55e" />
-                      ) : (
-                        <step.Icon
-                          size={18}
-                          color={isActive ? "#22c55e" : "#374151"}
-                        />
-                      )}
-                    </div>
-                    <div style={{ textAlign: "center" }}>
-                      <p
-                        style={{
-                          fontFamily: "DM Sans, sans-serif",
-                          fontSize: 11,
-                          fontWeight: 600,
-                          textTransform: "uppercase" as const,
-                          letterSpacing: "0.06em",
-                          color: isDone
-                            ? "#6b7280"
-                            : isActive
-                            ? "#22c55e"
-                            : "#374151",
-                          margin: "0 0 2px",
-                          transition: "color 0.3s ease",
-                        }}
-                      >
-                        {step.label}
-                      </p>
-                      <p
-                        style={{
-                          fontFamily: "DM Sans, sans-serif",
-                          fontSize: 10,
-                          color: "#374151",
-                          margin: 0,
-                        }}
-                      >
-                        {step.desc}
-                      </p>
-                    </div>
-                  </div>
-
-                  {i < SCAN_STEPS.length - 1 && (
-                    <div
-                      style={{
-                        width: 32,
-                        height: 2,
-                        background: isDone ? "#22c55e" : "#16191f",
-                        marginBottom: 32,
-                        transition: "background 0.5s ease",
-                      }}
-                    />
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </div>
-
-          <p
-            style={{
-              fontFamily: "DM Mono, monospace",
-              fontSize: 11,
-              color: "#374151",
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              marginTop: 16,
-              animation: "pulse 1.5s ease infinite",
-            }}
-          >
-            {SCAN_STEPS[Math.min(scanStep, 3)]?.desc}…
-          </p>
-        </div>
-      )}
 
       {/* Form area */}
       <div style={{ width: "100%", maxWidth: 560 }}>
@@ -419,7 +272,7 @@ export default function NewProjectPage() {
             margin: "0 0 32px",
           }}
         >
-          Enter a public GitHub repository URL to generate an SBOM and security report.
+          Enter a public GitHub repository URL to generate an DEPTIC and security report.
         </p>
 
         {/* Form */}
@@ -433,7 +286,7 @@ export default function NewProjectPage() {
                 left: 14,
                 top: "50%",
                 transform: "translateY(-50%)",
-                color: isValidUrl ? "#22c55e" : "#374151",
+                color: isValidUrl ? "#ffffff" : "#374151",
                 transition: "color 0.15s ease",
                 pointerEvents: "none",
               }}
@@ -468,7 +321,7 @@ export default function NewProjectPage() {
                   isValidUrl === false
                     ? "#ef4444"
                     : isValidUrl === true
-                    ? "#22c55e"
+                    ? "#ffffff"
                     : "#16191f"
                 }`,
                 borderRadius: 6,
@@ -493,7 +346,7 @@ export default function NewProjectPage() {
               }}
             >
               {isValidUrl === true && (
-                <CheckCircle2 size={16} color="#22c55e" />
+                <CheckCircle2 size={16} color="#ffffff" />
               )}
               {isValidUrl === false && <XCircle size={16} color="#ef4444" />}
             </div>
@@ -523,7 +376,6 @@ export default function NewProjectPage() {
             </div>
           )}
 
-          {/* CTA Button */}
           <button
             type="submit"
             disabled={loading || !githubUrl || isValidUrl === false}
@@ -533,7 +385,7 @@ export default function NewProjectPage() {
               background:
                 loading || !githubUrl || isValidUrl === false
                   ? "#16191f"
-                  : "#22c55e",
+                  : "#ffffff",
               color:
                 loading || !githubUrl || isValidUrl === false
                   ? "#374151"
@@ -554,7 +406,12 @@ export default function NewProjectPage() {
               gap: 8,
             }}
           >
-            {loading ? "Analyzing…" : "Analyze Supply Chain →"}
+            {loading ? (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="h-4 w-4 border-2 border-[#374151] border-t-white rounded-full animate-spin"></div>
+                {scanStep <= 0 ? "Detecting" : scanStep === 1 ? "Scanning" : scanStep === 2 ? "Analyzing" : "Reporting"}... ({elapsedTime}s)
+              </span>
+            ) : "Analyze Supply Chain →"}
           </button>
         </form>
 

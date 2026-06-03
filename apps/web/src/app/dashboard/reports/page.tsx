@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Search, Loader2, FileBarChart2 } from "lucide-react";
+import { Search, FileBarChart2 } from "lucide-react";
+import { CustomLoader } from "@/components/custom-loader";
 import { useWorkspace } from "@/lib/contexts/workspace-context";
 import {
   listScans,
@@ -44,7 +45,7 @@ function EcoBadge({ eco }: { eco: string }) {
 
 function NtiaScore({ score, loading }: { score?: number; loading: boolean }) {
   if (loading)
-    return <Loader2 size={14} color="#374151" className="animate-spin" />;
+    return <CustomLoader size={14} color="#374151" />;
   if (score === undefined)
     return (
       <span style={{ fontFamily: "DM Mono, monospace", fontSize: 12, color: "#374151" }}>
@@ -53,7 +54,7 @@ function NtiaScore({ score, loading }: { score?: number; loading: boolean }) {
     );
   const s = getComplianceStatus(score);
   const color =
-    s.color === "green" ? "#22c55e" : s.color === "amber" ? "#f59e0b" : "#ef4444";
+    s.color === "green" ? "#ffffff" : s.color === "amber" ? "#f59e0b" : "#ef4444";
   return (
     <span
       style={{
@@ -89,14 +90,14 @@ function StatusBadge({
           fontWeight: 600,
           textTransform: "uppercase" as const,
           letterSpacing: "0.04em",
-          color: "#22c55e",
+          color: "#ffffff",
           display: "inline-flex",
           alignItems: "center",
           gap: 5,
         }}
       >
         <span
-          style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", flexShrink: 0 }}
+          style={{ width: 6, height: 6, borderRadius: "50%", background: "#ffffff", flexShrink: 0 }}
         />
         Compliant
       </span>
@@ -304,7 +305,7 @@ export default function ReportsPage() {
               outline: "none",
               transition: "border-color 0.15s ease",
             }}
-            onFocus={(e) => (e.target.style.borderColor = "#22c55e")}
+            onFocus={(e) => (e.target.style.borderColor = "#ffffff")}
             onBlur={(e) => (e.target.style.borderColor = "#16191f")}
           />
         </div>
@@ -468,7 +469,7 @@ export default function ReportsPage() {
                               fontFamily: "DM Sans, sans-serif",
                               fontSize: 13,
                               fontWeight: 500,
-                              color: "#22c55e",
+                              color: "#ffffff",
                               textDecoration: "none",
                             }}
                           >
@@ -504,7 +505,7 @@ export default function ReportsPage() {
                                 }}
                               >
                                 {pdfLoading[report.id] ? (
-                                  <Loader2 size={12} className="animate-spin" />
+                                  <CustomLoader size={12} />
                                 ) : null}
                                 PDF
                               </button>

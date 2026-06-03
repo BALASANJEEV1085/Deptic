@@ -37,7 +37,7 @@ export function ToastContainer({ toasts }: { toasts: ToastMessage[] }) {
         <div key={t.id} className={cn(
           "flex items-center gap-2.5 px-4 py-3 rounded-lg border shadow-xl text-xs font-semibold pointer-events-auto animate-in slide-in-from-bottom-2 fade-in duration-300",
           t.type === 'success'
-            ? "bg-[#0d1f15] border-[#22c55e]/30 text-[#22c55e]"
+            ? "bg-[#0d1f15] border-[#ffffff]/30 text-[#ffffff]"
             : "bg-[#1f0d0d] border-red-500/30 text-red-400"
         )}>
           {t.type === 'success' ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> : <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
@@ -57,8 +57,8 @@ export function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: 
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={cn(
-        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#22c55e]/50",
-        checked ? "bg-[#22c55e]" : "bg-white/10"
+        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ffffff]/50",
+        checked ? "bg-emerald-500" : "bg-zinc-700"
       )}
     >
       <span className={cn(
@@ -84,8 +84,8 @@ export function Modal({ open, onClose, title, children }: {
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md rounded-xl border border-border bg-card shadow-2xl">
+      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md rounded-xl border border-border bg-card">
         <div className="flex items-center justify-between p-5 border-b border-border">
           <h3 className="text-sm font-bold text-foreground">{title}</h3>
           <button onClick={onClose} className="text-zinc-500 hover:text-foreground transition-colors">
@@ -101,7 +101,7 @@ export function Modal({ open, onClose, title, children }: {
 // ── Skeleton ─────────────────────────────────────────────────────────────────
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn("animate-pulse rounded-md bg-white/5", className)} />
+  return <div className={cn("animate-pulse rounded-md bg-muted", className)} />
 }
 
 export function SectionSkeleton() {

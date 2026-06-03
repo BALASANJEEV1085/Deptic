@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"github.com/gofiber/fiber/v2"
-	"github.com/sbom-io/api/internal/notify"
+	"github.com/deptic-io/api/internal/notify"
 )
 
 type IntegrationsHandler struct {
@@ -88,7 +88,7 @@ func (h *IntegrationsHandler) HandleSaveSlack(c *fiber.Ctx) error {
 	// Send test message
 	msg := notify.SlackMessage{
 		Blocks: []interface{}{
-			map[string]interface{}{"type": "section", "text": map[string]interface{}{"type": "mrkdwn", "text": "✅ *SBOM.io Slack Integration Connected*\nYou will now receive security alerts here."}},
+			map[string]interface{}{"type": "section", "text": map[string]interface{}{"type": "mrkdwn", "text": "✅ *DEPTIC.io Slack Integration Connected*\nYou will now receive security alerts here."}},
 		},
 	}
 	go notify.SendSlackNotification(context.Background(), req.WebhookURL, msg)
@@ -139,16 +139,16 @@ func (h *IntegrationsHandler) HandleSaveJira(c *fiber.Ctx) error {
 	go func() {
 		issue := notify.JiraIssue{}
 		issue.Fields.Project = map[string]string{"key": req.ProjectKey}
-		issue.Fields.Summary = "[SBOM.io] Integration Test Ticket"
+		issue.Fields.Summary = "[DEPTIC.io] Integration Test Ticket"
 		issue.Fields.IssueType = map[string]string{"name": "Bug"}
-		issue.Fields.Labels = []string{"sbom-io"}
+		issue.Fields.Labels = []string{"deptic-io"}
 		issue.Fields.Description = map[string]any{
 			"type": "doc", "version": 1,
 			"content": []map[string]any{
 				{
 					"type": "paragraph",
 					"content": []map[string]any{
-						{"type": "text", "text": "This is a test ticket to verify SBOM.io integration."},
+						{"type": "text", "text": "This is a test ticket to verify DEPTIC.io integration."},
 					},
 				},
 			},

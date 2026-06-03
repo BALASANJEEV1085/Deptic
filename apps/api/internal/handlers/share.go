@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/sbom-io/api/internal/scanner"
+	"github.com/deptic-io/api/internal/scanner"
 )
 
 type createShareRequest struct {
@@ -40,9 +40,9 @@ func generateToken() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
-// HandleCreateShareLink POST /api/sboms/:sbomID/share
+// HandleCreateShareLink POST /api/deptics/:depticID/share
 func (h *ScanHandler) HandleCreateShareLink(c *fiber.Ctx) error {
-	sbomID := c.Params("sbomID")
+	depticID := c.Params("depticID")
 	userID := c.Locals("user_id").(string)
 
 	var req createShareRequest
@@ -54,15 +54,15 @@ func (h *ScanHandler) HandleCreateShareLink(c *fiber.Ctx) error {
 		req.ExpiresInDays = 30 // default
 	}
 
-	// Verify user owns this sbom
+	// Verify user owns this deptic
 	var exists bool
 	err := h.db.QueryRowContext(c.Context(), `
 		SELECT EXISTS (
-			SELECT 1 FROM sboms s
+			SELECT 1 FROM deptics s
 			JOIN scans sc ON s.scan_id = sc.id
 			JOIN projects p ON sc.project_id = p.id
 			WHERE s.id = $1 AND p.user_id = $2
-		)`, sbomID, userID).Scan(&exists)
+		)`, depticID, userID).Scan(&exists)
 	if err != nil || !exists {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Access denied"})
 	}
@@ -75,9 +75,9 @@ func (h *ScanHandler) HandleCreateShareLink(c *fiber.Ctx) error {
 	expiresAt := time.Now().AddDate(0, 0, req.ExpiresInDays)
 
 	_, err = h.db.ExecContext(c.Context(), `
-		INSERT INTO shared_links (sbom_id, token, label, expires_at)
+		INSERT INTO shared_links (deptic_id, token, label, expires_at)
 		VALUES ($1, $2, $3, $4)`,
-		sbomID, token, req.Label, expiresAt)
+		depticID, token, req.Label, expiresAt)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create share link"})
 	}
@@ -94,14 +94,14 @@ func (h *ScanHandler) HandleViewShareLink(c *fiber.Ctx) error {
 	token := c.Params("token")
 
 	// 1. Look up shared link
-	var sbomID string
+	var depticID string
 	var label string
 	var expiresAt time.Time
 
 	err := h.db.QueryRowContext(c.Context(), `
-		SELECT sbom_id, label, expires_at
+		SELECT deptic_id, label, expires_at
 		FROM shared_links
-		WHERE token = $1`, token).Scan(&sbomID, &label, &expiresAt)
+		WHERE token = $1`, token).Scan(&depticID, &label, &expiresAt)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Share link not found"})
 	}
@@ -113,7 +113,7 @@ func (h *ScanHandler) HandleViewShareLink(c *fiber.Ctx) error {
 	// Increment view count
 	_, _ = h.db.ExecContext(c.Context(), "UPDATE shared_links SET view_count = view_count + 1 WHERE token = $1", token)
 
-	// Fetch sbom and scan details
+	// Fetch deptic and scan details
 	var format, specVersion, sha256, repoName string
 	var componentCount int
 	var generatedAt time.Time
@@ -121,12 +121,12 @@ func (h *ScanHandler) HandleViewShareLink(c *fiber.Ctx) error {
 
 	err = h.db.QueryRowContext(c.Context(), `
 		SELECT s.format, s.spec_version, s.sha256_hash, s.component_count, s.created_at, s.scan_id, p.name
-		FROM sboms s
+		FROM deptics s
 		JOIN scans sc ON s.scan_id = sc.id
 		JOIN projects p ON sc.project_id = p.id
-		WHERE s.id = $1`, sbomID).Scan(&format, &specVersion, &sha256, &componentCount, &generatedAt, &scanID, &repoName)
+		WHERE s.id = $1`, depticID).Scan(&format, &specVersion, &sha256, &componentCount, &generatedAt, &scanID, &repoName)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to load SBOM metadata"})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to load DEPTIC metadata"})
 	}
 
 	// Fetch components limit 5000
@@ -228,20 +228,20 @@ func (h *ScanHandler) HandleViewShareLink(c *fiber.Ctx) error {
 	})
 }
 
-// HandleListShareLinks GET /api/sboms/:sbomID/shares
+// HandleListShareLinks GET /api/deptics/:depticID/shares
 func (h *ScanHandler) HandleListShareLinks(c *fiber.Ctx) error {
-	sbomID := c.Params("sbomID")
+	depticID := c.Params("depticID")
 	userID := c.Locals("user_id").(string)
 
 	// Verify owner
 	var exists bool
 	err := h.db.QueryRowContext(c.Context(), `
 		SELECT EXISTS (
-			SELECT 1 FROM sboms s
+			SELECT 1 FROM deptics s
 			JOIN scans sc ON s.scan_id = sc.id
 			JOIN projects p ON sc.project_id = p.id
 			WHERE s.id = $1 AND p.user_id = $2
-		)`, sbomID, userID).Scan(&exists)
+		)`, depticID, userID).Scan(&exists)
 	if err != nil || !exists {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Access denied"})
 	}
@@ -249,8 +249,8 @@ func (h *ScanHandler) HandleListShareLinks(c *fiber.Ctx) error {
 	rows, err := h.db.QueryContext(c.Context(), `
 		SELECT token, label, view_count, expires_at, created_at
 		FROM shared_links
-		WHERE sbom_id = $1
-		ORDER BY created_at DESC`, sbomID)
+		WHERE deptic_id = $1
+		ORDER BY created_at DESC`, depticID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch share links"})
 	}
@@ -304,9 +304,9 @@ func (h *ScanHandler) HandleListScanShareLinks(c *fiber.Ctx) error {
 	}
 
 	rows, err := h.db.QueryContext(c.Context(), `
-		SELECT sl.token, sl.label, sl.view_count, sl.expires_at, sl.created_at, sl.sbom_id
+		SELECT sl.token, sl.label, sl.view_count, sl.expires_at, sl.created_at, sl.deptic_id
 		FROM shared_links sl
-		JOIN sboms s ON sl.sbom_id = s.id
+		JOIN deptics s ON sl.deptic_id = s.id
 		WHERE s.scan_id = $1
 		ORDER BY sl.created_at DESC`, scanID)
 	if err != nil {
@@ -322,13 +322,13 @@ func (h *ScanHandler) HandleListScanShareLinks(c *fiber.Ctx) error {
 		CreatedAt  time.Time `json:"created_at"`
 		URL        string    `json:"url"`
 		IsExpired  bool      `json:"is_expired"`
-		SbomID     string    `json:"sbom_id"`
+		DepticID     string    `json:"deptic_id"`
 	}
 
 	var links []shareLink
 	for rows.Next() {
 		var l shareLink
-		if err := rows.Scan(&l.Token, &l.Label, &l.ViewCount, &l.ExpiresAt, &l.CreatedAt, &l.SbomID); err != nil {
+		if err := rows.Scan(&l.Token, &l.Label, &l.ViewCount, &l.ExpiresAt, &l.CreatedAt, &l.DepticID); err != nil {
 			continue
 		}
 		l.URL = fmt.Sprintf("%s/share/%s", getFrontendURL(), l.Token)
@@ -345,25 +345,25 @@ func (h *ScanHandler) HandleListScanShareLinks(c *fiber.Ctx) error {
 	})
 }
 
-// HandleRevokeShareLink DELETE /api/sboms/:sbomID/shares/:token
+// HandleRevokeShareLink DELETE /api/deptics/:depticID/shares/:token
 func (h *ScanHandler) HandleRevokeShareLink(c *fiber.Ctx) error {
-	sbomID := c.Params("sbomID")
+	depticID := c.Params("depticID")
 	token := c.Params("token")
 	userID := c.Locals("user_id").(string)
 
 	var exists bool
 	err := h.db.QueryRowContext(c.Context(), `
 		SELECT EXISTS (
-			SELECT 1 FROM sboms s
+			SELECT 1 FROM deptics s
 			JOIN scans sc ON s.scan_id = sc.id
 			JOIN projects p ON sc.project_id = p.id
 			WHERE s.id = $1 AND p.user_id = $2
-		)`, sbomID, userID).Scan(&exists)
+		)`, depticID, userID).Scan(&exists)
 	if err != nil || !exists {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Access denied"})
 	}
 
-	_, err = h.db.ExecContext(c.Context(), "DELETE FROM shared_links WHERE token = $1 AND sbom_id = $2", token, sbomID)
+	_, err = h.db.ExecContext(c.Context(), "DELETE FROM shared_links WHERE token = $1 AND deptic_id = $2", token, depticID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete share link"})
 	}

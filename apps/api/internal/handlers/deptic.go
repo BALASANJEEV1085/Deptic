@@ -7,20 +7,20 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/sbom-io/api/internal/sbom"
-	"github.com/sbom-io/api/internal/scanner"
-	"github.com/sbom-io/api/internal/storage"
-	"github.com/sbom-io/api/internal/vuln"
+	"github.com/deptic-io/api/internal/deptic"
+	"github.com/deptic-io/api/internal/scanner"
+	"github.com/deptic-io/api/internal/storage"
+	"github.com/deptic-io/api/internal/vuln"
 )
 
-type generateSBOMRequest struct {
+type generateDEPTICRequest struct {
 	Format string `json:"format"`
 }
 
-// HandleGenerateSBOM handles POST /api/scans/:scanID/sbom
-func (h *ScanHandler) HandleGenerateSBOM(c *fiber.Ctx) error {
+// HandleGenerateDEPTIC handles POST /api/scans/:scanID/deptic
+func (h *ScanHandler) HandleGenerateDEPTIC(c *fiber.Ctx) error {
 	scanID := c.Params("scanID")
-	var req generateSBOMRequest
+	var req generateDEPTICRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 	}
@@ -54,7 +54,7 @@ func (h *ScanHandler) HandleGenerateSBOM(c *fiber.Ctx) error {
 		ecosystem = eco
 	}
 
-	scanInfo := sbom.ScanInfo{
+	scanInfo := deptic.ScanInfo{
 		ID:        scanID,
 		RepoName:  repoName,
 		RepoURL:   actualRepoURL,
@@ -113,7 +113,7 @@ func (h *ScanHandler) HandleGenerateSBOM(c *fiber.Ctx) error {
 		vulns = append(vulns, v)
 	}
 
-	// 2. Generate SBOM
+	// 2. Generate DEPTIC
 	var fileBytes []byte
 	var sha256Hash string
 	var contentType string
@@ -121,19 +121,19 @@ func (h *ScanHandler) HandleGenerateSBOM(c *fiber.Ctx) error {
 	var ext string
 
 	if req.Format == "cyclonedx" {
-		fileBytes, sha256Hash, err = sbom.GenerateCycloneDX(scanInfo, components, vulns)
+		fileBytes, sha256Hash, err = deptic.GenerateCycloneDX(scanInfo, components, vulns)
 		contentType = "application/json"
 		specVersion = "1.5"
 		ext = "json"
 	} else if req.Format == "spdx" {
-		fileBytes, sha256Hash, err = sbom.GenerateSPDX(scanInfo, components)
+		fileBytes, sha256Hash, err = deptic.GenerateSPDX(scanInfo, components)
 		contentType = "text/spdx"
 		specVersion = "2.3"
 		ext = "spdx"
 	}
 
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to generate SBOM", "details": err.Error()})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to generate DEPTIC", "details": err.Error()})
 	}
 
 	// 3. Upload to E2
@@ -144,23 +144,23 @@ func (h *ScanHandler) HandleGenerateSBOM(c *fiber.Ctx) error {
 
 	timestamp := time.Now().UTC().Format("20060102150405")
 	filename := fmt.Sprintf("%s-%s.%s", req.Format, timestamp, ext)
-	fileKey := storage.BuildSBOMKey(scanID, filename)
+	fileKey := storage.BuildDEPTICKey(scanID, filename)
 
 	err = storage.UploadFile(c.Context(), e2Client, fileKey, fileBytes, contentType)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to upload SBOM", "details": err.Error()})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to upload DEPTIC", "details": err.Error()})
 	}
 
 	// 4. Save to database
-	sbomID := uuid.New().String()
+	depticID := uuid.New().String()
 	_, err = h.db.ExecContext(c.Context(), `
-		INSERT INTO sboms (id, scan_id, format, spec_version, file_key, sha256_hash, component_count)
+		INSERT INTO deptics (id, scan_id, format, spec_version, file_key, sha256_hash, component_count)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		sbomID, scanID, req.Format, specVersion, fileKey, sha256Hash, len(components))
+		depticID, scanID, req.Format, specVersion, fileKey, sha256Hash, len(components))
 	
 	if err != nil {
 		// Log but don't fail if we uploaded successfully
-		fmt.Printf("Failed to insert sbom into db: %v\n", err)
+		fmt.Printf("Failed to insert deptic into db: %v\n", err)
 	}
 
 	// 5. Generate presigned URL
@@ -170,21 +170,21 @@ func (h *ScanHandler) HandleGenerateSBOM(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"sbom_id":         sbomID,
+		"deptic_id":         depticID,
 		"sha256":          sha256Hash,
 		"download_url":    downloadURL,
 		"component_count": len(components),
 	})
 }
 
-// HandleDownloadSBOM handles GET /api/sboms/:sbomID/download
-func (h *ScanHandler) HandleDownloadSBOM(c *fiber.Ctx) error {
-	sbomID := c.Params("sbomID")
+// HandleDownloadDEPTIC handles GET /api/deptics/:depticID/download
+func (h *ScanHandler) HandleDownloadDEPTIC(c *fiber.Ctx) error {
+	depticID := c.Params("depticID")
 
 	var fileKey string
-	err := h.db.QueryRowContext(c.Context(), "SELECT file_key FROM sboms WHERE id = $1", sbomID).Scan(&fileKey)
+	err := h.db.QueryRowContext(c.Context(), "SELECT file_key FROM deptics WHERE id = $1", depticID).Scan(&fileKey)
 	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "SBOM not found"})
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "DEPTIC not found"})
 	}
 
 	e2Client, err := storage.NewE2Client()

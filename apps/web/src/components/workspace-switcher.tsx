@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { useWorkspace } from '@/lib/contexts/workspace-context'
 import type { Workspace } from '@/lib/api'
-import { Check, ChevronDown, Plus, Loader2, Building2, User } from 'lucide-react'
+import { Check, ChevronDown, Plus, Building2, User } from 'lucide-react'
+import { CustomLoader } from '@/components/custom-loader'
 import { cn } from '@/lib/utils'
 
 function WorkspaceAvatar({ ws, size = 22 }: { ws: Workspace; size?: number }) {
@@ -86,7 +87,7 @@ function CreateWorkspaceDialog({ onClose, onCreated }: CreateWorkspaceDialogProp
             Create Workspace
           </h2>
           <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-            Collaborate with your team on SBOM analysis
+            Collaborate with your team on DEPTIC analysis
           </p>
         </div>
 
@@ -117,7 +118,7 @@ function CreateWorkspaceDialog({ onClose, onCreated }: CreateWorkspaceDialogProp
               borderRadius: 6, overflow: 'hidden',
             }}>
               <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#4a5068', padding: '8px 0 8px 12px' }}>
-                sbom.io/
+                deptic.io/
               </span>
               <input
                 value={slug}
@@ -167,14 +168,14 @@ function CreateWorkspaceDialog({ onClose, onCreated }: CreateWorkspaceDialogProp
             <button
               type="submit" disabled={loading || !name.trim() || !slug.trim()}
               style={{
-                background: '#22c55e', border: 'none', borderRadius: 6,
+                background: '#ffffff', border: 'none', borderRadius: 6,
                 padding: '7px 16px', color: '#000', fontFamily: 'DM Sans, sans-serif',
                 fontSize: 13, fontWeight: 600, cursor: 'pointer',
                 opacity: loading || !name.trim() || !slug.trim() ? 0.6 : 1,
                 display: 'flex', alignItems: 'center', gap: 6,
               }}
             >
-              {loading && <Loader2 size={12} className="animate-spin" />}
+              {loading && <CustomLoader size={12} />}
               Create Workspace
             </button>
           </div>
@@ -201,7 +202,7 @@ export function WorkspaceSwitcher() {
   if (isLoading) {
     return (
       <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Loader2 size={12} style={{ color: '#4a5068' }} className="animate-spin" />
+        <CustomLoader size={12} style={{ color: '#4a5068' }} />
         <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 11, color: '#4a5068' }}>Loading...</span>
       </div>
     )
@@ -229,11 +230,11 @@ export function WorkspaceSwitcher() {
             <WorkspaceAvatar ws={activeWorkspace} size={20} />
           ) : (
             <div style={{
-              width: 20, height: 20, borderRadius: 4, background: 'rgba(34,197,94,0.1)',
-              border: '1px solid rgba(34,197,94,0.2)', display: 'flex',
+              width: 20, height: 20, borderRadius: 4, background: 'rgba(255, 255, 255,0.1)',
+              border: '1px solid rgba(255, 255, 255,0.2)', display: 'flex',
               alignItems: 'center', justifyContent: 'center', flexShrink: 0,
             }}>
-              <User size={10} color="#22c55e" />
+              <User size={10} color="#ffffff" />
             </div>
           )}
           <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
@@ -283,7 +284,7 @@ export function WorkspaceSwitcher() {
                     key={ws.id}
                     onClick={() => { setActiveWorkspace(ws); setOpen(false) }}
                     style={{
-                      width: '100%', background: isActive ? 'rgba(34,197,94,0.08)' : 'transparent',
+                      width: '100%', background: isActive ? 'rgba(255, 255, 255,0.08)' : 'transparent',
                       border: 'none', padding: '7px 10px', cursor: 'pointer',
                       display: 'flex', alignItems: 'center', gap: 8,
                       transition: 'background 0.1s',
@@ -295,7 +296,7 @@ export function WorkspaceSwitcher() {
                     <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
                       <p style={{
                         fontFamily: 'DM Sans, sans-serif', fontSize: 12, fontWeight: 500,
-                        color: isActive ? '#22c55e' : '#c9d1e0', margin: 0,
+                        color: isActive ? '#ffffff' : '#c9d1e0', margin: 0,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>
                         {ws.name}
@@ -307,7 +308,7 @@ export function WorkspaceSwitcher() {
                         {ws.is_personal ? 'Personal' : (ws.role || 'member')}
                       </p>
                     </div>
-                    {isActive && <Check size={11} color="#22c55e" />}
+                    {isActive && <Check size={11} color="#ffffff" />}
                   </button>
                 )
               })}

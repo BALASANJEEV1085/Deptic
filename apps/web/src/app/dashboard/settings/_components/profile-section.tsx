@@ -88,14 +88,14 @@ export function ProfileSection({ user, loading }: Props) {
           <div className="relative group">
             <Avatar className="h-20 w-20 border-2 border-border ring-2 ring-black">
               <AvatarImage src={avatarUrl} />
-              <AvatarFallback className="bg-[#22c55e]/10 text-[#22c55e] text-2xl font-black">{initials}</AvatarFallback>
+              <AvatarFallback className="bg-[#ffffff]/10 text-[#ffffff] text-2xl font-black">{initials}</AvatarFallback>
             </Avatar>
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
               className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full cursor-pointer"
             >
-              <Camera className="h-5 w-5 text-white" />
+              <Camera className="h-5 w-5 text-foreground" />
             </button>
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
           </div>
@@ -117,7 +117,7 @@ export function ProfileSection({ user, loading }: Props) {
               value={fullName}
               onChange={e => setFullName(e.target.value)}
               placeholder="Jane Smith"
-              className="bg-muted/40 border-border focus:border-[#22c55e]/50 h-9 text-sm"
+              className="bg-muted/40 border-border focus:border-[#ffffff]/50 h-9 text-sm"
             />
           </div>
 
@@ -127,7 +127,7 @@ export function ProfileSection({ user, loading }: Props) {
               <Input
                 value={user?.email || ''}
                 disabled
-                className="bg-black/20 border-border text-zinc-500 h-9 text-sm flex-1 cursor-not-allowed"
+                className="bg-muted border-border text-zinc-500 h-9 text-sm flex-1 cursor-not-allowed"
               />
               <Button
                 variant="outline"
@@ -146,7 +146,7 @@ export function ProfileSection({ user, loading }: Props) {
               onChange={e => setBio(e.target.value)}
               rows={3}
               placeholder="Tell us about yourself..."
-              className="w-full bg-muted/40 border border-border rounded-lg p-3 text-sm text-foreground focus:border-[#22c55e]/50 focus:outline-none resize-none transition-colors"
+              className="w-full bg-muted/40 border border-border rounded-lg p-3 text-sm text-foreground focus:border-[#ffffff]/50 focus:outline-none resize-none transition-colors"
             />
           </div>
         </div>
@@ -167,8 +167,8 @@ export function ProfileSection({ user, loading }: Props) {
               className={cn(
                 "flex items-center justify-center gap-2 p-3 rounded-lg border text-sm font-semibold transition-all",
                 theme === value
-                  ? "border-[#22c55e] bg-[#22c55e]/10 text-[#22c55e]"
-                  : "border-border bg-muted/30 text-zinc-400 hover:text-foreground hover:border-zinc-600"
+                  ? "border-[#ffffff] bg-[#ffffff]/10 text-[#ffffff]"
+                  : "border-border bg-muted/30 text-muted-foreground hover:text-foreground hover:border-zinc-600"
               )}
             >
               <Icon className="h-4 w-4" /> {label}
@@ -177,7 +177,7 @@ export function ProfileSection({ user, loading }: Props) {
         </div>
       </div>
 
-      <Button onClick={handleSave} disabled={saving} className="bg-[#22c55e] hover:bg-[#22c55e]/90 text-black font-bold h-9 px-6">
+      <Button onClick={handleSave} disabled={saving} className="bg-[#ffffff] hover:bg-[#ffffff]/90 text-black font-bold h-9 px-6">
         <Save className="h-3.5 w-3.5 mr-2" />
         {saving ? 'Saving…' : 'Save Profile'}
       </Button>
@@ -185,7 +185,7 @@ export function ProfileSection({ user, loading }: Props) {
       {/* Change Email Modal */}
       <Modal open={emailModal} onClose={() => setEmailModal(false)} title="Change Email Address">
         <div className="space-y-4">
-          <p className="text-xs text-zinc-400">Enter your new email address. A confirmation link will be sent to verify the change.</p>
+          <p className="text-xs text-muted-foreground">Enter your new email address. A confirmation link will be sent to verify the change.</p>
           <div className="space-y-1.5">
             <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">New Email</label>
             <Input
@@ -198,7 +198,7 @@ export function ProfileSection({ user, loading }: Props) {
           </div>
           <div className="flex gap-2 justify-end pt-1">
             <Button variant="outline" onClick={() => setEmailModal(false)} className="border-border text-xs h-9">Cancel</Button>
-            <Button onClick={handleEmailChange} disabled={sendingEmail || !newEmail} className="bg-[#22c55e] hover:bg-[#22c55e]/90 text-black font-bold text-xs h-9">
+            <Button onClick={handleEmailChange} disabled={sendingEmail || !newEmail} className="bg-[#ffffff] hover:bg-[#ffffff]/90 text-black font-bold text-xs h-9">
               {sendingEmail ? 'Sending…' : 'Send Confirmation'}
             </Button>
           </div>

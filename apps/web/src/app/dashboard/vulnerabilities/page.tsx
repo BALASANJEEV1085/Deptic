@@ -183,7 +183,7 @@ export default function VulnerabilitiesPage() {
                   style={{
                     fontFamily: "DM Sans, sans-serif",
                     fontSize: 13,
-                    color: severityFilter === s ? "#22c55e" : "#c9d1e0",
+                    color: severityFilter === s ? "#ffffff" : "#c9d1e0",
                     padding: "6px 10px",
                     cursor: "pointer",
                     borderRadius: 4,
@@ -211,7 +211,7 @@ export default function VulnerabilitiesPage() {
             gap: 12,
           }}
         >
-          <ShieldCheck size={40} color="#22c55e" style={{ opacity: 0.3 }} />
+          <ShieldCheck size={40} color="#ffffff" style={{ opacity: 0.3 }} />
           <p style={{ fontFamily: "DM Sans, sans-serif", fontSize: 15, color: "#e8ecf4", margin: 0 }}>
             No vulnerabilities detected
           </p>
@@ -378,7 +378,7 @@ export default function VulnerabilitiesPage() {
                             style={{
                               fontFamily: "DM Mono, monospace",
                               fontSize: 12,
-                              color: "#22c55e",
+                              color: "#ffffff",
                             }}
                           >
                             → v{v.fixed_version}
@@ -405,7 +405,7 @@ export default function VulnerabilitiesPage() {
                               fontFamily: "DM Sans, sans-serif",
                               fontSize: 13,
                               fontWeight: 500,
-                              color: "#22c55e",
+                              color: "#ffffff",
                               textDecoration: "none",
                             }}
                           >

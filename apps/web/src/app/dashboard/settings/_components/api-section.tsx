@@ -59,7 +59,7 @@ function CopyButton({ text, label = 'Copied!' }: { text: string; label?: string 
   return (
     <button
       onClick={handleCopy}
-      className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50 transition-all"
+      className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold text-muted-foreground hover:text-zinc-100 hover:bg-zinc-700/50 transition-all"
     >
       {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
       {copied ? 'Copied' : 'Copy'}
@@ -83,10 +83,21 @@ function CodeSnippet({ code, lang }: { code: string; lang: string }) {
 // ─── CLI How-to Section ────────────────────────────────────────────────────────
 function CLIHowTo() {
   const [open, setOpen] = useState(false)
+  const [platform, setPlatform] = useState<'windows' | 'mac'>('windows')
 
-  // Same command on all platforms after npm install -g ssbom-scan
-  const installSnippet = `npm install -g ssbom-scan`
-  const runSnippet     = `ssbom-scan`
+  const installSnippet = `npm install -g deptic-scan`
+
+  const windowsSnippet = `# Navigate to your project folder
+cd C:\\Users\\you\\projects\\my-app
+
+# Run the scanner
+deptic-scan`
+
+  const macSnippet = `# Navigate to your project folder
+cd ~/projects/my-app
+
+# Run the scanner
+deptic-scan`
 
   return (
     <div className="rounded-xl border border-border bg-muted/20 overflow-hidden">
@@ -96,7 +107,7 @@ function CLIHowTo() {
       >
         <div className="flex items-center gap-2.5">
           <Terminal className="h-4 w-4 text-zinc-500" />
-          <span className="text-xs font-bold text-zinc-400">How to use the CLI Scanner</span>
+          <span className="text-xs font-bold text-muted-foreground">How to use the CLI Scanner</span>
         </div>
         {open
           ? <ChevronUp className="h-4 w-4 text-zinc-600" />
@@ -108,16 +119,58 @@ function CLIHowTo() {
         <div className="px-5 pb-5 space-y-5 border-t border-border pt-5">
           <div className="space-y-2">
             <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-              1. Install the CLI Globally
+              1. Install the scanner (one time only)
             </p>
             <CodeSnippet code={installSnippet} lang="npm" />
           </div>
 
           <div className="space-y-2">
             <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-              2. Run the Scanner
+              2. Navigate to your project &amp; run
             </p>
-            <CodeSnippet code={runSnippet} lang="bash" />
+            {/* Platform tabs */}
+            <div className="flex gap-1 p-0.5 rounded-lg bg-zinc-900/60 border border-zinc-800 w-fit">
+              <button
+                onClick={() => setPlatform('windows')}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-[10px] font-bold transition-all",
+                  platform === 'windows'
+                    ? "bg-zinc-700 text-white shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-300"
+                )}
+              >
+                Windows PowerShell
+              </button>
+              <button
+                onClick={() => setPlatform('mac')}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-[10px] font-bold transition-all",
+                  platform === 'mac'
+                    ? "bg-zinc-700 text-white shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-300"
+                )}
+              >
+                Mac / Linux
+              </button>
+            </div>
+            <CodeSnippet
+              code={platform === 'windows' ? windowsSnippet : macSnippet}
+              lang={platform === 'windows' ? 'powershell' : 'bash'}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+              3. Enter your API key when prompted
+            </p>
+            <p className="text-[10px] text-zinc-500 leading-relaxed">
+              The scanner will ask for your API key, then automatically detect manifest files
+              (<code className="text-muted-foreground">package.json</code>,
+              {' '}<code className="text-muted-foreground">requirements.txt</code>,
+              {' '}<code className="text-muted-foreground">pom.xml</code>,
+              {' '}<code className="text-muted-foreground">go.mod</code>, etc.)
+              and send them for analysis.
+            </p>
           </div>
 
           <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/5 border border-amber-500/15">
@@ -129,9 +182,9 @@ function CLIHowTo() {
 
           <p className="text-[10px] text-zinc-600">
             The scanner prints results to your terminal and downloads{' '}
-            <code className="text-zinc-400 text-[10px]">sbom-report.pdf</code>,{' '}
-            <code className="text-zinc-400 text-[10px]">sbom.cyclonedx.json</code>, and{' '}
-            <code className="text-zinc-400 text-[10px]">sbom.spdx</code>{' '}
+            <code className="text-muted-foreground text-[10px]">deptic-report.pdf</code>,{' '}
+            <code className="text-muted-foreground text-[10px]">deptic.cyclonedx.json</code>, and{' '}
+            <code className="text-muted-foreground text-[10px]">deptic.spdx</code>{' '}
             to your current directory. Download links expire after 1 hour.
           </p>
         </div>
@@ -224,7 +277,7 @@ export function ApiAccessSection({ user, loading }: { user: User | null; loading
         </div>
         <Button
           onClick={() => { setNewKey(null); setGenerateModal(true) }}
-          className="bg-[#22c55e] hover:bg-[#22c55e]/90 text-black font-bold h-9 text-xs"
+          className="bg-[#ffffff] hover:bg-[#ffffff]/90 text-black font-bold h-9 text-xs"
         >
           <Plus className="h-3.5 w-3.5 mr-1.5" /> Generate New Key
         </Button>
@@ -353,7 +406,7 @@ export function ApiAccessSection({ user, loading }: { user: User | null; loading
                 <Button
                   onClick={handleGenerate}
                   disabled={generating || !keyName.trim()}
-                  className="bg-[#22c55e] hover:bg-[#22c55e]/90 text-black font-bold text-xs h-9"
+                  className="bg-[#ffffff] hover:bg-[#ffffff]/90 text-black font-bold text-xs h-9"
                 >
                   {generating ? 'Generating…' : 'Generate Key'}
                 </Button>
@@ -362,11 +415,11 @@ export function ApiAccessSection({ user, loading }: { user: User | null; loading
           ) : (
             <div className="space-y-4">
               {/* Warning banner */}
-              <div className="p-3 rounded-lg bg-[#22c55e]/10 border border-[#22c55e]/25 flex items-start gap-2">
-                <Key className="h-4 w-4 text-[#22c55e] shrink-0 mt-0.5" />
+              <div className="p-3 rounded-lg bg-[#ffffff]/10 border border-[#ffffff]/25 flex items-start gap-2">
+                <Key className="h-4 w-4 text-[#ffffff] shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-xs font-bold text-[#22c55e]">Copy your key now</p>
-                  <p className="text-[10px] text-[#22c55e]/70 mt-0.5">
+                  <p className="text-xs font-bold text-[#ffffff]">Copy your key now</p>
+                  <p className="text-[10px] text-[#ffffff]/70 mt-0.5">
                     This key will <strong>not</strong> be shown again. It is valid for one scan only.
                   </p>
                 </div>
@@ -378,7 +431,7 @@ export function ApiAccessSection({ user, loading }: { user: User | null; loading
                   <span className="text-[10px] text-zinc-600 font-mono">API Key</span>
                   <CopyButton text={newKey} label="Key copied!" />
                 </div>
-                <code className="block p-4 text-[12px] font-mono text-[#22c55e] break-all leading-relaxed select-all">
+                <code className="block p-4 text-[12px] font-mono text-[#ffffff] break-all leading-relaxed select-all">
                   {newKey}
                 </code>
               </div>

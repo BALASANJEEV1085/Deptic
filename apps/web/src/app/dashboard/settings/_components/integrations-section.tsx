@@ -145,7 +145,7 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
   }
 
   if (loading) {
-    return <div className="animate-pulse bg-white/5 rounded-xl h-64 border border-white/10" />
+    return <div className="animate-pulse bg-muted rounded-xl h-64 border border-border" />
   }
 
   const slackConfig = integrations.find(i => i.type === 'slack')
@@ -160,7 +160,7 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
         </div>
       )}
       {success && (
-        <div className="bg-[#22c55e]/10 border border-[#22c55e]/20 text-[#22c55e] p-4 rounded-xl text-sm font-medium flex items-center gap-3">
+        <div className="bg-[#4ade80]/10 border border-[#4ade80]/20 text-[#4ade80] p-4 rounded-xl text-sm font-medium flex items-center gap-3">
           <CheckCircle2 className="h-5 w-5" />
           {success}
         </div>
@@ -168,22 +168,22 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Slack Integration */}
-        <Card className="bg-[#0f1117] border-white/[0.06] shadow-xl overflow-hidden group hover:border-[#22c55e]/30 transition-colors">
-          <CardHeader className="border-b border-white/[0.04] bg-white/[0.01]">
+        <Card className="bg-card border-border shadow-xl overflow-hidden group hover:border-[#ffffff]/30 transition-colors">
+          <CardHeader className="border-b border-border bg-muted/20">
             <div className="flex items-start justify-between">
               <div>
-                <CardTitle className="text-lg font-bold flex items-center gap-3 text-white">
+                <CardTitle className="text-lg font-bold flex items-center gap-3 text-foreground">
                   <img src="https://upload.wikimedia.org/wikipedia/commons/d/d5/Slack_icon_2019.svg" alt="Slack" className="w-6 h-6" />
                   Slack
                 </CardTitle>
-                <CardDescription className="text-zinc-400 text-xs mt-1.5 leading-relaxed">
+                <CardDescription className="text-muted-foreground text-xs mt-1.5 leading-relaxed">
                   Get real-time security alerts directly in your workspace.
                 </CardDescription>
               </div>
               {slackConfig ? (
-                <Badge className="bg-[#22c55e]/10 text-[#22c55e] border-[#22c55e]/20 font-bold tracking-widest text-[9px] uppercase px-2 py-0.5">Connected</Badge>
+                <Badge className="bg-[#4ade80]/10 text-[#4ade80] border-[#4ade80]/20 font-bold tracking-widest text-[9px] uppercase px-2 py-0.5">Connected</Badge>
               ) : (
-                <Badge className="bg-zinc-500/10 text-zinc-400 border-zinc-500/20 font-bold tracking-widest text-[9px] uppercase px-2 py-0.5">Disconnected</Badge>
+                <Badge className="bg-zinc-500/10 text-muted-foreground border-zinc-500/20 font-bold tracking-widest text-[9px] uppercase px-2 py-0.5">Disconnected</Badge>
               )}
             </div>
           </CardHeader>
@@ -192,21 +192,21 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
               <div className="space-y-6">
                 <div className="space-y-2">
                   <Label className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Active Channel</Label>
-                  <p className="text-white text-sm font-mono bg-white/5 px-3 py-2 rounded-lg border border-white/10">{slackConfig.config.channel}</p>
+                  <p className="text-foreground text-sm font-mono bg-muted px-3 py-2 rounded-lg border border-border">{slackConfig.config.channel}</p>
                 </div>
-                <div className="flex items-center justify-between py-2 border-t border-white/5">
+                <div className="flex items-center justify-between py-2 border-t border-border">
                   <div className="space-y-0.5">
-                    <Label className="text-sm font-semibold text-white">Enable Notifications</Label>
+                    <Label className="text-sm font-semibold text-foreground">Enable Notifications</Label>
                     <p className="text-[11px] text-zinc-500">Receive alerts for new scans</p>
                   </div>
                   <Switch 
                     checked={slackConfig.enabled} 
                     onCheckedChange={() => handleToggle('slack')}
-                    className="data-[state=checked]:bg-[#22c55e]"
+                    className="data-[state=checked]:bg-[#4ade80]"
                   />
                 </div>
                 <div className="pt-2 flex items-center justify-between">
-                  <Button variant="outline" className="h-8 text-xs font-semibold bg-white/5 border-white/10 text-zinc-300 hover:bg-white/10 hover:text-white" onClick={handleConnectSlack}>
+                  <Button variant="outline" className="h-8 text-xs font-semibold bg-muted border-border text-foreground hover:bg-muted hover:text-foreground" onClick={handleConnectSlack}>
                     Send Test Message
                   </Button>
                   <button onClick={() => handleDisconnect('slack')} className="text-[11px] text-red-400 hover:text-red-300 font-semibold tracking-wide transition-colors">
@@ -217,22 +217,22 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
             ) : (
               <form onSubmit={handleConnectSlack} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="slackUrl" className="text-zinc-400 text-xs font-bold">Webhook URL</Label>
+                  <Label htmlFor="slackUrl" className="text-muted-foreground text-xs font-bold">Webhook URL</Label>
                   <Input 
                     id="slackUrl" 
                     placeholder="https://hooks.slack.com/services/..." 
-                    className="bg-[#0a0c10] border-white/10 text-sm h-10"
+                    className="bg-[#0a0c10] border-border text-sm h-10"
                     value={slackUrl}
                     onChange={(e) => setSlackUrl(e.target.value)}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="slackChannel" className="text-zinc-400 text-xs font-bold">Channel Name</Label>
+                  <Label htmlFor="slackChannel" className="text-muted-foreground text-xs font-bold">Channel Name</Label>
                   <Input 
                     id="slackChannel" 
                     placeholder="#security-alerts" 
-                    className="bg-[#0a0c10] border-white/10 text-sm h-10 font-mono"
+                    className="bg-[#0a0c10] border-border text-sm h-10 font-mono"
                     value={slackChannel}
                     onChange={(e) => setSlackChannel(e.target.value)}
                     required
@@ -242,7 +242,7 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
                   <Button type="submit" disabled={saving} className="w-full bg-white text-black hover:bg-zinc-200 font-bold h-10 shadow-[0_0_20px_rgba(255,255,255,0.1)]">
                     {saving ? 'Connecting...' : 'Connect Slack'}
                   </Button>
-                  <a href="https://api.slack.com/messaging/webhooks" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 mt-4 text-[11px] text-zinc-500 hover:text-[#22c55e] transition-colors">
+                  <a href="https://api.slack.com/messaging/webhooks" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 mt-4 text-[11px] text-zinc-500 hover:text-[#ffffff] transition-colors">
                     How to create a Slack webhook <ExternalLink className="h-3 w-3" />
                   </a>
                 </div>
@@ -252,22 +252,22 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
         </Card>
 
         {/* Jira Integration */}
-        <Card className="bg-[#0f1117] border-white/[0.06] shadow-xl overflow-hidden group hover:border-blue-500/30 transition-colors">
-          <CardHeader className="border-b border-white/[0.04] bg-white/[0.01]">
+        <Card className="bg-card border-border shadow-xl overflow-hidden group hover:border-blue-500/30 transition-colors">
+          <CardHeader className="border-b border-border bg-muted/20">
             <div className="flex items-start justify-between">
               <div>
-                <CardTitle className="text-lg font-bold flex items-center gap-3 text-white">
+                <CardTitle className="text-lg font-bold flex items-center gap-3 text-foreground">
                   <img src="https://cdn.worldvectorlogo.com/logos/jira-3.svg" alt="Jira" className="w-6 h-6 rounded" />
                   Jira Software
                 </CardTitle>
-                <CardDescription className="text-zinc-400 text-xs mt-1.5 leading-relaxed">
+                <CardDescription className="text-muted-foreground text-xs mt-1.5 leading-relaxed">
                   Auto-create tickets for critical security issues.
                 </CardDescription>
               </div>
               {jiraConfig ? (
                 <Badge className="bg-blue-500/10 text-blue-400 border-blue-500/20 font-bold tracking-widest text-[9px] uppercase px-2 py-0.5">Connected</Badge>
               ) : (
-                <Badge className="bg-zinc-500/10 text-zinc-400 border-zinc-500/20 font-bold tracking-widest text-[9px] uppercase px-2 py-0.5">Disconnected</Badge>
+                <Badge className="bg-zinc-500/10 text-muted-foreground border-zinc-500/20 font-bold tracking-widest text-[9px] uppercase px-2 py-0.5">Disconnected</Badge>
               )}
             </div>
           </CardHeader>
@@ -276,11 +276,11 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
               <div className="space-y-6">
                 <div className="space-y-2">
                   <Label className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Active Project</Label>
-                  <p className="text-white text-sm font-mono bg-white/5 px-3 py-2 rounded-lg border border-white/10">{jiraConfig.config.project_key}</p>
+                  <p className="text-foreground text-sm font-mono bg-muted px-3 py-2 rounded-lg border border-border">{jiraConfig.config.project_key}</p>
                 </div>
-                <div className="flex items-center justify-between py-2 border-t border-white/5">
+                <div className="flex items-center justify-between py-2 border-t border-border">
                   <div className="space-y-0.5">
-                    <Label className="text-sm font-semibold text-white">Auto-create Tickets</Label>
+                    <Label className="text-sm font-semibold text-foreground">Auto-create Tickets</Label>
                     <p className="text-[11px] text-zinc-500">Only for Critical & High severity</p>
                   </div>
                   <Switch 
@@ -290,7 +290,7 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
                   />
                 </div>
                 <div className="pt-2 flex items-center justify-between">
-                  <Button variant="outline" className="h-8 text-xs font-semibold bg-white/5 border-white/10 text-zinc-300 hover:bg-white/10 hover:text-white" onClick={handleConnectJira}>
+                  <Button variant="outline" className="h-8 text-xs font-semibold bg-muted border-border text-foreground hover:bg-muted hover:text-foreground" onClick={handleConnectJira}>
                     Create Test Ticket
                   </Button>
                   <button onClick={() => handleDisconnect('jira')} className="text-[11px] text-red-400 hover:text-red-300 font-semibold tracking-wide transition-colors">
@@ -301,53 +301,53 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
             ) : (
               <form onSubmit={handleConnectJira} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="jiraUrl" className="text-zinc-400 text-xs font-bold">Jira Base URL</Label>
+                  <Label htmlFor="jiraUrl" className="text-muted-foreground text-xs font-bold">Jira Base URL</Label>
                   <Input 
                     id="jiraUrl" 
                     placeholder="https://company.atlassian.net" 
-                    className="bg-[#0a0c10] border-white/10 text-sm h-10"
+                    className="bg-[#0a0c10] border-border text-sm h-10"
                     value={jiraUrl}
                     onChange={(e) => setJiraUrl(e.target.value)}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="jiraEmail" className="text-zinc-400 text-xs font-bold">Email Address</Label>
+                  <Label htmlFor="jiraEmail" className="text-muted-foreground text-xs font-bold">Email Address</Label>
                   <Input 
                     id="jiraEmail" 
                     type="email"
                     placeholder="admin@company.com" 
-                    className="bg-[#0a0c10] border-white/10 text-sm h-10"
+                    className="bg-[#0a0c10] border-border text-sm h-10"
                     value={jiraEmail}
                     onChange={(e) => setJiraEmail(e.target.value)}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="jiraToken" className="text-zinc-400 text-xs font-bold">API Token</Label>
+                  <Label htmlFor="jiraToken" className="text-muted-foreground text-xs font-bold">API Token</Label>
                   <Input 
                     id="jiraToken" 
                     type="password"
                     placeholder="••••••••••••••••" 
-                    className="bg-[#0a0c10] border-white/10 text-sm h-10"
+                    className="bg-[#0a0c10] border-border text-sm h-10"
                     value={jiraToken}
                     onChange={(e) => setJiraToken(e.target.value)}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="jiraProject" className="text-zinc-400 text-xs font-bold">Project Key</Label>
+                  <Label htmlFor="jiraProject" className="text-muted-foreground text-xs font-bold">Project Key</Label>
                   <Input 
                     id="jiraProject" 
                     placeholder="SEC" 
-                    className="bg-[#0a0c10] border-white/10 text-sm h-10 font-mono uppercase"
+                    className="bg-[#0a0c10] border-border text-sm h-10 font-mono uppercase"
                     value={jiraProject}
                     onChange={(e) => setJiraProject(e.target.value.toUpperCase())}
                     required
                   />
                 </div>
                 <div className="pt-2">
-                  <Button type="submit" disabled={saving} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold h-10 shadow-[0_0_20px_rgba(37,99,235,0.2)]">
+                  <Button type="submit" disabled={saving} className="w-full bg-blue-600 hover:bg-blue-500 text-foreground font-bold h-10 shadow-[0_0_20px_rgba(37,99,235,0.2)]">
                     {saving ? 'Connecting...' : 'Connect Jira'}
                   </Button>
                   <a href="https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 mt-4 text-[11px] text-zinc-500 hover:text-blue-400 transition-colors">

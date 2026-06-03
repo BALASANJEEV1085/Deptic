@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback } from 'react';
-import { Search, Loader2, Lock, Globe, Star, GitBranch, AlertCircle, RefreshCw, ArrowUpDown, ChevronRight } from 'lucide-react';
+import { Search, Lock, Globe, Star, GitBranch, AlertCircle, RefreshCw, ArrowUpDown, ChevronRight } from 'lucide-react';
+import { CustomLoader } from '@/components/custom-loader';
 import { useRouter } from 'next/navigation';
 import { useWorkspace } from "@/lib/contexts/workspace-context";
 import { createClient } from '@/lib/supabase/client';
-import { listGitHubRepos } from '@/lib/api';
+import { listGitHubRepos, listWebhooks, registerWebhook, toggleWebhook, WebhookRegistration } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -58,24 +59,31 @@ function timeAgo(d: string) {
 
 // ── Repository Row ─────────────────────────────────────────────────────────
 
-function RepoRow({ repo, onScan }: { repo: GitHubRepo; onScan: (url: string) => void }) {
+function RepoRow({ repo, webhook, onToggleWebhook, onScan }: { repo: GitHubRepo; webhook?: WebhookRegistration; onToggleWebhook: (repo: GitHubRepo, active: boolean, webhook?: WebhookRegistration) => void; onScan: (url: string) => void }) {
   const [owner, name] = repo.full_name.split('/');
   const dotColor = repo.language ? (LANG_COLORS[repo.language] ?? '#8b949e') : null;
+  const [isToggling, setIsToggling] = useState(false);
+
+  const handleToggle = async () => {
+    setIsToggling(true);
+    await onToggleWebhook(repo, !webhook?.enabled, webhook);
+    setIsToggling(false);
+  };
 
   return (
-    <tr className="group border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+    <tr className="group border-b border-border hover:bg-muted/40 transition-colors">
       {/* Repo name */}
       <td className="px-5 py-3.5">
         <div className="flex items-center gap-3">
-          <div className="h-7 w-7 rounded-md bg-white/[0.04] border border-white/[0.06] flex items-center justify-center shrink-0">
-            <GitHubIcon className="h-3.5 w-3.5 text-zinc-400" />
+          <div className="h-7 w-7 rounded-md bg-muted/60 border border-border flex items-center justify-center shrink-0">
+            <GitHubIcon className="h-3.5 w-3.5 text-muted-foreground" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[11px] text-zinc-500">{owner}/</span>
-              <span className="text-[13px] font-semibold text-white leading-tight">{name}</span>
+              <span className="text-[13px] font-semibold text-foreground leading-tight">{name}</span>
               {repo.private ? (
-                <span className="inline-flex items-center gap-0.5 text-[8px] font-bold uppercase tracking-widest text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded border border-white/5">
+                <span className="inline-flex items-center gap-0.5 text-[8px] font-bold uppercase tracking-widest text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded border border-border">
                   <Lock className="h-2 w-2" /> Private
                 </span>
               ) : (
@@ -84,7 +92,7 @@ function RepoRow({ repo, onScan }: { repo: GitHubRepo; onScan: (url: string) => 
                 </span>
               )}
               {repo.fork && (
-                <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-600 bg-zinc-800/50 px-1.5 py-0.5 rounded border border-white/5">Fork</span>
+                <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-600 bg-zinc-800/50 px-1.5 py-0.5 rounded border border-border">Fork</span>
               )}
             </div>
             {repo.description && (
@@ -97,7 +105,7 @@ function RepoRow({ repo, onScan }: { repo: GitHubRepo; onScan: (url: string) => 
       {/* Language */}
       <td className="px-4 py-3.5 hidden lg:table-cell">
         {repo.language ? (
-          <span className="flex items-center gap-1.5 text-[11px] text-zinc-400 whitespace-nowrap">
+          <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground whitespace-nowrap">
             <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: dotColor! }} />
             {repo.language}
           </span>
@@ -106,24 +114,32 @@ function RepoRow({ repo, onScan }: { repo: GitHubRepo; onScan: (url: string) => 
         )}
       </td>
 
-      {/* Stars */}
-      <td className="px-4 py-3.5 hidden xl:table-cell">
-        {repo.stargazers_count > 0 ? (
-          <span className="flex items-center gap-1 text-[11px] text-zinc-500">
-            <Star className="h-3 w-3" />
-            {repo.stargazers_count.toLocaleString()}
+      {/* Auto-Scan */}
+      <td className="px-4 py-3.5 hidden md:table-cell">
+        <div className="flex items-center gap-2">
+          <button
+            disabled={isToggling}
+            onClick={handleToggle}
+            className={cn(
+              "relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50",
+              webhook?.enabled ? "bg-[#ffffff]" : "bg-zinc-700"
+            )}
+          >
+            <span className="sr-only">Toggle auto-scan</span>
+            <span
+              className={cn(
+                "pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                webhook?.enabled ? "translate-x-3" : "translate-x-0"
+              )}
+            />
+          </button>
+          <span className={cn(
+            "text-[10px] font-semibold uppercase tracking-wider",
+            webhook?.enabled ? "text-[#ffffff]" : "text-zinc-500"
+          )}>
+            {webhook?.enabled ? 'Active' : 'Off'}
           </span>
-        ) : (
-          <span className="text-[10px] text-zinc-700">—</span>
-        )}
-      </td>
-
-      {/* Branch */}
-      <td className="px-4 py-3.5 hidden xl:table-cell">
-        <span className="flex items-center gap-1 text-[11px] text-zinc-500 font-mono">
-          <GitBranch className="h-3 w-3 shrink-0" />
-          {repo.default_branch}
-        </span>
+        </div>
       </td>
 
       {/* Last push */}
@@ -133,11 +149,23 @@ function RepoRow({ repo, onScan }: { repo: GitHubRepo; onScan: (url: string) => 
         </span>
       </td>
 
+      {/* Badge */}
+      <td className="px-4 py-3.5 hidden xl:table-cell">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img 
+          src={`http://localhost:8081/badge/github/${repo.full_name}`} 
+          alt="Badge preview" 
+          className="h-5 rounded opacity-80 hover:opacity-100 transition-opacity cursor-pointer"
+          onClick={() => window.open(`http://localhost:8081/badge/github/${repo.full_name}/embed`, '_blank')}
+          title="Click to get badge snippets"
+        />
+      </td>
+
       {/* Action */}
       <td className="px-5 py-3.5 text-right">
         <button
           onClick={() => onScan(repo.html_url)}
-          className="inline-flex items-center gap-1.5 bg-[#22c55e]/10 hover:bg-[#22c55e]/20 border border-[#22c55e]/20 hover:border-[#22c55e]/40 text-[#22c55e] text-[9px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all whitespace-nowrap group-hover:border-[#22c55e]/40"
+          className="inline-flex items-center gap-1.5 bg-[#ffffff]/10 hover:bg-[#ffffff]/20 border border-[#ffffff]/20 hover:border-[#ffffff]/40 text-[#ffffff] text-[9px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all whitespace-nowrap group-hover:border-[#ffffff]/40"
         >
           Scan <ChevronRight className="h-2.5 w-2.5" />
         </button>
@@ -153,26 +181,26 @@ function NotConnected({ onConnect, loading }: { onConnect: () => void; loading: 
     <div className="flex flex-col items-center justify-center min-h-[65vh] text-center">
       {/* Outer ring glow */}
       <div className="relative mb-8">
-        <div className="absolute inset-0 rounded-full bg-[#22c55e]/10 blur-2xl scale-150" />
-        <div className="relative h-24 w-24 rounded-2xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/[0.08] flex items-center justify-center shadow-2xl">
-          <GitHubIcon className="h-12 w-12 text-zinc-300" />
+        <div className="absolute inset-0 rounded-full bg-[#ffffff]/10 blur-2xl scale-150" />
+        <div className="relative h-24 w-24 rounded-2xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-border flex items-center justify-center shadow-2xl">
+          <GitHubIcon className="h-12 w-12 text-foreground" />
         </div>
       </div>
 
-      <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">Connect your GitHub account</h2>
+      <h2 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Connect your GitHub account</h2>
       <p className="text-sm text-zinc-500 max-w-sm mb-8 leading-relaxed">
-        Browse all your repositories, scan for vulnerabilities, and generate SBOM reports — all in one place.
+        Browse all your repositories, scan for vulnerabilities, and generate DEPTIC reports — all in one place.
       </p>
 
       {/* Feature list */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-10 max-w-2xl w-full">
         {[
           { title: 'All repositories', desc: 'Public and private repos from your account' },
-          { title: 'SBOM generation', desc: 'Automated software bill of materials' },
+          { title: 'DEPTIC generation', desc: 'Automated software bill of materials' },
           { title: 'NTIA compliance', desc: 'EO 14028 compliance scoring per scan' },
         ].map(f => (
-          <div key={f.title} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-left">
-            <p className="text-xs font-bold text-white mb-1">{f.title}</p>
+          <div key={f.title} className="rounded-xl border border-border bg-muted/40 p-4 text-left">
+            <p className="text-xs font-bold text-foreground mb-1">{f.title}</p>
             <p className="text-[10px] text-zinc-600 leading-relaxed">{f.desc}</p>
           </div>
         ))}
@@ -181,9 +209,9 @@ function NotConnected({ onConnect, loading }: { onConnect: () => void; loading: 
       <button
         onClick={onConnect}
         disabled={loading}
-        className="inline-flex items-center gap-3 bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-60 text-black font-bold text-[11px] px-8 py-3 rounded-xl transition-all uppercase tracking-widest"
+        className="inline-flex items-center gap-3 bg-[#ffffff] hover:bg-[#e2e8f0] disabled:opacity-60 text-black font-bold text-[11px] px-8 py-3 rounded-xl transition-all uppercase tracking-widest"
       >
-        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <GitHubIcon className="h-4 w-4" />}
+        {loading ? <CustomLoader size={16} /> : <GitHubIcon className="h-4 w-4" />}
         Authorize with GitHub
       </button>
       <p className="text-[10px] text-zinc-700 mt-4">Read-only access · No write permissions</p>
@@ -199,6 +227,7 @@ type SortKey = 'pushed' | 'name' | 'stars';
 export default function ProjectsPage() {
   const { activeWorkspace } = useWorkspace();
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
+  const [webhooks, setWebhooks] = useState<WebhookRegistration[]>([]);
   const [status, setStatus] = useState<'loading' | 'connected' | 'not_connected' | 'error'>('loading');
   const [connectingOAuth, setConnectingOAuth] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -215,8 +244,12 @@ export default function ProjectsPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { setStatus('not_connected'); return; }
 
-      const data = await listGitHubRepos();
-      setRepos(data.repositories as GitHubRepo[]);
+      const [repoData, webhookData] = await Promise.all([
+        listGitHubRepos(),
+        listWebhooks().catch(() => []) // Webhooks might fail if no permissions, we can just return []
+      ]);
+      setRepos(repoData.repositories as GitHubRepo[]);
+      setWebhooks(webhookData);
       setStatus('connected');
     } catch (e: any) {
       if (e.message && (e.message.includes("GitHub not connected") || e.message.includes("401") || e.message.includes("Bad credentials"))) {
@@ -238,7 +271,7 @@ export default function ProjectsPage() {
       provider: 'github',
       options: {
         redirectTo: `${window.location.origin}/dashboard/projects`,
-        scopes: 'repo read:user read:org',
+        scopes: 'repo read:user read:org admin:repo_hook',
         queryParams: { prompt: 'consent' },
       },
     });
@@ -248,6 +281,28 @@ export default function ProjectsPage() {
   const handleScan = useCallback((url: string) => {
     router.push(`/dashboard/projects/new?url=${encodeURIComponent(url)}`);
   }, [router]);
+
+  const handleToggleWebhook = useCallback(async (repo: GitHubRepo, active: boolean, webhook?: WebhookRegistration) => {
+    try {
+      if (webhook) {
+        await toggleWebhook(webhook.id, active);
+        setWebhooks(prev => prev.map(w => w.id === webhook.id ? { ...w, enabled: active } : w));
+      } else if (active) {
+        const [owner, name] = repo.full_name.split('/');
+        const newWebhook = await registerWebhook({
+          repo_owner: owner,
+          repo_name: name,
+          branch: repo.default_branch,
+          scan_all_branches: false
+        });
+        // refresh webhooks
+        const webhookData = await listWebhooks();
+        setWebhooks(webhookData);
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
 
   // Filter + sort
   const visible = repos
@@ -278,9 +333,9 @@ export default function ProjectsPage() {
     <div className="max-w-7xl mx-auto pb-12 space-y-0">
 
       {/* ── Page header ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/[0.04] pb-5 mb-0">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-5 mb-0">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white mb-0.5">Projects</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground mb-0.5">Projects</h1>
           <p className="text-[11px] text-zinc-500 uppercase tracking-widest font-bold">
             {status === 'connected' ? `${visible.length} of ${repos.length} repositories` : 'GitHub repositories'}
           </p>
@@ -288,8 +343,15 @@ export default function ProjectsPage() {
         {status === 'connected' && (
           <div className="flex items-center gap-2">
             <button
+              onClick={handleConnect}
+              disabled={connectingOAuth}
+              className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-foreground bg-muted/50 hover:bg-muted/50 border border-border px-3 py-1.5 rounded-lg transition-all disabled:opacity-50"
+            >
+              {connectingOAuth ? <CustomLoader size={12} /> : <GitHubIcon className="h-3 w-3" />} Re-authorize
+            </button>
+            <button
               onClick={fetchRepos}
-              className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.07] px-3 py-1.5 rounded-lg transition-all"
+              className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-foreground bg-muted/50 hover:bg-muted/50 border border-border px-3 py-1.5 rounded-lg transition-all"
             >
               <RefreshCw className="h-3 w-3" /> Refresh
             </button>
@@ -300,7 +362,7 @@ export default function ProjectsPage() {
       {/* ── Loading ── */}
       {status === 'loading' && (
         <div className="flex items-center justify-center min-h-[60vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-[#22c55e]" />
+          <CustomLoader size={32} className="text-[#ffffff]" />
         </div>
       )}
 
@@ -316,10 +378,10 @@ export default function ProjectsPage() {
             <AlertCircle className="h-7 w-7 text-red-400" />
           </div>
           <div>
-            <p className="text-white font-semibold text-sm mb-1">Failed to load repositories</p>
+            <p className="text-foreground font-semibold text-sm mb-1">Failed to load repositories</p>
             <p className="text-xs text-zinc-500 max-w-xs">{error}</p>
           </div>
-          <button onClick={fetchRepos} className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 text-[10px] font-bold px-4 py-2 rounded-lg transition-all uppercase tracking-widest">
+          <button onClick={fetchRepos} className="inline-flex items-center gap-2 bg-muted hover:bg-muted border border-border text-foreground text-[10px] font-bold px-4 py-2 rounded-lg transition-all uppercase tracking-widest">
             <RefreshCw className="h-3 w-3" /> Try Again
           </button>
         </div>
@@ -330,9 +392,9 @@ export default function ProjectsPage() {
         <div>
 
           {/* Toolbar */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 py-4 border-b border-white/[0.04]">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 py-4 border-b border-border">
             {/* Tabs */}
-            <div className="flex items-center gap-1 bg-white/[0.02] border border-white/[0.06] rounded-lg p-1 shrink-0">
+            <div className="flex items-center gap-1 bg-muted/40 border border-border rounded-lg p-1 shrink-0">
               {tabs.map(t => (
                 <button
                   key={t.key}
@@ -340,14 +402,14 @@ export default function ProjectsPage() {
                   className={cn(
                     'flex items-center gap-1.5 px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all',
                     tab === t.key
-                      ? 'bg-white/[0.08] text-white'
-                      : 'text-zinc-600 hover:text-zinc-400'
+                      ? 'bg-muted/50 text-foreground'
+                      : 'text-zinc-600 hover:text-muted-foreground'
                   )}
                 >
                   {t.label}
                   <span className={cn(
                     'text-[8px] font-bold px-1 rounded',
-                    tab === t.key ? 'bg-[#22c55e]/20 text-[#22c55e]' : 'bg-white/5 text-zinc-600'
+                    tab === t.key ? 'bg-[#ffffff]/20 text-[#ffffff]' : 'bg-muted text-zinc-600'
                   )}>{t.count}</span>
                 </button>
               ))}
@@ -361,7 +423,7 @@ export default function ProjectsPage() {
                 placeholder="Search repositories…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-1.5 bg-white/[0.02] border border-white/[0.07] rounded-lg text-[11px] text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-[#22c55e]/30 focus:bg-white/[0.03] transition-all"
+                className="w-full pl-9 pr-4 py-1.5 bg-muted/40 border border-border rounded-lg text-[11px] text-foreground placeholder-zinc-600 focus:outline-none focus:border-[#ffffff]/30 focus:bg-muted/50 transition-all"
               />
             </div>
 
@@ -376,8 +438,8 @@ export default function ProjectsPage() {
                   className={cn(
                     'px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest rounded transition-all',
                     sort === s
-                      ? 'bg-white/[0.08] text-white border border-white/10'
-                      : 'text-zinc-600 hover:text-zinc-400'
+                      ? 'bg-muted/50 text-foreground border border-border'
+                      : 'text-zinc-600 hover:text-muted-foreground'
                   )}
                 >
                   {s === 'pushed' ? 'Recent' : s === 'name' ? 'Name' : 'Stars'}
@@ -388,39 +450,43 @@ export default function ProjectsPage() {
 
           {/* Table */}
           {visible.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 border border-dashed border-white/[0.06] rounded-xl mt-4 bg-white/[0.005]">
+            <div className="flex flex-col items-center justify-center py-24 border border-dashed border-border rounded-xl mt-4 bg-muted/50">
               <GitHubIcon className="h-10 w-10 text-zinc-700 mb-3" />
               <p className="text-zinc-500 text-sm">
                 {search ? `No repositories match "${search}"` : `No ${tab === 'all' ? '' : tab} repositories found.`}
               </p>
             </div>
           ) : (
-            <div className="rounded-xl border border-white/[0.06] overflow-hidden mt-4 shadow-2xl">
+            <div className="rounded-xl border border-border overflow-hidden mt-4 shadow-2xl">
               <table className="w-full text-left">
                 <thead>
-                  <tr className="border-b border-white/[0.06] bg-white/[0.02]">
+                  <tr className="border-b border-border bg-muted/40">
                     <th className="px-5 py-2.5 text-[9px] font-bold uppercase tracking-widest text-zinc-500">Repository</th>
                     <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-widest text-zinc-500 hidden lg:table-cell">Language</th>
-                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-widest text-zinc-500 hidden xl:table-cell">Stars</th>
-                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-widest text-zinc-500 hidden xl:table-cell">Branch</th>
+                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-widest text-zinc-500 hidden md:table-cell">Auto-Scan</th>
                     <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-widest text-zinc-500 hidden md:table-cell">Last Push</th>
+                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-widest text-zinc-500 hidden xl:table-cell">Badge</th>
                     <th className="px-5 py-2.5 text-[9px] font-bold uppercase tracking-widest text-zinc-500 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.03]">
-                  {visible.map(repo => (
-                    <RepoRow key={repo.id} repo={repo} onScan={handleScan} />
-                  ))}
+                  {visible.map(repo => {
+                    const [owner, name] = repo.full_name.split('/');
+                    const wh = webhooks.find(w => w.repo_owner === owner && w.repo_name === name);
+                    return (
+                      <RepoRow key={repo.id} repo={repo} webhook={wh} onToggleWebhook={handleToggleWebhook} onScan={handleScan} />
+                    );
+                  })}
                 </tbody>
               </table>
 
               {/* Table footer */}
-              <div className="px-5 py-2.5 border-t border-white/[0.04] bg-white/[0.01] flex items-center justify-between">
+              <div className="px-5 py-2.5 border-t border-border bg-muted/20 flex items-center justify-between">
                 <p className="text-[10px] text-zinc-700">
                   Showing <span className="text-zinc-500 font-semibold">{visible.length}</span> of <span className="text-zinc-500 font-semibold">{repos.length}</span> repositories
                 </p>
                 <div className="flex items-center gap-1.5">
-                  <div className="h-1.5 w-1.5 rounded-full bg-[#22c55e] animate-pulse" />
+                  <div className="h-1.5 w-1.5 rounded-full bg-[#4ade80] animate-pulse" />
                   <span className="text-[9px] text-zinc-600 uppercase tracking-widest font-bold">GitHub Connected</span>
                 </div>
               </div>

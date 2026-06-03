@@ -10,6 +10,7 @@ import {
 } from "@/lib/api";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { CustomLoader } from "@/components/custom-loader";
 
 /* ── Tiny helpers ─────────────────────────────────────────────────────── */
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -57,7 +58,7 @@ function StatCard({
   label,
   value,
   delta,
-  deltaColor = "#22c55e",
+  deltaColor = "#ffffff",
 }: {
   label: string;
   value: string | number;
@@ -138,28 +139,7 @@ export default function DashboardPage() {
           gap: 12,
         }}
       >
-        <div
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: "50%",
-            border: "2px solid #16191f",
-            borderTopColor: "#22c55e",
-            animation: "spin 0.8s linear infinite",
-          }}
-        />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        <p
-          style={{
-            fontFamily: "DM Mono, monospace",
-            fontSize: 11,
-            color: "#4a5068",
-            textTransform: "uppercase",
-            letterSpacing: "0.1em",
-          }}
-        >
-          Loading…
-        </p>
+        <CustomLoader size={45} className="text-[#ffffff]" />
       </div>
     );
   }
@@ -196,9 +176,9 @@ export default function DashboardPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
       {/* ── Page header ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/[0.04] pb-5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-5">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white mb-0.5">Dashboard</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground mb-0.5">Dashboard</h1>
           <p className="text-[11px] text-zinc-500 uppercase tracking-widest font-bold">
             Overview & Metrics
           </p>
@@ -223,19 +203,19 @@ export default function DashboardPage() {
           label="Critical CVEs"
           value={stats.critical_cves}
           delta={stats.critical_cves > 0 ? "Needs action" : "All clear"}
-          deltaColor={stats.critical_cves > 0 ? "#ef4444" : "#22c55e"}
+          deltaColor={stats.critical_cves > 0 ? "#ef4444" : "#ffffff"}
         />
         <StatCard
           label="NTIA Compliant"
           value={`${stats.ntia_compliant_scans}/${totalScans}`}
           delta={`${compliancePct}% compliance rate`}
-          deltaColor={compliancePct === 100 ? "#22c55e" : "#f59e0b"}
+          deltaColor={compliancePct === 100 ? "#ffffff" : "#f59e0b"}
         />
         <StatCard
           label="Clean Projects"
           value={stats.clean_projects}
           delta="No critical CVEs"
-          deltaColor="#22c55e"
+          deltaColor="#ffffff"
         />
       </div>
 
@@ -258,7 +238,7 @@ export default function DashboardPage() {
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 12,
                 fontWeight: 500,
-                color: "#22c55e",
+                color: "#ffffff",
                 textDecoration: "none",
                 display: "flex",
                 alignItems: "center",
@@ -312,7 +292,7 @@ export default function DashboardPage() {
                               flexShrink: 0,
                               background:
                                 scan.status === "done"
-                                  ? "#22c55e"
+                                  ? "#ffffff"
                                   : scan.status === "failed"
                                   ? "#ef4444"
                                   : "#f59e0b",
@@ -385,7 +365,7 @@ export default function DashboardPage() {
                   fontFamily: "DM Sans, sans-serif",
                   fontSize: 12,
                   fontWeight: 500,
-                  color: "#22c55e",
+                  color: "#ffffff",
                   textDecoration: "none",
                   display: "flex",
                   alignItems: "center",
@@ -496,7 +476,7 @@ export default function DashboardPage() {
                     fontWeight: 700,
                     color:
                       compliancePct === 100
-                        ? "#22c55e"
+                        ? "#ffffff"
                         : compliancePct >= 75
                         ? "#f59e0b"
                         : "#ef4444",
@@ -521,7 +501,7 @@ export default function DashboardPage() {
                     borderRadius: 3,
                     background:
                       compliancePct === 100
-                        ? "#22c55e"
+                        ? "#ffffff"
                         : compliancePct >= 75
                         ? "#f59e0b"
                         : "#ef4444",

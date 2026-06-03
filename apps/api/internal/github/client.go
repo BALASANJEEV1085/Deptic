@@ -9,8 +9,17 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 )
+
+func getWebhookURL() string {
+	url := os.Getenv("WEBHOOK_URL")
+	if url != "" {
+		return url
+	}
+	return "https://api.deptic.in/api/webhooks/github"
+}
 
 // Client represents a GitHub API client
 type Client struct {
@@ -244,7 +253,7 @@ func (c *Client) FindAllManifests(ctx context.Context, owner, repo string) ([]Ma
 	}
 
 	var manifests []ManifestFile
-	skipPatterns := []string{"node_modules", ".git", "dist", "build", "__pycache__", ".venv", "vendor", "target"}
+	skipPatterns := []string{"node_modules", ".git", "dist", "build", "__pycache__", ".venv", "vendor", "target", "testdata"}
 
 	for _, entry := range tree.Tree {
 		if entry.Type != "blob" {
@@ -279,6 +288,8 @@ func (c *Client) FindAllManifests(ctx context.Context, owner, repo string) ([]Ma
 			ecoType = "maven"
 		} else if filename == "requirements.txt" || filename == "pyproject.toml" || filename == "setup.py" || filename == "Pipfile" {
 			ecoType = "pip"
+		} else if filename == "go.mod" {
+			ecoType = "go"
 		}
 
 		if ecoType != "" {
@@ -288,9 +299,25 @@ func (c *Client) FindAllManifests(ctx context.Context, owner, repo string) ([]Ma
 			})
 		}
 
-		if len(manifests) >= 30 {
+		if len(manifests) >= 100 { // gather more to sort properly before truncating
 			break
 		}
+	}
+
+	// Priority: prefer manifests closest to root (shortest path wins)
+	// Sort by path depth (number of slashes)
+	for i := 0; i < len(manifests); i++ {
+		for j := i + 1; j < len(manifests); j++ {
+			depthI := strings.Count(manifests[i].Path, "/")
+			depthJ := strings.Count(manifests[j].Path, "/")
+			if depthJ < depthI {
+				manifests[i], manifests[j] = manifests[j], manifests[i]
+			}
+		}
+	}
+
+	if len(manifests) > 30 {
+		manifests = manifests[:30]
 	}
 
 	// Fetch content for each found manifest
@@ -397,6 +424,44 @@ func (c *Client) ListUserRepositories(ctx context.Context) ([]Repository, error)
 	return allRepos, nil
 }
 
+// repoPermissions is the subset of the GitHub repo object we care about.
+type repoPermissions struct {
+	Permissions struct {
+		Push bool `json:"push"`
+	} `json:"permissions"`
+	Message string `json:"message"` // set on error responses
+}
+
+// CheckRepoPushAccess returns true when the client's token grants push (write)
+// access to the given owner/repo. It returns false — not an error — when the
+// token is absent, the repo is not found, or the user only has read access.
+func (c *Client) CheckRepoPushAccess(ctx context.Context, owner, repo string) (bool, error) {
+	if c.token == "" {
+		return false, nil
+	}
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s", owner, repo)
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return false, fmt.Errorf("building repo request: %w", err)
+	}
+	resp, err := c.doRequest(ctx, req)
+	if err != nil {
+		return false, fmt.Errorf("executing repo request: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return false, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return false, nil
+	}
+	var rp repoPermissions
+	if err := json.NewDecoder(resp.Body).Decode(&rp); err != nil {
+		return false, nil
+	}
+	return rp.Permissions.Push, nil
+}
+
 // ParseRepoURL parses a GitHub repository URL and extracts the owner and repo name
 func ParseRepoURL(repoURL string) (owner, repo string, err error) {
 	repoURL = strings.TrimSpace(repoURL)
@@ -436,4 +501,94 @@ func ParseRepoURL(repoURL string) (owner, repo string, err error) {
 	}
 
 	return owner, repo, nil
+}
+
+// CreateWebhook creates a repository webhook
+func (c *Client) CreateWebhook(ctx context.Context, owner, repo, secret string) (int64, error) {
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/hooks", owner, repo)
+	
+	payload := map[string]interface{}{
+		"name":   "web",
+		"active": true,
+		"events": []string{"push"},
+		"config": map[string]string{
+			"url":          getWebhookURL(),
+			"content_type": "json",
+			"secret":       secret,
+			"insecure_ssl": "0",
+		},
+	}
+	body, _ := json.Marshal(payload)
+	
+	req, err := http.NewRequest(http.MethodPost, apiURL, strings.NewReader(string(body)))
+	if err != nil {
+		return 0, err
+	}
+	
+	resp, err := c.doRequest(ctx, req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode == http.StatusUnprocessableEntity {
+		return 0, errors.New("webhook already exists")
+	}
+	if resp.StatusCode != http.StatusCreated {
+		return 0, fmt.Errorf("github api returned %d", resp.StatusCode)
+	}
+	
+	var res struct {
+		ID int64 `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return 0, err
+	}
+	return res.ID, nil
+}
+
+// DeleteWebhook deletes a repository webhook
+func (c *Client) DeleteWebhook(ctx context.Context, owner, repo string, hookID int64) error {
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/hooks/%d", owner, repo, hookID)
+	req, err := http.NewRequest(http.MethodDelete, apiURL, nil)
+	if err != nil {
+		return err
+	}
+	
+	resp, err := c.doRequest(ctx, req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
+		return fmt.Errorf("github api returned %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// UpdateWebhookStatus updates a webhook active status
+func (c *Client) UpdateWebhookStatus(ctx context.Context, owner, repo string, hookID int64, active bool) error {
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/hooks/%d", owner, repo, hookID)
+	
+	payload := map[string]interface{}{
+		"active": active,
+	}
+	body, _ := json.Marshal(payload)
+	
+	req, err := http.NewRequest(http.MethodPatch, apiURL, strings.NewReader(string(body)))
+	if err != nil {
+		return err
+	}
+	
+	resp, err := c.doRequest(ctx, req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("github api returned %d", resp.StatusCode)
+	}
+	return nil
 }

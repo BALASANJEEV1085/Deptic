@@ -16,8 +16,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {
   LayoutDashboard, Folder, ShieldAlert, FileText, Settings,
-  LogOut, ScanSearch, PlusCircle, Search, Loader2
+  LogOut, ScanSearch, PlusCircle, Search
 } from 'lucide-react'
+import { CustomLoader } from '@/components/custom-loader'
 import { cn } from '@/lib/utils'
 import { WorkspaceSwitcher } from '@/components/workspace-switcher'
 import { useWorkspace } from '@/lib/contexts/workspace-context'
@@ -40,14 +41,14 @@ function ShieldIcon() {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
       <path
         d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.25C16.5 22.15 20 17.25 20 12V6L12 2z"
-        fill="rgba(34,197,94,0.15)"
-        stroke="#22c55e"
+        fill="rgba(255, 255, 255,0.15)"
+        stroke="#ffffff"
         strokeWidth="1.5"
         strokeLinejoin="round"
       />
       <path
         d="M9 12l2 2 4-4"
-        stroke="#22c55e"
+        stroke="#ffffff"
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -114,7 +115,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
           style={{
             width: 24,
             height: 24,
-            background: '#22c55e',
+            background: '#ffffff',
             borderRadius: 4,
             display: 'flex',
             alignItems: 'center',
@@ -133,7 +134,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
             letterSpacing: '-0.3px',
           }}
         >
-          SBOM.io
+          DEPTIC
         </span>
       </div>
 
@@ -156,12 +157,12 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
             height: 32,
             padding: '0 10px',
             borderRadius: 6,
-            background: 'rgba(34,197,94,0.08)',
-            border: '1px solid rgba(34,197,94,0.15)',
+            background: 'rgba(255, 255, 255,0.08)',
+            border: '1px solid rgba(255, 255, 255,0.15)',
             fontFamily: 'DM Sans, sans-serif',
             fontSize: 12,
             fontWeight: 500,
-            color: '#22c55e',
+            color: '#ffffff',
             textDecoration: 'none',
             transition: 'all 0.15s ease',
           }}
@@ -220,7 +221,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                 width: '100%',
               }}
             />
-            {isSearching && <Loader2 size={12} className="animate-spin text-zinc-500" />}
+            {isSearching && <CustomLoader size={12} className="text-zinc-500" />}
           </div>
           {searchError && (
             <div style={{
@@ -274,7 +275,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
               >
                 <Icon
                   size={14}
-                  style={{ color: active ? '#22c55e' : '#6b7280', flexShrink: 0 }}
+                  style={{ color: active ? '#ffffff' : '#6b7280', flexShrink: 0 }}
                 />
                 <span style={{ flex: 1 }}>{item.name}</span>
                 {item.name === 'Vulnerabilities' && hasCritical && (
@@ -321,7 +322,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
               >
                 <Icon
                   size={14}
-                  style={{ color: active ? '#22c55e' : '#6b7280', flexShrink: 0 }}
+                  style={{ color: active ? '#ffffff' : '#6b7280', flexShrink: 0 }}
                 />
                 <span>{item.name}</span>
               </Link>
@@ -348,8 +349,8 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                 width: 28,
                 height: 28,
                 borderRadius: '50%',
-                background: 'rgba(34,197,94,0.12)',
-                border: '1px solid rgba(34,197,94,0.2)',
+                background: 'rgba(255, 255, 255,0.12)',
+                border: '1px solid rgba(255, 255, 255,0.2)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -357,7 +358,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                 fontFamily: 'DM Sans, sans-serif',
                 fontSize: 11,
                 fontWeight: 600,
-                color: '#22c55e',
+                color: '#ffffff',
               }}
             >
               {initials}

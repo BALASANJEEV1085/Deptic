@@ -57,15 +57,15 @@ export default function LoginPage() {
               <path d="M14.017 21L14.017 18C14.017 16.8954 14.9124 16 16.017 16H19.017C19.5693 16 20.017 15.5523 20.017 15V9C20.017 8.44772 19.5693 8 19.017 8H16.017C14.9124 8 14.017 7.10457 14.017 6V3L22.017 3V15C22.017 18.3137 19.3307 21 16.017 21H14.017ZM2.01697 21L2.01697 18C2.01697 16.8954 2.9124 16 4.01697 16H7.01697C7.56925 16 8.01697 15.5523 8.01697 15V9C8.01697 8.44772 7.56925 8 7.01697 8H4.01697C2.9124 8 2.01697 7.10457 2.01697 6V3L10.017 3V15C10.017 18.3137 7.33068 21 4.01697 21H2.01697Z" />
             </svg>
           </div>
-          <blockquote className="text-2xl font-syne font-medium leading-relaxed mb-8 text-white">
-            "Integrating SBOM.io into our CI/CD pipeline gave us immediate visibility into our software supply chain. The proactive vulnerability alerts are a game-changer."
+          <blockquote className="text-2xl font-syne font-medium leading-relaxed mb-8 text-foreground">
+            "Integrating DEPTIC.io into our CI/CD pipeline gave us immediate visibility into our software supply chain. The proactive vulnerability alerts are a game-changer."
           </blockquote>
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-[var(--lp-border)] border border-[var(--lp-border2)] flex items-center justify-center">
               <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[var(--lp-green)] to-[#3b82f6] opacity-50"></div>
             </div>
             <div>
-              <div className="font-bold text-white">@security_pro</div>
+              <div className="font-bold text-foreground">@security_pro</div>
               <div className="text-sm text-[var(--lp-text3)]">Security Engineer</div>
             </div>
           </div>
@@ -76,7 +76,7 @@ export default function LoginPage() {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 md:p-12">
         <div className="w-full max-w-[400px]">
           {/* LOGO */}
-          <Link href="/" className="flex items-center gap-3 font-syne font-bold text-xl text-white mb-8 group">
+          <Link href="/" className="flex items-center gap-3 font-syne font-bold text-xl text-foreground mb-8 group">
             <div className="lp-logo-icon group-hover:scale-110 transition-transform">
                <svg width="18" height="18" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-black">
                 <path d="M60 30L90 60" stroke="currentColor" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
@@ -89,11 +89,11 @@ export default function LoginPage() {
                 <g transform="translate(18, 48)"><path d="M12 2L22 7L12 12L2 7L12 2Z" fill="currentColor" fillOpacity="0.1" stroke="currentColor" strokeWidth="8" strokeLinejoin="round" /><path d="M22 7V17L12 22V12L22 7Z" fill="currentColor" fillOpacity="0.05" stroke="currentColor" strokeWidth="8" strokeLinejoin="round" /><path d="M2 7V17L12 22V12L2 7Z" fill="currentColor" fillOpacity="0.08" stroke="currentColor" strokeWidth="8" strokeLinejoin="round" /></g>
               </svg>
             </div>
-            SBOM.io
+            DEPTIC.io
           </Link>
 
           <div className="mb-10">
-            <h2 className="text-3xl font-syne font-bold text-white mb-2">Get Started</h2>
+            <h2 className="text-3xl font-syne font-bold text-foreground mb-2">Get Started</h2>
             <p className="text-[var(--lp-text2)] text-base font-light">Secure your software supply chain with a single click.</p>
           </div>
 
@@ -108,10 +108,10 @@ export default function LoginPage() {
             <button 
               onClick={() => handleOAuthLogin('google')}
               disabled={loading !== null}
-              className="w-full flex items-center justify-center gap-3 py-4 px-4 bg-[var(--lp-card)] border border-[var(--lp-border)] rounded-xl text-sm font-bold text-white hover:border-[var(--lp-green)]/30 hover:bg-[#12141c] transition-all group disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-3 py-4 px-4 bg-[var(--lp-card)] border border-[var(--lp-border)] rounded-xl text-sm font-bold text-foreground hover:border-[var(--lp-green)]/30 hover:bg-[#12141c] transition-all group disabled:opacity-50"
             >
               {loading === 'google' ? (
-                <div className="h-5 w-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                <div className="h-5 w-5 border-2 border-border border-t-white rounded-full animate-spin"></div>
               ) : (
                 <svg className="h-5 w-5 group-hover:scale-110 transition-transform" viewBox="0 0 24 24">
                   <path
@@ -138,10 +138,10 @@ export default function LoginPage() {
             <button 
               onClick={() => handleOAuthLogin('github')}
               disabled={loading !== null}
-              className="w-full flex items-center justify-center gap-3 py-4 px-4 bg-[var(--lp-card)] border border-[var(--lp-border)] rounded-xl text-sm font-bold text-white hover:border-[var(--lp-green)]/30 hover:bg-[#12141c] transition-all group disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-3 py-4 px-4 bg-[var(--lp-card)] border border-[var(--lp-border)] rounded-xl text-sm font-bold text-foreground hover:border-[var(--lp-green)]/30 hover:bg-[#12141c] transition-all group disabled:opacity-50"
             >
               {loading === 'github' ? (
-                <div className="h-5 w-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                <div className="h-5 w-5 border-2 border-border border-t-white rounded-full animate-spin"></div>
               ) : (
                 <GitHubIcon className="h-5 w-5 group-hover:scale-110 transition-transform" />
               )}
@@ -159,7 +159,7 @@ export default function LoginPage() {
           </div>
 
           <div className="mt-12 text-[10px] text-[var(--lp-text3)] leading-relaxed text-center">
-            By continuing, you agree to SBOM.io's <Link href="/terms" className="underline hover:text-[var(--lp-text2)]">Terms of Service</Link> and <Link href="/privacy" className="underline hover:text-[var(--lp-text2)]">Privacy Policy</Link>.
+            By continuing, you agree to DEPTIC.io's <Link href="/terms" className="underline hover:text-[var(--lp-text2)]">Terms of Service</Link> and <Link href="/privacy" className="underline hover:text-[var(--lp-text2)]">Privacy Policy</Link>.
           </div>
         </div>
       </div>

@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react'
 import { listWorkspaces, createWorkspace, type Workspace } from '@/lib/api'
 
-const LS_KEY = 'sbom_active_workspace_id'
+const LS_KEY = 'deptic_active_workspace_id'
 
 interface WorkspaceContextValue {
   workspaces: Workspace[]

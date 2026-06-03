@@ -1,4 +1,4 @@
-package sbom
+package deptic
 
 import (
 	"crypto/sha256"
@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sbom-io/api/internal/scanner"
-	"github.com/sbom-io/api/internal/vuln"
+	"github.com/deptic-io/api/internal/scanner"
+	"github.com/deptic-io/api/internal/vuln"
 )
 
 type ScanInfo struct {
@@ -129,8 +129,8 @@ func GenerateCycloneDX(
 			Timestamp: time.Now().UTC().Format(time.RFC3339),
 			Tools: []BOMTool{
 				{
-					Vendor:  "SBOM.io",
-					Name:    "sbom-io-scanner",
+					Vendor:  "DEPTIC.io",
+					Name:    "deptic-io-scanner",
 					Version: "1.0.0",
 				},
 			},
@@ -165,6 +165,8 @@ func GenerateCycloneDX(
 			} else {
 				purl = fmt.Sprintf("pkg:maven/%s@%s", pkg.Name, pkg.Version)
 			}
+		} else if pkg.Ecosystem == "go" {
+			purl = fmt.Sprintf("pkg:golang/%s@%s", pkg.Name, pkg.Version)
 		} else {
 			purl = fmt.Sprintf("pkg:generic/%s@%s", pkg.Name, pkg.Version)
 		}

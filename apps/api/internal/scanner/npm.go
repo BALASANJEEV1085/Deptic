@@ -143,7 +143,7 @@ func ResolveDependencies(ctx context.Context, redisClient *redis.Client, deps ma
 	var results []Package
 	var wg sync.WaitGroup
 
-	sem := make(chan struct{}, 30) // increased from 10 for faster resolution
+	sem := make(chan struct{}, 5) // decreased to prevent npm rate limiting
 	// visited stores pkgKey -> minimum depth seen so far
 	visited := sync.Map{}
 

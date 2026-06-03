@@ -202,7 +202,7 @@ func ScanPip(ctx context.Context, rdb *redis.Client, fileBytes []byte, fileType 
 	var results []Package
 	var mu sync.Mutex
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, 10)
+	sem := make(chan struct{}, 5)
 	
 	visited := &sync.Map{}
 

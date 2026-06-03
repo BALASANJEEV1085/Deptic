@@ -9,9 +9,9 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/sbom-io/api/internal/compliance"
-	"github.com/sbom-io/api/internal/db"
-	"github.com/sbom-io/api/internal/scanner"
+	"github.com/deptic-io/api/internal/compliance"
+	"github.com/deptic-io/api/internal/db"
+	"github.com/deptic-io/api/internal/scanner"
 )
 
 func main() {
@@ -90,14 +90,14 @@ func main() {
 			repoName = s.RepoURL
 		}
 
-		sbomMeta := compliance.SBOMMeta{
-			AuthorName:  "SBOM.io",
-			AuthorTool:  "sbom-io-scanner v1.0.0",
+		depticMeta := compliance.DEPTICMeta{
+			AuthorName:  "DEPTIC.io",
+			AuthorTool:  "deptic-io-scanner v1.0.0",
 			GeneratedAt: s.CreatedAt,
 			RepoName:    repoName,
 		}
 
-		ntiaResult := compliance.CheckNTIA(pkgs, sbomMeta)
+		ntiaResult := compliance.CheckNTIA(pkgs, depticMeta)
 		euCompliant := compliance.CheckEUCRA(ntiaResult)
 		detailBytes, _ := json.Marshal(ntiaResult)
 

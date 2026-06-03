@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sbom-io/api/internal/scanner"
+	"github.com/deptic-io/api/internal/scanner"
 )
 
-type SBOMMeta struct {
+type DEPTICMeta struct {
 	AuthorName  string
 	AuthorTool  string
 	GeneratedAt time.Time
@@ -38,7 +38,7 @@ type FailedComponent struct {
 	Missing []string `json:"missing"` // which fields are missing
 }
 
-func CheckNTIA(components []scanner.Package, sbomMeta SBOMMeta) NTIAResult {
+func CheckNTIA(components []scanner.Package, depticMeta DEPTICMeta) NTIAResult {
 	var result NTIAResult
 	result.FailedComponents = []FailedComponent{}
 	result.Recommendations = []string{}
@@ -186,42 +186,42 @@ func CheckNTIA(components []scanner.Package, sbomMeta SBOMMeta) NTIAResult {
 		result.Recommendations = append(result.Recommendations, "Element 5 failed: No dependency relationships found (all components at depth 0).")
 	}
 
-	// Element 6: Author of SBOM
-	authorPassed := sbomMeta.AuthorName != "" && sbomMeta.AuthorTool != ""
+	// Element 6: Author of DEPTIC
+	authorPassed := depticMeta.AuthorName != "" && depticMeta.AuthorTool != ""
 	authorCov := 0
 	if authorPassed {
 		authorCov = 100
 	}
 	e6 := NTIAElement{
-		Name:        "Author of SBOM Data",
-		Description: "Name of the entity that creates the SBOM data",
+		Name:        "Author of DEPTIC Data",
+		Description: "Name of the entity that creates the DEPTIC data",
 		Passed:      authorPassed,
 		Coverage:    authorCov,
-		Detail:      fmt.Sprintf("Author: %s, Tool: %s", sbomMeta.AuthorName, sbomMeta.AuthorTool),
+		Detail:      fmt.Sprintf("Author: %s, Tool: %s", depticMeta.AuthorName, depticMeta.AuthorTool),
 	}
 	result.Elements = append(result.Elements, e6)
 	if !e6.Passed {
-		result.Recommendations = append(result.Recommendations, "Element 6 failed: SBOM author name or tool is missing in metadata.")
+		result.Recommendations = append(result.Recommendations, "Element 6 failed: DEPTIC author name or tool is missing in metadata.")
 	}
 
 	// Element 7: Timestamp
 	now := time.Now()
 	oneYearAgo := now.AddDate(-1, 0, 0)
-	timestampPassed := !sbomMeta.GeneratedAt.IsZero() && sbomMeta.GeneratedAt.After(oneYearAgo) && sbomMeta.GeneratedAt.Before(now.Add(24*time.Hour))
+	timestampPassed := !depticMeta.GeneratedAt.IsZero() && depticMeta.GeneratedAt.After(oneYearAgo) && depticMeta.GeneratedAt.Before(now.Add(24*time.Hour))
 	timestampCov := 0
 	if timestampPassed {
 		timestampCov = 100
 	}
 	e7 := NTIAElement{
 		Name:        "Timestamp",
-		Description: "Record of the date and time of the SBOM data assembly",
+		Description: "Record of the date and time of the DEPTIC data assembly",
 		Passed:      timestampPassed,
 		Coverage:    timestampCov,
-		Detail:      fmt.Sprintf("Generated At: %s", sbomMeta.GeneratedAt.Format(time.RFC3339)),
+		Detail:      fmt.Sprintf("Generated At: %s", depticMeta.GeneratedAt.Format(time.RFC3339)),
 	}
 	result.Elements = append(result.Elements, e7)
 	if !e7.Passed {
-		result.Recommendations = append(result.Recommendations, "Element 7 failed: SBOM timestamp is missing or too old (> 1 year).")
+		result.Recommendations = append(result.Recommendations, "Element 7 failed: DEPTIC timestamp is missing or too old (> 1 year).")
 	}
 
 	// Calculate final score

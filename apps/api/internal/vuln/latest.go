@@ -109,7 +109,7 @@ func fetchLatestMaven(ctx context.Context, pkgName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("User-Agent", "sbom-io-scanner/1.0")
+	req.Header.Set("User-Agent", "deptic-io-scanner/1.0")
 
 	client := &http.Client{Timeout: 12 * time.Second}
 	resp, err := client.Do(req)

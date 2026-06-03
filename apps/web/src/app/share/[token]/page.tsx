@@ -22,6 +22,7 @@ function EcoDot({ eco }: { eco: string }) {
     case 'npm': return <div className="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />;
     case 'pip': return <div className="h-2 w-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]" />;
     case 'maven': return <div className="h-2 w-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]" />;
+    case 'go': return <div className="h-2 w-2 rounded-full bg-[#00add8] shadow-[0_0_8px_rgba(0,173,216,0.5)]" />;
     default: return <div className="h-2 w-2 rounded-full bg-zinc-600" />;
   }
 }
@@ -82,7 +83,7 @@ export default function PublicSharePage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-zinc-500">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#22c55e] border-t-transparent" />
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#ffffff] border-t-transparent" />
           <div className="text-xs font-bold tracking-[0.2em] uppercase text-zinc-600">Decrypting Audit Log...</div>
         </div>
       </div>
@@ -102,7 +103,7 @@ export default function PublicSharePage() {
           </p>
           <div className="pt-6 border-t border-border flex items-center justify-center gap-2 text-zinc-600">
             <ShieldCheck className="h-4 w-4 opacity-30" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-700">Verified by SBOM.io</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-700">Verified by DEPTIC.io</span>
           </div>
         </div>
       </div>
@@ -124,11 +125,11 @@ export default function PublicSharePage() {
   const { compliance = {}, vulnerability_summary = {} } = data;
 
   return (
-    <div className="min-h-screen bg-background text-zinc-300 selection:bg-[#22c55e]/30 selection:text-[#22c55e]">
+    <div className="min-h-screen bg-background text-foreground selection:bg-[#ffffff]/30 selection:text-[#ffffff]">
       {/* Top Banner */}
-      <div className="bg-[#0d2818] px-6 py-2 text-center border-b border-[#22c55e]/10">
-        <p className="text-[10px] font-bold text-[#22c55e] uppercase tracking-[0.2em] flex items-center justify-center gap-2">
-          <Globe className="h-3 w-3 text-[#22c55e]" /> SECURE PUBLIC REPORT — READ ONLY ACCESS AUTHORIZED
+      <div className="bg-[#0d2818] px-6 py-2 text-center border-b border-[#ffffff]/10">
+        <p className="text-[10px] font-bold text-[#ffffff] uppercase tracking-[0.2em] flex items-center justify-center gap-2">
+          <Globe className="h-3 w-3 text-[#ffffff]" /> SECURE PUBLIC REPORT — READ ONLY ACCESS AUTHORIZED
         </p>
       </div>
 
@@ -137,13 +138,13 @@ export default function PublicSharePage() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8 border-b border-border pb-10">
           <div className="space-y-6">
             <div className="flex items-center gap-3">
-              <svg width="28" height="28" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-[#22c55e]">
+              <svg width="28" height="28" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-[#ffffff]">
                 <path d="M60 30L90 60" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M90 60L60 90" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M60 90L30 60" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M30 60L60 30" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <span className="font-bold text-lg text-foreground tracking-tight">SBOM.io</span>
+              <span className="font-bold text-lg text-foreground tracking-tight">DEPTIC.io</span>
             </div>
             <div>
               <h1 className="text-4xl font-extrabold text-foreground tracking-tight mb-2">Software Compliance Report</h1>
@@ -156,7 +157,7 @@ export default function PublicSharePage() {
           
           <div className="grid grid-cols-1 gap-y-3 text-right">
              <div className="flex items-center gap-2 justify-end text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-                Ref: <span className="text-zinc-300 font-mono">{(data.sha256_hash || data.sha256 || '').substring(0, 16)}</span>
+                Ref: <span className="text-foreground font-mono">{(data.sha256_hash || data.sha256 || '').substring(0, 16)}</span>
              </div>
              <div className="flex items-center gap-2 justify-end text-xs">
                 <Clock className="h-3 w-3 text-zinc-600" />
@@ -165,7 +166,7 @@ export default function PublicSharePage() {
              <div className="flex items-center justify-end pt-2">
                 <a 
                   href={`/api/share/${token}/download`}
-                  className="inline-flex items-center gap-2 px-4 py-2 border border-[#22c55e]/30 rounded-xl text-[11px] font-bold text-[#22c55e] hover:bg-[#22c55e]/5 transition-all"
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-[#ffffff]/30 rounded-xl text-[11px] font-bold text-[#ffffff] hover:bg-[#ffffff]/5 transition-all"
                 >
                   <Download className="h-3.5 w-3.5" />
                   ↓ Download CycloneDX
@@ -179,7 +180,7 @@ export default function PublicSharePage() {
           <div className="lg:col-span-1">
             <div className="bg-card border border-border rounded-2xl p-6 h-full">
               <h2 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-                <ShieldCheck className="h-3 w-3 text-[#22c55e]" /> NTIA Minimum Elements
+                <ShieldCheck className="h-3 w-3 text-[#ffffff]" /> NTIA Minimum Elements
               </h2>
               <ul className="space-y-4">
                 {[
@@ -192,11 +193,11 @@ export default function PublicSharePage() {
                   { key: 'has_timestamp', label: 'Audit Timestamp' }
                 ].map(item => (
                   <li key={item.key} className="flex items-center justify-between text-xs">
-                    <span className={compliance[item.key] ? "text-zinc-300" : "text-zinc-600"}>
+                    <span className={compliance[item.key] ? "text-foreground" : "text-zinc-600"}>
                       {item.label}
                     </span>
                     {compliance[item.key] ? (
-                      <CheckCircle2 className="h-4 w-4 text-[#22c55e]" />
+                      <CheckCircle2 className="h-4 w-4 text-[#ffffff]" />
                     ) : (
                       <XCircle className="h-4 w-4 text-red-500" />
                     )}
@@ -213,7 +214,7 @@ export default function PublicSharePage() {
                         <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">NTIA Status</span>
                         <span className={cn(
                           "text-[9px] font-bold px-2 py-0.5 rounded border uppercase tracking-widest",
-                          s.color === 'green' ? "bg-[#22c55e]/10 text-[#22c55e] border-[#22c55e]/20" :
+                          s.color === 'green' ? "bg-[#ffffff]/10 text-[#ffffff] border-[#ffffff]/20" :
                           s.color === 'amber' ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
                           "bg-red-500/10 text-red-400 border-red-500/20"
                         )}>{s.label}</span>
@@ -228,7 +229,7 @@ export default function PublicSharePage() {
                   <FileJson className="h-4 w-4 text-zinc-600" />
                   <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Protocol</span>
                 </div>
-                <Badge variant="outline" className="text-[#22c55e] border-[#22c55e]/30 bg-transparent text-[10px] uppercase font-mono">{data.format} {data.spec_version}</Badge>
+                <Badge variant="outline" className="text-[#ffffff] border-[#ffffff]/30 bg-transparent text-[10px] uppercase font-mono">{data.format} {data.spec_version}</Badge>
               </div>
             </div>
           </div>
@@ -241,7 +242,7 @@ export default function PublicSharePage() {
                 { label: 'Critical', value: vulnerability_summary.critical || 0, color: 'text-red-500', bg: 'bg-red-500/15', border: 'border-red-500/20' },
                 { label: 'High', value: vulnerability_summary.high || 0, color: 'text-orange-500', bg: 'bg-orange-500/15', border: 'border-orange-500/20' },
                 { label: 'Medium', value: vulnerability_summary.medium || 0, color: 'text-yellow-500', bg: 'bg-yellow-500/15', border: 'border-yellow-500/20' },
-                { label: 'Low', value: vulnerability_summary.low || 0, color: 'text-[#22c55e]', bg: 'bg-[#22c55e]/15', border: 'border-[#22c55e]/20' },
+                { label: 'Low', value: vulnerability_summary.low || 0, color: 'text-[#ffffff]', bg: 'bg-[#ffffff]/15', border: 'border-[#ffffff]/20' },
               ].map((v, i) => (
                 <div key={i} className={cn("rounded-2xl border p-6 flex flex-col items-center justify-center gap-2", v.bg, v.border)}>
                   <span className="text-[9px] font-bold uppercase tracking-[0.2em] opacity-80 mb-1">{v.label}</span>
@@ -259,7 +260,7 @@ export default function PublicSharePage() {
                   <p className="text-sm text-zinc-500">Verified components extracted from primary manifests.</p>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-black text-[#22c55e]">{data.component_count}</span>
+                  <span className="text-4xl font-black text-[#ffffff]">{data.component_count}</span>
                   <Package className="h-4 w-4 text-zinc-700" />
                 </div>
               </div>
@@ -267,14 +268,14 @@ export default function PublicSharePage() {
               <div className="space-y-3">
                 <div className="h-3 w-full bg-zinc-800 rounded-full overflow-hidden flex">
                   <div 
-                    className="h-full bg-[#22c55e] transition-all duration-1000" 
+                    className="h-full bg-[#ffffff] transition-all duration-1000" 
                     style={{ width: `${(directCount / (data.component_count || 1)) * 100}%` }}
                   />
                 </div>
                 <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest">
                   <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-[#22c55e]" />
-                    <span className="text-zinc-300">Direct ({directCount})</span>
+                    <div className="h-2 w-2 rounded-full bg-[#ffffff]" />
+                    <span className="text-foreground">Direct ({directCount})</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="h-2 w-2 rounded-full bg-zinc-700" />
@@ -290,7 +291,7 @@ export default function PublicSharePage() {
         <div className="space-y-6">
           <div className="flex items-center justify-between border-b border-border pb-4">
             <h2 className="text-xl font-bold text-foreground flex items-center gap-3">
-              <Layers className="h-5 w-5 text-[#22c55e]" /> Component Ledger
+              <Layers className="h-5 w-5 text-[#ffffff]" /> Component Ledger
             </h2>
           </div>
           
@@ -311,7 +312,7 @@ export default function PublicSharePage() {
                     <TableCell className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <EcoDot eco={c.Ecosystem} />
-                        <span className="text-sm font-bold text-zinc-200">{c.Name}</span>
+                        <span className="text-sm font-bold text-foreground">{c.Name}</span>
                       </div>
                     </TableCell>
                     <TableCell className="px-6 py-4">
@@ -321,7 +322,7 @@ export default function PublicSharePage() {
                       <span className="text-[10px] text-zinc-600 font-medium px-2 py-0.5 border border-border rounded-md">{c.License || 'Proprietary'}</span>
                     </TableCell>
                     <TableCell className="px-6 py-4 text-right">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded bg-[#22c55e]/10 text-[#22c55e] text-[9px] font-black uppercase tracking-widest border border-[#22c55e]/20">Direct</span>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded bg-[#ffffff]/10 text-[#ffffff] text-[9px] font-black uppercase tracking-widest border border-[#ffffff]/20">Direct</span>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -347,7 +348,7 @@ export default function PublicSharePage() {
                     <TableCell className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <EcoDot eco={c.Ecosystem} />
-                        <span className="text-sm font-bold text-zinc-400">{c.Name}</span>
+                        <span className="text-sm font-bold text-muted-foreground">{c.Name}</span>
                       </div>
                     </TableCell>
                     <TableCell className="px-6 py-4">
@@ -376,14 +377,14 @@ export default function PublicSharePage() {
                   <path d="M60 90L30 60" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                   <path d="M30 60L60 30" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                <span className="text-xs font-black text-zinc-600 tracking-[0.3em] uppercase">Powered by SBOM.io</span>
+                <span className="text-xs font-black text-zinc-600 tracking-[0.3em] uppercase">Powered by DEPTIC.io</span>
              </div>
              <p className="text-[10px] text-zinc-700 font-medium">
-               Report generated: {formattedDate} · Platform: <Link href="/" className="text-zinc-500 hover:text-[#22c55e] transition-colors underline underline-offset-4 decoration-zinc-800">sbom.io</Link>
+               Report generated: {formattedDate} · Platform: <Link href="/" className="text-zinc-500 hover:text-[#ffffff] transition-colors underline underline-offset-4 decoration-zinc-800">deptic.io</Link>
              </p>
            </div>
            <p className="text-[9px] text-zinc-800 max-w-2xl mx-auto leading-relaxed">
-             This cryptographic artifact is generated and signed by the SBOM.io platform. 
+             This cryptographic artifact is generated and signed by the DEPTIC.io platform. 
              Authorized for external auditing and supply chain transparency as per NIST and EU CRA 2024 directives.
            </p>
         </div>

@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/sbom-io/api/internal/compliance"
-	"github.com/sbom-io/api/internal/db"
-	"github.com/sbom-io/api/internal/scanner"
+	"github.com/deptic-io/api/internal/compliance"
+	"github.com/deptic-io/api/internal/db"
+	"github.com/deptic-io/api/internal/scanner"
 )
 
 // GetCompliance GET /api/scans/:scanID/compliance
@@ -55,14 +55,14 @@ func (h *ScanHandler) GetCompliance(c *fiber.Ctx) error {
 				Depth:     comp.Depth,
 			})
 		}
-		sbomMeta := compliance.SBOMMeta{
-			AuthorName:  "SBOM.io",
-			AuthorTool:  "sbom-io-scanner v1.0.0",
+		depticMeta := compliance.DEPTICMeta{
+			AuthorName:  "DEPTIC.io",
+			AuthorTool:  "deptic-io-scanner v1.0.0",
 			GeneratedAt: scan.CreatedAt,
 			RepoName:    "Unknown Repository", // generic for old scans
 		}
 		
-		result := compliance.CheckNTIA(pkgs, sbomMeta)
+		result := compliance.CheckNTIA(pkgs, depticMeta)
 		euCompliant = compliance.CheckEUCRA(result)
 		detailBytes, _ = json.Marshal(result)
 

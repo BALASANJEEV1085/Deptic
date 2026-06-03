@@ -9,10 +9,10 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/sbom-io/api/internal/scanner"
+	"github.com/deptic-io/api/internal/scanner"
 )
 
-// Scan represents a single SBOM scan operation
+// Scan represents a single DEPTIC scan operation
 type Scan struct {
 	ID              string    `json:"id"`
 	ProjectID       string    `json:"project_id"`
@@ -23,6 +23,9 @@ type Scan struct {
 	ComplianceScore int       `json:"ntia_score"`
 	NTIACompliant   bool      `json:"ntia_compliant"`
 	EUCRACompliant  bool      `json:"eu_cra_compliant"`
+	TriggerType     string    `json:"trigger_type"`
+	CommitSHA       string    `json:"commit_sha"`
+	Branch          string    `json:"branch"`
 	CreatedAt       time.Time `json:"created_at"`
 
 	// Derived/Subquery fields
@@ -72,10 +75,26 @@ func CreateOrGetDefaultProject(ctx context.Context, db *sql.DB, userID string) (
 	return projectID, nil
 }
 
+type CreateScanParams struct {
+	ProjectID   string
+	RepoURL     string
+	TriggerType string
+	CommitSHA   string
+	Branch      string
+}
+
 // CreateScan inserts a new scan row with status="running" and returns its UUID
-func CreateScan(ctx context.Context, db *sql.DB, projectID, repoURL string) (scanID string, err error) {
-	query := `INSERT INTO scans (id, project_id, status, repo_url, created_at) VALUES (gen_random_uuid(), $1, 'running', $2, now()) RETURNING id`
-	err = db.QueryRowContext(ctx, query, projectID, repoURL).Scan(&scanID)
+func CreateScan(ctx context.Context, db *sql.DB, p *CreateScanParams) (scanID string, err error) {
+	triggerType := p.TriggerType
+	if triggerType == "" {
+		triggerType = "manual"
+	}
+	branch := p.Branch
+	if branch == "" {
+		branch = "main"
+	}
+	query := `INSERT INTO scans (id, project_id, status, repo_url, trigger_type, commit_sha, branch, created_at) VALUES (gen_random_uuid(), $1, 'running', $2, $3, $4, $5, now()) RETURNING id`
+	err = db.QueryRowContext(ctx, query, p.ProjectID, p.RepoURL, triggerType, p.CommitSHA, branch).Scan(&scanID)
 	if err != nil {
 		fmt.Printf("CreateScan DB error: %v\n", err)
 		return "", fmt.Errorf("creating scan: %w", err)
@@ -144,10 +163,10 @@ func insertComponentsBatch(ctx context.Context, db *sql.DB, scanID string, batch
 func GetScanWithComponents(ctx context.Context, db *sql.DB, scanID string) (scan Scan, components []Component, err error) {
 	err = db.QueryRowContext(ctx, `
 		SELECT id, project_id, status, COALESCE(repo_url, ''), COALESCE(ecosystem, ''), 
-		       COALESCE(compliance_score, 0), ntia_compliant, eu_cra_compliant, created_at 
+		       COALESCE(compliance_score, 0), ntia_compliant, eu_cra_compliant, COALESCE(trigger_type, 'manual'), COALESCE(commit_sha, ''), COALESCE(branch, 'main'), created_at 
 		FROM scans WHERE id::text LIKE $1 || '%' LIMIT 1`, scanID).
 		Scan(&scan.ID, &scan.ProjectID, &scan.Status, &scan.RepoURL, &scan.Ecosystem, 
-			&scan.ComplianceScore, &scan.NTIACompliant, &scan.EUCRACompliant, &scan.CreatedAt)
+			&scan.ComplianceScore, &scan.NTIACompliant, &scan.EUCRACompliant, &scan.TriggerType, &scan.CommitSHA, &scan.Branch, &scan.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return scan, nil, fmt.Errorf("scan not found")

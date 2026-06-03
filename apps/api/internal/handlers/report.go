@@ -8,11 +8,11 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/sbom-io/api/internal/compliance"
-	"github.com/sbom-io/api/internal/db"
-	"github.com/sbom-io/api/internal/report"
-	"github.com/sbom-io/api/internal/scanner"
-	"github.com/sbom-io/api/internal/vuln"
+	"github.com/deptic-io/api/internal/compliance"
+	"github.com/deptic-io/api/internal/db"
+	"github.com/deptic-io/api/internal/report"
+	"github.com/deptic-io/api/internal/scanner"
+	"github.com/deptic-io/api/internal/vuln"
 )
 
 // DownloadPDFReport handles GET /api/scans/:scanID/report/pdf
@@ -150,13 +150,13 @@ func (h *ScanHandler) DownloadPDFReport(c *fiber.Ctx) error {
 
 	fmt.Printf("NTIA elements loaded: %d, score: %d\n", len(ntiaResult.Elements), ntiaResult.Score)
 	if len(ntiaResult.Elements) == 0 {
-		sbomMeta := compliance.SBOMMeta{
-			AuthorName:  "SBOM.io",
-			AuthorTool:  "sbom-io-scanner v1.0.0",
+		depticMeta := compliance.DEPTICMeta{
+			AuthorName:  "DEPTIC.io",
+			AuthorTool:  "deptic-io-scanner v1.0.0",
 			GeneratedAt: scanRow.CreatedAt,
 			RepoName:    fullRepoName,
 		}
-		ntiaResult = compliance.CheckNTIA(pkgs, sbomMeta)
+		ntiaResult = compliance.CheckNTIA(pkgs, depticMeta)
 	}
 
 	scanInfo := report.ScanInfo{
@@ -182,6 +182,6 @@ func (h *ScanHandler) DownloadPDFReport(c *fiber.Ctx) error {
 	}, shortName)
 
 	c.Set("Content-Type", "application/pdf")
-	c.Set("Content-Disposition", fmt.Sprintf(`attachment; filename="sbom-report-%s.pdf"`, safeShortName))
+	c.Set("Content-Disposition", fmt.Sprintf(`attachment; filename="deptic-report-%s.pdf"`, safeShortName))
 	return c.Send(pdfBytes)
 }

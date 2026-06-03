@@ -32,7 +32,7 @@ const (
 	PermViewIntegrations   Permission = "integrations:view"
 	PermManageWorkspace    Permission = "workspace:manage"
 	PermDeleteWorkspace    Permission = "workspace:delete"
-	PermExportSBOM         Permission = "sbom:export"
+	PermExportDEPTIC         Permission = "deptic:export"
 	PermCreateAPIKey       Permission = "apikey:create"
 )
 
@@ -40,15 +40,15 @@ var RolePermissions = map[Role][]Permission{
 	RoleOwner: {
 		PermCreateScan, PermDeleteScan, PermViewScan, PermCreateFixPR,
 		PermManageMembers, PermInviteMembers, PermManageIntegrations, PermViewIntegrations,
-		PermManageWorkspace, PermDeleteWorkspace, PermExportSBOM, PermCreateAPIKey,
+		PermManageWorkspace, PermDeleteWorkspace, PermExportDEPTIC, PermCreateAPIKey,
 	},
 	RoleAdmin: {
 		PermCreateScan, PermDeleteScan, PermViewScan, PermCreateFixPR,
 		PermManageMembers, PermInviteMembers, PermManageIntegrations, PermViewIntegrations,
-		PermExportSBOM, PermCreateAPIKey,
+		PermExportDEPTIC, PermCreateAPIKey,
 	},
 	RoleMember: {
-		PermCreateScan, PermViewScan, PermCreateFixPR, PermExportSBOM, PermViewIntegrations,
+		PermCreateScan, PermViewScan, PermCreateFixPR, PermExportDEPTIC, PermViewIntegrations,
 	},
 	RoleViewer: {
 		PermViewScan,

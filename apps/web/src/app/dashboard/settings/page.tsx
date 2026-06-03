@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
-import { User as UserIcon, Bell, ShieldCheck, Key, Users, Zap } from 'lucide-react'
+import { User as UserIcon, Bell, ShieldCheck, Key, Users, Zap, Webhook } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import { ToastContainer, useToastEmitter } from './_components/shared'
@@ -12,10 +12,11 @@ import { NotificationsSection } from './_components/notifications-section'
 import { SecuritySection } from './_components/security-section'
 import { ApiAccessSection } from './_components/api-section'
 import { IntegrationsSection } from './_components/integrations-section'
+import { WebhooksSection } from './_components/webhook-section'
 import { WorkspaceSettingsSection } from './_components/workspace-section'
 import { useWorkspace } from '@/lib/contexts/workspace-context'
 
-type SectionId = 'profile' | 'workspace' | 'notifications' | 'security' | 'api' | 'integrations'
+type SectionId = 'profile' | 'workspace' | 'notifications' | 'security' | 'api' | 'integrations' | 'webhooks'
 
 const TABS: { id: SectionId; label: string; icon: React.ElementType }[] = [
   { id: 'profile',       label: 'Profile',         icon: UserIcon   },
@@ -24,6 +25,7 @@ const TABS: { id: SectionId; label: string; icon: React.ElementType }[] = [
   { id: 'security',      label: 'Security & Auth',  icon: ShieldCheck },
   { id: 'api',           label: 'API Access',       icon: Key        },
   { id: 'integrations',  label: 'Integrations',     icon: Zap        },
+  { id: 'webhooks',      label: 'Webhooks',         icon: Webhook    },
 ]
 
 const SECTION_TITLES: Record<SectionId, { title: string; desc: string }> = {
@@ -33,6 +35,7 @@ const SECTION_TITLES: Record<SectionId, { title: string; desc: string }> = {
   security:      { title: 'Security & Auth', desc: 'Passwords, connected providers, and active sessions.' },
   api:           { title: 'API Access',      desc: 'Generate and manage API keys for programmatic access.' },
   integrations:  { title: 'Integrations',    desc: 'Connect Slack and Jira for automated alerts and ticketing.' },
+  webhooks:      { title: 'Webhooks',        desc: 'Manage auto-scan triggers for your GitHub repositories.' },
 }
 
 export default function SettingsPage() {
@@ -89,7 +92,7 @@ export default function SettingsPage() {
               className={cn(
                 "flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all shrink-0",
                 active === id
-                  ? "bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20"
+                  ? "bg-[#ffffff]/10 text-[#ffffff] border border-[#ffffff]/20"
                   : "text-zinc-500 hover:text-foreground hover:bg-muted/40 border border-transparent"
               )}
             >
@@ -112,17 +115,17 @@ export default function SettingsPage() {
                   className={cn(
                     "group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left",
                     active === id
-                      ? "bg-[#22c55e]/[0.08] text-foreground"
+                      ? "bg-[#ffffff]/[0.08] text-foreground"
                       : "text-zinc-500 hover:text-foreground hover:bg-muted/40"
                   )}
                 >
                   {/* Green left border for active */}
                   {active === id && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full bg-[#22c55e] shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full bg-[#ffffff] shadow-[0_0_8px_rgba(255, 255, 255,0.6)]" />
                   )}
                   <Icon className={cn(
                     "h-4 w-4 transition-colors ml-1",
-                    active === id ? "text-[#22c55e]" : "text-zinc-600 group-hover:text-zinc-400"
+                    active === id ? "text-[#ffffff]" : "text-zinc-600 group-hover:text-muted-foreground"
                   )} />
                   <span>{label}</span>
                 </button>
@@ -147,6 +150,7 @@ export default function SettingsPage() {
             {active === 'security'      && <SecuritySection      user={user} loading={loading} />}
             {active === 'api'           && <ApiAccessSection     user={user} loading={loading} />}
             {active === 'integrations'  && <IntegrationsSection  user={user} loading={loading} />}
+            {active === 'webhooks'      && <WebhooksSection />}
           </main>
         </div>
       </div>

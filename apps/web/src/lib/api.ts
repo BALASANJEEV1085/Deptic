@@ -1,6 +1,6 @@
 import { createClient } from './supabase/client';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api';
+
 
 export interface Component {
   id: string;
@@ -24,6 +24,9 @@ export interface Scan {
   repo_url?: string;
   repo_name?: string;
   ecosystem?: string;
+  trigger_type?: string;
+  commit_sha?: string;
+  branch?: string;
   ntia_score?: number;
   component_count?: number;
   critical_cves?: number;
@@ -87,6 +90,8 @@ export interface GetScanResponse {
   ecosystem_breakdown: Record<string, { count: number; direct: number; transitive: number }>;
   manifest_files: { path: string; ecosystem: string }[];
   is_owner?: boolean;
+  /** True only when the current user's connected GitHub account has push access to this repo */
+  has_github_push_access?: boolean;
 }
 
 export interface StartScanResponse {
@@ -126,7 +131,9 @@ export interface WorkspaceInvitation {
   created_at: string;
 }
 
-async function getAuthHeaders() {
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api';
+
+export async function getAuthHeaders() {
   const supabase = createClient();
   const { data: { session } } = await supabase.auth.getSession();
   
@@ -140,10 +147,14 @@ async function getAuthHeaders() {
   };
 
   if (typeof window !== 'undefined') {
-    const wsID = localStorage.getItem('sbom_active_workspace_id');
+    const wsID = localStorage.getItem('deptic_active_workspace_id');
     if (wsID) {
       headers['X-Workspace-ID'] = wsID;
     }
+  }
+
+  if (session?.provider_token) {
+    headers['X-GitHub-Token'] = session.provider_token;
   }
 
   return headers;
@@ -180,17 +191,23 @@ export async function resolveAuditId(auditId: string): Promise<{ scan_id: string
 }
 
 export async function getScan(scanId: string): Promise<GetScanResponse> {
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
   const headers = await getAuthHeaders();
-  
-  const response = await fetch(`${API_URL}/scans/${scanId}`, {
-    headers
-  });
-  
+
+  // Pass the live GitHub OAuth token so the backend can verify push access
+  // using a fresh token rather than the potentially-stale one in the DB
+  if (session?.provider_token) {
+    headers['X-GitHub-Token'] = session.provider_token;
+  }
+
+  const response = await fetch(`${API_URL}/scans/${scanId}`, { headers });
+
   if (!response.ok) {
     const err = await response.json().catch(() => ({ error: response.statusText }));
     throw new Error(err.error || 'Failed to fetch scan results');
   }
-  
+
   return response.json();
 }
 
@@ -323,20 +340,20 @@ export async function getAllVulnerabilities(): Promise<AllVulnerabilitiesRespons
   return response.json();
 }
 
-export async function generateSBOM(scanId: string, format: string): Promise<{ sbom_id: string; sha256: string; download_url: string; component_count: number }> {
+export async function generateDEPTIC(scanId: string, format: string): Promise<{ deptic_id: string; sha256: string; download_url: string; component_count: number }> {
   const headers = await getAuthHeaders();
-  const response = await fetch(`${API_URL}/scans/${scanId}/sbom`, {
+  const response = await fetch(`${API_URL}/scans/${scanId}/deptic`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ format })
   });
-  if (!response.ok) throw new Error('Failed to generate SBOM');
+  if (!response.ok) throw new Error('Failed to generate DEPTIC');
   return response.json();
 }
 
-export async function createShareLink(sbomId: string, label: string, expiresInDays: number): Promise<{ share_url: string; expires_at: string; label: string }> {
+export async function createShareLink(depticId: string, label: string, expiresInDays: number): Promise<{ share_url: string; expires_at: string; label: string }> {
   const headers = await getAuthHeaders();
-  const response = await fetch(`${API_URL}/sboms/${sbomId}/share`, {
+  const response = await fetch(`${API_URL}/deptics/${depticId}/share`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ label, expires_in_days: expiresInDays })
@@ -345,16 +362,16 @@ export async function createShareLink(sbomId: string, label: string, expiresInDa
   return response.json();
 }
 
-export async function getShareLinks(sbomId: string): Promise<{ shares: any[] }> {
+export async function getShareLinks(depticId: string): Promise<{ shares: any[] }> {
   const headers = await getAuthHeaders();
-  const response = await fetch(`${API_URL}/sboms/${sbomId}/shares`, { headers });
+  const response = await fetch(`${API_URL}/deptics/${depticId}/shares`, { headers });
   if (!response.ok) throw new Error('Failed to list share links');
   return response.json();
 }
 
-export async function revokeShareLink(sbomId: string, token: string): Promise<void> {
+export async function revokeShareLink(depticId: string, token: string): Promise<void> {
   const headers = await getAuthHeaders();
-  const response = await fetch(`${API_URL}/sboms/${sbomId}/shares/${token}`, {
+  const response = await fetch(`${API_URL}/deptics/${depticId}/shares/${token}`, {
     method: 'DELETE',
     headers
   });
@@ -433,7 +450,7 @@ export async function downloadPDFReport(scanId: string): Promise<void> {
   // pick filename from Content-Disposition header if present
   const cd = response.headers.get('Content-Disposition') || '';
   const match = cd.match(/filename="([^"]+)"/);
-  a.download = match?.[1] ?? `sbom-report-${scanId}.pdf`;
+  a.download = match?.[1] ?? `deptic-report-${scanId}.pdf`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -457,6 +474,44 @@ export async function listGitHubRepos(): Promise<{ repositories: GitHubRepositor
     const err = await response.json().catch(() => ({ error: response.statusText }));
     throw new Error(err.error || 'Failed to fetch GitHub repositories');
   }
+  return response.json();
+}
+
+export interface AddBadgeResponse {
+  status: string;
+  pr_url?: string;
+  pr_number?: number;
+  readme_created?: boolean;
+  badge_url?: string;
+  message?: string;
+}
+
+export async function addBadgeToReadme(repo_owner: string, repo_name: string): Promise<AddBadgeResponse> {
+  const authHeaders = await getAuthHeaders();
+  
+  // Need to pass OAuth token if available
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  const headers: Record<string, string> = { 
+    ...authHeaders,
+    'Content-Type': 'application/json' 
+  };
+  
+  if (session?.provider_token) {
+    headers['X-GitHub-Token'] = session.provider_token;
+  }
+
+  const response = await fetch(`${API_URL}/badge/add-to-readme`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ repo_owner, repo_name }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || 'Failed to add badge to README');
+  }
+
   return response.json();
 }
 
@@ -674,4 +729,92 @@ export async function acceptInvitation(token: string): Promise<{ workspace_id: s
     throw new Error(err.error || 'Failed to accept invitation');
   }
   return res.json();
+}
+
+// ── Webhooks API ───────────────────────────────────────────────────────────
+
+export interface WebhookRegistration {
+  id: string;
+  repo_owner: string;
+  repo_name: string;
+  enabled: boolean;
+  auto_scan_branch: string;
+  scan_on_all_branches: boolean;
+  last_triggered_at: string | null;
+  last_scan_id: string | null;
+  created_at: string;
+}
+
+export interface WebhookEvent {
+  id: string;
+  webhook_id: string;
+  event_type: string;
+  branch: string;
+  commit_sha: string;
+  pusher: string;
+  scan_id: string | null;
+  status: string;
+  received_at: string;
+}
+
+export async function registerWebhook(data: { repo_owner: string; repo_name: string; branch: string; scan_all_branches: boolean }): Promise<{ webhook_id: string; status: string; repo: string; branch: string }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/webhooks/register`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to register webhook');
+  }
+  return res.json();
+}
+
+export async function deleteWebhook(id: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/webhooks/${id}`, { method: 'DELETE', headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to delete webhook');
+  }
+}
+
+export async function toggleWebhook(id: string, active: boolean): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/webhooks/${id}/toggle`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ active }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to toggle webhook');
+  }
+}
+
+export async function listWebhooks(): Promise<WebhookRegistration[]> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/webhooks`, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error('Failed to list webhooks');
+  return res.json();
+}
+
+export async function listWebhookEvents(id: string): Promise<WebhookEvent[]> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/webhooks/${id}/events`, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error('Failed to list webhook events');
+  return res.json();
+}
+
+export async function deleteAccount(): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/account`, {
+    method: 'DELETE',
+    headers,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to delete account');
+  }
 }

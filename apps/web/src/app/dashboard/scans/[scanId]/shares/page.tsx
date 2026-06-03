@@ -13,7 +13,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Trash2, Copy, ExternalLink, CheckCircle2 } from "lucide-react";
+import { Trash2, Copy, ExternalLink, CheckCircle2 } from "lucide-react";
+import { CustomLoader } from "@/components/custom-loader";
 
 export default function ScanSharesPage() {
   const params = useParams();
@@ -42,11 +43,11 @@ export default function ScanSharesPage() {
     }
   }, [scanId]);
 
-  const handleRevoke = async (sbomId: string, token: string) => {
+  const handleRevoke = async (depticId: string, token: string) => {
     if (!confirm("Are you sure you want to revoke this link? It will immediately stop working.")) return;
     
     try {
-      await revokeShareLink(sbomId, token);
+      await revokeShareLink(depticId, token);
       setShares(shares.filter(s => s.token !== token));
     } catch (err: any) {
       alert("Failed to revoke link: " + err.message);
@@ -63,9 +64,9 @@ export default function ScanSharesPage() {
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex justify-between items-end">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Active Share Links</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-foreground">Active Share Links</h1>
           <p className="text-gray-500 mt-2">
-            Manage public access links generated for SBOMs belonging to this scan.
+            Manage public access links generated for DEPTICs belonging to this scan.
           </p>
         </div>
       </div>
@@ -86,7 +87,7 @@ export default function ScanSharesPage() {
             {loading ? (
               <TableRow>
                 <TableCell colSpan={6} className="h-32 text-center text-gray-500">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                  <CustomLoader size={24} className="mx-auto mb-2" />
                   Loading shares...
                 </TableCell>
               </TableRow>
@@ -99,13 +100,13 @@ export default function ScanSharesPage() {
             ) : shares.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="h-32 text-center text-gray-500">
-                  No share links generated yet for this scan. Generate an SBOM and share it to see links here.
+                  No share links generated yet for this scan. Generate an DEPTIC and share it to see links here.
                 </TableCell>
               </TableRow>
             ) : (
               shares.map((share) => (
                 <TableRow key={share.token}>
-                  <TableCell className="font-medium text-gray-900 dark:text-white">
+                  <TableCell className="font-medium text-gray-900 dark:text-foreground">
                     {share.label || <span className="text-gray-400 italic">Unnamed</span>}
                   </TableCell>
                   <TableCell className="text-gray-500 text-sm">
@@ -136,7 +137,7 @@ export default function ScanSharesPage() {
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      onClick={() => handleRevoke(share.sbom_id, share.token)}
+                      onClick={() => handleRevoke(share.deptic_id, share.token)}
                       className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
                     >
                       <Trash2 className="h-4 w-4 mr-2" />

@@ -25,7 +25,7 @@ func SendEmail(ctx context.Context, toEmail, subject, htmlBody string) error {
 	}
 
 	payload := SendEmailPayload{
-		From:    "SBOM.io <onboarding@resend.dev>",
+		From:    "DEPTIC.io <onboarding@resend.dev>",
 		To:      []string{toEmail},
 		Subject: subject,
 		HTML:    htmlBody,
@@ -58,7 +58,7 @@ func SendEmail(ctx context.Context, toEmail, subject, htmlBody string) error {
 }
 
 func SendInvitationEmail(ctx context.Context, toEmail, inviterName, workspaceName, role, token string) error {
-	subject := fmt.Sprintf("%s invited you to %s on SBOM.io", inviterName, workspaceName)
+	subject := fmt.Sprintf("%s invited you to %s on DEPTIC.io", inviterName, workspaceName)
 	acceptURL := fmt.Sprintf("http://localhost:3000/invite/%s", token)
 
 	if siteURL := os.Getenv("NEXT_PUBLIC_SITE_URL"); siteURL != "" {
@@ -67,7 +67,7 @@ func SendInvitationEmail(ctx context.Context, toEmail, inviterName, workspaceNam
 
 	htmlBody := fmt.Sprintf(`
 		<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
-			<h2 style="color: #10b981;">Join %s on SBOM.io</h2>
+			<h2 style="color: #10b981;">Join %s on DEPTIC.io</h2>
 			<p>Hi,</p>
 			<p><strong>%s</strong> has invited you to join the <strong>%s</strong> workspace as a <strong>%s</strong>.</p>
 			<div style="margin: 30px 0; text-align: center;">

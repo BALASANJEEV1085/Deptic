@@ -1,5 +1,5 @@
-sbom-report.pdf
-sbom.cyclonedx.json
-sbom.spdx
-sbom-scan.sh
-sbom-scan.ps1
+deptic-report.pdf
+deptic.cyclonedx.json
+deptic.spdx
+deptic-scan.sh
+deptic-scan.ps1

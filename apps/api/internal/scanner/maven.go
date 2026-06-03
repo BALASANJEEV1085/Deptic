@@ -163,7 +163,7 @@ func FetchAndParseParentPOM(ctx context.Context, rdb *redis.Client, parent Paren
 		if err != nil {
 			break
 		}
-		req.Header.Set("User-Agent", "sbom-io-scanner/1.0")
+		req.Header.Set("User-Agent", "deptic-io-scanner/1.0")
 
 		client := &http.Client{Timeout: 12 * time.Second}
 		resp, err := client.Do(req)
@@ -236,7 +236,7 @@ func fetchLatestVersion(ctx context.Context, groupID, artifactID string) (string
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("User-Agent", "sbom-io-scanner/1.0")
+	req.Header.Set("User-Agent", "deptic-io-scanner/1.0")
 
 	client := &http.Client{Timeout: 12 * time.Second}
 	resp, err := client.Do(req)
@@ -274,7 +274,7 @@ func fetchPOMMeta(ctx context.Context, groupID, artifactID, version string) (nam
 	if err != nil {
 		return "", "", ""
 	}
-	req.Header.Set("User-Agent", "sbom-io-scanner/1.0")
+	req.Header.Set("User-Agent", "deptic-io-scanner/1.0")
 
 	client := &http.Client{Timeout: 12 * time.Second}
 	resp, err := client.Do(req)
@@ -475,7 +475,7 @@ func ScanMaven(ctx context.Context, rdb *redis.Client, pomXMLBytes []byte) ([]Pa
 
 				req, err := http.NewRequestWithContext(ctx, http.MethodGet, pomURL, nil)
 				if err == nil {
-					req.Header.Set("User-Agent", "sbom-io-scanner/1.0")
+					req.Header.Set("User-Agent", "deptic-io-scanner/1.0")
 					client := &http.Client{Timeout: 12 * time.Second}
 					resp, err := client.Do(req)
 					if err == nil && resp.StatusCode == http.StatusOK {

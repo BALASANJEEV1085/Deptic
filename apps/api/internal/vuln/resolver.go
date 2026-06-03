@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/deptic-io/api/internal/scanner"
 	"golang.org/x/mod/semver"
 	"github.com/redis/go-redis/v9"
 )
@@ -148,6 +150,8 @@ func FindCleanVersion(ctx context.Context, pkgName, ecosystem string) (string, e
 		allVersions, err = fetchAllVersionsPyPI(ctx, pkgName)
 	case "maven":
 		allVersions, err = fetchAllVersionsMaven(ctx, pkgName)
+	case "go":
+		allVersions, err = fetchAllVersionsGo(ctx, pkgName)
 	default:
 		return "", fmt.Errorf("unsupported ecosystem: %s", ecosystem)
 	}
@@ -335,7 +339,7 @@ func fetchAllVersionsMaven(ctx context.Context, pkgName string) ([]string, error
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "sbom-io-scanner/1.0")
+	req.Header.Set("User-Agent", "deptic-io-scanner/1.0")
 
 	client := &http.Client{Timeout: 12 * time.Second}
 	resp, err := client.Do(req)
@@ -365,6 +369,58 @@ func fetchAllVersionsMaven(ctx context.Context, pkgName string) ([]string, error
 			versions = append(versions, doc.Version)
 		}
 	}
+
+	return versions, nil
+}
+
+func fetchAllVersionsGo(ctx context.Context, pkgName string) ([]string, error) {
+	escapedPath := scanner.EscapePath(pkgName)
+	apiURL := fmt.Sprintf("https://proxy.golang.org/%s/@v/list", escapedPath)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Go proxy returned %d for %s", resp.StatusCode, pkgName)
+	}
+
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var versions []string
+	lines := strings.Split(string(b), "\n")
+	for _, line := range lines {
+		v := strings.TrimSpace(line)
+		if v != "" && !isPreRelease(v) {
+			versions = append(versions, v)
+		}
+	}
+
+	sort.Slice(versions, func(i, j int) bool {
+		v1 := versions[i]
+		if !strings.HasPrefix(v1, "v") {
+			v1 = "v" + v1
+		}
+		v2 := versions[j]
+		if !strings.HasPrefix(v2, "v") {
+			v2 = "v" + v2
+		}
+		if !semver.IsValid(v1) || !semver.IsValid(v2) {
+			return versions[i] > versions[j]
+		}
+		return semver.Compare(v1, v2) > 0
+	})
 
 	return versions, nil
 }

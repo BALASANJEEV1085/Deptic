@@ -26,9 +26,9 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SBOM.io | Secure Your Software Supply Chain",
+  title: "DEPTIC - SBOM Generation and CVE Detection",
   description:
-    "Automate your SBOM compliance and security with high-fidelity reports and real-time vulnerability monitoring.",
+    "Automate your DEPTIC compliance and security with high-fidelity reports and real-time vulnerability monitoring.",
 };
 
 export default function RootLayout({

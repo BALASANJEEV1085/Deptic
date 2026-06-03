@@ -23,7 +23,7 @@ const PLANS = [
     description: 'Perfect for individual researchers and open-source projects.',
     features: ['5 scans / month', 'NTIA compliance reports', 'Basic vulnerability scan', 'PDF export', 'Community support'],
     color: 'border-border',
-    badgeColor: 'bg-zinc-800 text-zinc-300 border-zinc-700',
+    badgeColor: 'bg-zinc-800 text-foreground border-zinc-700',
   },
   {
     id: 'pro',
@@ -32,8 +32,8 @@ const PLANS = [
     badge: 'PRO',
     description: 'For security teams requiring real-time CVE intelligence.',
     features: ['Unlimited scans', 'Real-time CVE monitoring', 'API access', 'GitHub Actions integration', 'Priority support'],
-    color: 'border-[#22c55e]/30',
-    badgeColor: 'bg-[#22c55e]/10 text-[#22c55e] border-[#22c55e]/20',
+    color: 'border-[#ffffff]/30',
+    badgeColor: 'bg-[#ffffff]/10 text-[#ffffff] border-[#ffffff]/20',
     recommended: true,
   },
   {
@@ -83,7 +83,7 @@ export function BillingSection({ user, loading }: { user: User | null; loading: 
   }, [user, supabase])
 
   const handleUpgrade = () => {
-    showToast('Stripe integration coming soon! Email us at hello@sbom.io', 'error')
+    showToast('Stripe integration coming soon! Email us at hello@deptic.io', 'error')
   }
 
   const scanPct = Math.min((usage.scans_used / FREE_SCAN_LIMIT) * 100, 100)
@@ -94,12 +94,12 @@ export function BillingSection({ user, loading }: { user: User | null; loading: 
   return (
     <div className="space-y-6">
       {/* Current Plan */}
-      <div className={cn("rounded-xl border p-6 space-y-4", currentPlanId === 'pro' ? "border-[#22c55e]/30 bg-[#22c55e]/5" : "border-border bg-muted/20")}>
+      <div className={cn("rounded-xl border p-6 space-y-4", currentPlanId === 'pro' ? "border-[#ffffff]/30 bg-[#ffffff]/5" : "border-border bg-muted/20")}>
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <p className="text-sm font-bold text-foreground">Current Plan</p>
-              <Badge className={cn("text-[10px] font-bold border", currentPlanId === 'pro' ? "bg-[#22c55e]/10 text-[#22c55e] border-[#22c55e]/20" : "bg-zinc-800 text-zinc-300 border-zinc-700")}>
+              <Badge className={cn("text-[10px] font-bold border", currentPlanId === 'pro' ? "bg-[#ffffff]/10 text-[#ffffff] border-[#ffffff]/20" : "bg-zinc-800 text-foreground border-zinc-700")}>
                 {currentPlanId.toUpperCase()}
               </Badge>
             </div>
@@ -108,7 +108,7 @@ export function BillingSection({ user, loading }: { user: User | null; loading: 
             </p>
           </div>
           {currentPlanId !== 'pro' && (
-            <Button onClick={handleUpgrade} className="bg-[#22c55e] hover:bg-[#22c55e]/90 text-black font-bold text-xs h-9 shrink-0">
+            <Button onClick={handleUpgrade} className="bg-[#ffffff] hover:bg-[#ffffff]/90 text-black font-bold text-xs h-9 shrink-0">
               <Zap className="h-3.5 w-3.5 mr-1.5" /> Upgrade to Pro
             </Button>
           )}
@@ -120,7 +120,7 @@ export function BillingSection({ user, loading }: { user: User | null; loading: 
           <div className="space-y-3">
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-zinc-400 font-medium">Scans used</span>
+                <span className="text-muted-foreground font-medium">Scans used</span>
                 <span className={cn("font-bold", isOverLimit ? "text-red-400" : "text-foreground")}>
                   {usage.scans_used} / {currentPlanId === 'starter' ? FREE_SCAN_LIMIT : '∞'}
                 </span>
@@ -128,7 +128,7 @@ export function BillingSection({ user, loading }: { user: User | null; loading: 
               {currentPlanId === 'starter' && (
                 <div className="w-full h-2 rounded-full bg-muted/50 overflow-hidden">
                   <div
-                    className={cn("h-full rounded-full transition-all duration-700", isOverLimit ? "bg-red-500" : "bg-[#22c55e]")}
+                    className={cn("h-full rounded-full transition-all duration-700", isOverLimit ? "bg-red-500" : "bg-[#ffffff]")}
                     style={{ width: `${scanPct}%` }}
                   />
                 </div>
@@ -136,7 +136,7 @@ export function BillingSection({ user, loading }: { user: User | null; loading: 
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-zinc-400 font-medium">Components scanned</span>
+                <span className="text-muted-foreground font-medium">Components scanned</span>
                 <span className="font-bold text-foreground">{usage.components_scanned.toLocaleString()}</span>
               </div>
               <div className="w-full h-2 rounded-full bg-muted/50 overflow-hidden">
@@ -154,10 +154,10 @@ export function BillingSection({ user, loading }: { user: User | null; loading: 
           {PLANS.map(plan => {
             const isCurrent = plan.id === currentPlanId
             return (
-              <div key={plan.id} className={cn("rounded-xl border p-5 space-y-4 relative transition-all", plan.color, isCurrent ? "ring-1 ring-[#22c55e]/30" : "", plan.recommended ? "bg-[#22c55e]/[0.03]" : "bg-muted/20")}>
+              <div key={plan.id} className={cn("rounded-xl border p-5 space-y-4 relative transition-all", plan.color, isCurrent ? "ring-1 ring-[#ffffff]/30" : "", plan.recommended ? "bg-[#ffffff]/[0.03]" : "bg-muted/20")}>
                 {plan.recommended && (
                   <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
-                    <span className="bg-[#22c55e] text-black text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest">Popular</span>
+                    <span className="bg-[#ffffff] text-black text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest">Popular</span>
                   </div>
                 )}
                 <div>
@@ -174,8 +174,8 @@ export function BillingSection({ user, loading }: { user: User | null; loading: 
                 <div className="space-y-2">
                   {plan.features.map(f => (
                     <div key={f} className="flex items-start gap-2">
-                      <CheckCircle2 className="h-3 w-3 text-[#22c55e] shrink-0 mt-0.5" />
-                      <span className="text-[11px] text-zinc-400">{f}</span>
+                      <CheckCircle2 className="h-3 w-3 text-[#ffffff] shrink-0 mt-0.5" />
+                      <span className="text-[11px] text-muted-foreground">{f}</span>
                     </div>
                   ))}
                 </div>
@@ -185,10 +185,10 @@ export function BillingSection({ user, loading }: { user: User | null; loading: 
                   className={cn(
                     "w-full h-8 text-[11px] font-bold transition-all",
                     isCurrent
-                      ? "bg-white/5 border border-white/10 text-zinc-600 cursor-default"
+                      ? "bg-muted border border-border text-zinc-600 cursor-default"
                       : plan.id === 'enterprise'
                       ? "bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/20"
-                      : "bg-[#22c55e] hover:bg-[#22c55e]/90 text-black"
+                      : "bg-[#ffffff] hover:bg-[#ffffff]/90 text-black"
                   )}
                 >
                   {isCurrent ? 'Current Plan' : plan.id === 'enterprise' ? (

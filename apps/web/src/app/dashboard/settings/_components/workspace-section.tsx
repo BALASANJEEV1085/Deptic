@@ -16,7 +16,8 @@ import {
   deleteWorkspace
 } from '@/lib/api'
 import { showToast } from './shared'
-import { Loader2, Plus, Trash2, ShieldAlert, Check, X, Users, Mail, Settings, UserMinus, Shield, UserX } from 'lucide-react'
+import { Plus, Trash2, ShieldAlert, Check, X, Users, Mail, Settings, UserMinus, Shield, UserX } from 'lucide-react'
+import { CustomLoader } from '@/components/custom-loader'
 import { Button } from '@/components/ui/button'
 
 export function WorkspaceSettingsSection() {
@@ -224,7 +225,7 @@ export function WorkspaceSettingsSection() {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <Loader2 className="h-6 w-6 text-[#22c55e] animate-spin" />
+        <CustomLoader size={24} className="text-[#ffffff]" />
       </div>
     )
   }
@@ -234,36 +235,36 @@ export function WorkspaceSettingsSection() {
       {/* General Settings */}
       <section className="p-6 rounded-xl border border-border bg-[#0e1015]">
         <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-          <Settings className="h-4 w-4 text-[#22c55e]" />
+          <Settings className="h-4 w-4 text-[#ffffff]" />
           Workspace Details
         </h3>
         <form onSubmit={handleUpdateDetails} className="space-y-4">
           <div className="grid gap-2">
-            <label className="text-xs text-zinc-400 font-medium">Workspace Name</label>
+            <label className="text-xs text-muted-foreground font-medium">Workspace Name</label>
             <input
               value={name}
               onChange={e => setName(e.target.value)}
               disabled={!canManage}
-              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-[#22c55e] disabled:opacity-50"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-[#ffffff] disabled:opacity-50"
             />
           </div>
           <div className="grid gap-2">
-            <label className="text-xs text-zinc-400 font-medium">Description</label>
+            <label className="text-xs text-muted-foreground font-medium">Description</label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
               disabled={!canManage}
               rows={2}
-              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground resize-none focus:outline-none focus:border-[#22c55e] disabled:opacity-50"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground resize-none focus:outline-none focus:border-[#ffffff] disabled:opacity-50"
             />
           </div>
           {canManage && (
             <Button
               type="submit"
               disabled={updatingDetails || !name.trim()}
-              className="h-8 text-xs bg-[#22c55e] hover:bg-[#22c55e]/90 text-black font-semibold"
+              className="h-8 text-xs bg-[#ffffff] hover:bg-[#ffffff]/90 text-black font-semibold"
             >
-              {updatingDetails && <Loader2 className="h-3 w-3 animate-spin mr-1.5" />}
+              {updatingDetails && <CustomLoader size={12} className="mr-1.5" />}
               Save Details
             </Button>
           )}
@@ -274,9 +275,9 @@ export function WorkspaceSettingsSection() {
       <section className="p-6 rounded-xl border border-border bg-[#0e1015] space-y-6">
         <div>
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Users className="h-4 w-4 text-[#22c55e]" />
+            <Users className="h-4 w-4 text-[#ffffff]" />
             Team Members
-            <span className="ml-1 text-[10px] font-bold bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20 px-1.5 py-0.5 rounded">
+            <span className="ml-1 text-[10px] font-bold bg-[#ffffff]/10 text-[#ffffff] border border-[#ffffff]/20 px-1.5 py-0.5 rounded">
               {members.length}
             </span>
           </h3>
@@ -298,17 +299,17 @@ export function WorkspaceSettingsSection() {
               return (
                 <div key={member.user_id} className="flex items-center justify-between p-3.5 bg-background/30">
                   <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-xs text-[#22c55e]">
+                    <div className="h-8 w-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-xs text-[#ffffff]">
                       {displayName.charAt(0).toUpperCase()}
                     </div>
                     <div>
                       <h4 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                         {displayName}
                         {isMe && (
-                          <span className="text-[9px] bg-zinc-800 text-zinc-400 border border-zinc-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">You</span>
+                          <span className="text-[9px] bg-zinc-800 text-muted-foreground border border-zinc-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">You</span>
                         )}
                         {memberIsOwner && (
-                          <span className="text-[9px] bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Owner</span>
+                          <span className="text-[9px] bg-[#ffffff]/10 text-[#ffffff] border border-[#ffffff]/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Owner</span>
                         )}
                       </h4>
                       <p className="text-[10px] text-zinc-500 mt-0.5">{member.email}</p>
@@ -322,7 +323,7 @@ export function WorkspaceSettingsSection() {
                         <select
                           value={member.role}
                           onChange={e => handleRoleChange(member.user_id, e.target.value)}
-                          className="bg-background border border-border rounded px-2 py-1 text-[11px] text-zinc-400 outline-none"
+                          className="bg-background border border-border rounded px-2 py-1 text-[11px] text-muted-foreground outline-none"
                         >
                           <option value="admin">Admin</option>
                           <option value="member">Member</option>
@@ -335,7 +336,7 @@ export function WorkspaceSettingsSection() {
                           title="Remove member"
                         >
                           {removingId === member.user_id
-                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ? <CustomLoader size={14} />
                             : <UserX className="h-3.5 w-3.5" />
                           }
                         </button>
@@ -362,14 +363,14 @@ export function WorkspaceSettingsSection() {
                   placeholder="collaborator@company.com"
                   value={inviteEmail}
                   onChange={e => setInviteEmail(e.target.value)}
-                  className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-xs text-foreground focus:outline-none focus:border-[#22c55e]"
+                  className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-xs text-foreground focus:outline-none focus:border-[#ffffff]"
                 />
               </div>
               <div className="flex gap-2">
                 <select
                   value={inviteRole}
                   onChange={e => setInviteRole(e.target.value)}
-                  className="bg-background border border-border rounded-lg px-3 py-2 text-xs text-zinc-400 outline-none"
+                  className="bg-background border border-border rounded-lg px-3 py-2 text-xs text-muted-foreground outline-none"
                 >
                   <option value="admin">Admin</option>
                   <option value="member">Member</option>
@@ -378,9 +379,9 @@ export function WorkspaceSettingsSection() {
                 <Button
                   type="submit"
                   disabled={inviting || !inviteEmail.trim()}
-                  className="bg-[#22c55e] hover:bg-[#22c55e]/90 text-black font-semibold text-xs h-9 px-4 shrink-0"
+                  className="bg-[#ffffff] hover:bg-[#ffffff]/90 text-black font-semibold text-xs h-9 px-4 shrink-0"
                 >
-                  {inviting && <Loader2 className="h-3 w-3 animate-spin mr-1.5" />}
+                  {inviting && <CustomLoader size={12} className="mr-1.5" />}
                   Send Invite
                 </Button>
               </div>

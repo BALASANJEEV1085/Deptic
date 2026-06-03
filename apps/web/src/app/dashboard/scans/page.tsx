@@ -23,7 +23,7 @@ import {
 /* ── Helpers ──────────────────────────────────────────────────────────── */
 function StatusDot({ status }: { status: string }) {
   const color =
-    status === "done" ? "#22c55e" : status === "failed" ? "#ef4444" : "#f59e0b";
+    status === "done" ? "#ffffff" : status === "failed" ? "#ef4444" : "#f59e0b";
   return (
     <span
       style={{
@@ -134,7 +134,7 @@ function CopyId({ id }: { id: string }) {
         className="group-hover/copy:opacity-100 transition-opacity"
       >
         {copied ? (
-          <Check size={10} color="#22c55e" />
+          <Check size={10} color="#ffffff" />
         ) : (
           <Copy size={10} />
         )}
@@ -158,7 +158,7 @@ function NtiaCell({ score, status }: { score?: number; status: string }) {
     );
   const s = getComplianceStatus(score);
   const color =
-    s.color === "green" ? "#22c55e" : s.color === "amber" ? "#f59e0b" : "#ef4444";
+    s.color === "green" ? "#ffffff" : s.color === "amber" ? "#f59e0b" : "#ef4444";
   return (
     <span
       style={{
@@ -246,7 +246,7 @@ function FilterDropdown({
             style={{
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13,
-              color: value === o ? "#22c55e" : "#c9d1e0",
+              color: value === o ? "#ffffff" : "#c9d1e0",
               padding: "6px 10px",
               cursor: "pointer",
               borderRadius: 4,
@@ -328,7 +328,7 @@ export default function ScansPage() {
             margin: 0,
           }}
         >
-          All SBOM scans across your repositories.
+          All DEPTIC scans across your repositories.
         </p>
       </div>
 
@@ -366,7 +366,7 @@ export default function ScansPage() {
               outline: "none",
               transition: "border-color 0.15s ease",
             }}
-            onFocus={(e) => (e.target.style.borderColor = "#22c55e")}
+            onFocus={(e) => (e.target.style.borderColor = "#ffffff")}
             onBlur={(e) => (e.target.style.borderColor = "#16191f")}
           />
         </div>
@@ -514,7 +514,7 @@ export default function ScansPage() {
                             fontFamily: "DM Sans, sans-serif",
                             fontSize: 13,
                             fontWeight: 500,
-                            color: "#22c55e",
+                            color: "#ffffff",
                             textDecoration: "none",
                           }}
                         >

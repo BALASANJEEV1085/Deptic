@@ -1,16 +1,22 @@
 {
-  "name": "ssbom-scan",
-  "version": "1.0.3",
-  "description": "CLI scanner for SBOM.io — scan any GitHub repo for vulnerabilities and NTIA compliance",
+  "name": "deptic-scan",
+  "version": "1.0.5",
+  "description": "CLI scanner for DEPTIC.io — scan local projects for vulnerabilities and NTIA compliance",
   "main": "index.js",
   "bin": {
-    "ssbom-scan": "./index.js"
+    "deptic-scan": "index.js"
   },
   "scripts": {
     "start": "node index.js"
   },
-  "keywords": ["sbom", "security", "vulnerability", "compliance", "cli"],
-  "author": "SBOM.io",
+  "keywords": [
+    "deptic",
+    "security",
+    "vulnerability",
+    "compliance",
+    "cli"
+  ],
+  "author": "DEPTIC.io",
   "license": "MIT",
   "engines": {
     "node": ">=16.0.0"

@@ -1,8 +1,8 @@
 #!/bin/bash
-# SBOM.io CLI Scanner
-# Usage: ./sbom-scan.sh --key=sbomio_xxx --repo=https://github.com/owner/repo
+# DEPTIC.io CLI Scanner
+# Usage: ./deptic-scan.sh --key=depticio_xxx --repo=https://github.com/owner/repo
 
-API_BASE="https://api.sbom.io"
+API_BASE="https://api.deptic.io"
 KEY=""
 REPO=""
 
@@ -16,14 +16,14 @@ done
 
 if [ -z "$KEY" ] || [ -z "$REPO" ]; then
   echo ""
-  echo "  SBOM.io CLI Scanner"
-  echo "  Usage: ./sbom-scan.sh --key=YOUR_API_KEY --repo=GITHUB_URL"
+  echo "  DEPTIC.io CLI Scanner"
+  echo "  Usage: ./deptic-scan.sh --key=YOUR_API_KEY --repo=GITHUB_URL"
   echo ""
   exit 1
 fi
 
 echo "  +---------------------------------+"
-echo "  |        SBOM.io Scanner          |"
+echo "  |        DEPTIC.io Scanner          |"
 echo "  +---------------------------------+"
 echo "  Repository : $REPO"
 echo "  Scanning… (this may take up to 2 minutes)"
@@ -77,13 +77,13 @@ echo ""
 echo "  Downloading reports…"
 
 if [ -n "$PDF" ] && [ "$PDF" != "None" ]; then
-  curl -s -L "$PDF" -o "sbom-report.pdf" && echo "  [ok] sbom-report.pdf"
+  curl -s -L "$PDF" -o "deptic-report.pdf" && echo "  [ok] deptic-report.pdf"
 fi
 if [ -n "$CDX" ] && [ "$CDX" != "None" ]; then
-  curl -s -L "$CDX" -o "sbom.cyclonedx.json" && echo "  [ok] sbom.cyclonedx.json"
+  curl -s -L "$CDX" -o "deptic.cyclonedx.json" && echo "  [ok] deptic.cyclonedx.json"
 fi
 if [ -n "$SPD" ] && [ "$SPD" != "None" ]; then
-  curl -s -L "$SPD" -o "sbom.spdx" && echo "  [ok] sbom.spdx"
+  curl -s -L "$SPD" -o "deptic.spdx" && echo "  [ok] deptic.spdx"
 fi
 
 echo ""

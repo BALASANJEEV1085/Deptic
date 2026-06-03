@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sbom-io/api/internal/scanner"
+	"github.com/deptic-io/api/internal/scanner"
 )
 
 type ComponentVuln struct {
@@ -64,6 +64,7 @@ func QueryOSV(ctx context.Context, pkgName, version, ecosystem string) ([]Compon
 		"npm":   "npm",
 		"pip":   "PyPI",
 		"maven": "Maven",
+		"go":    "Go",
 	}
 
 	mappedEco, ok := ecoMap[ecosystem]

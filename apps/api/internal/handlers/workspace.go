@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/sbom-io/api/internal/notify"
-	"github.com/sbom-io/api/internal/workspace"
+	"github.com/deptic-io/api/internal/notify"
+	"github.com/deptic-io/api/internal/workspace"
 )
 
 type WorkspaceHandler struct {
@@ -975,7 +975,7 @@ func (h *WorkspaceHandler) HandleSaveWorkspaceSlack(c *fiber.Ctx) error {
 	// Send verification Slack message
 	msg := notify.SlackMessage{
 		Blocks: []interface{}{
-			map[string]interface{}{"type": "section", "text": map[string]interface{}{"type": "mrkdwn", "text": "✅ *SBOM.io Slack Integration Connected for Workspace*\nYou will now receive workspace security alerts here."}},
+			map[string]interface{}{"type": "section", "text": map[string]interface{}{"type": "mrkdwn", "text": "✅ *DEPTIC.io Slack Integration Connected for Workspace*\nYou will now receive workspace security alerts here."}},
 		},
 	}
 	go notify.SendSlackNotification(context.Background(), req.WebhookURL, msg)

@@ -1,4 +1,4 @@
-package sbom
+package deptic
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sbom-io/api/internal/scanner"
+	"github.com/deptic-io/api/internal/scanner"
 )
 
 func sanitizeSPDXID(s string) string {
@@ -31,8 +31,8 @@ func GenerateSPDX(scan ScanInfo, components []scanner.Package) ([]byte, string, 
 	sb.WriteString("DataLicense: CC0-1.0\n")
 	sb.WriteString("SPDXID: SPDXRef-DOCUMENT\n")
 	sb.WriteString(fmt.Sprintf("DocumentName: %s\n", scan.RepoName))
-	sb.WriteString(fmt.Sprintf("DocumentNamespace: https://sbom.io/spdx/%s\n", scan.ID))
-	sb.WriteString("Creator: Tool: SBOM.io-1.0.0\n")
+	sb.WriteString(fmt.Sprintf("DocumentNamespace: https://deptic.io/spdx/%s\n", scan.ID))
+	sb.WriteString("Creator: Tool: DEPTIC.io-1.0.0\n")
 	sb.WriteString(fmt.Sprintf("Created: %s\n", time.Now().UTC().Format(time.RFC3339)))
 	sb.WriteString("\n")
 

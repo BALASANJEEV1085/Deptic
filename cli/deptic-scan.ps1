@@ -1,19 +1,19 @@
 <#
 .SYNOPSIS
-  SBOM.io CLI Scanner for Windows PowerShell
+  DEPTIC.io CLI Scanner for Windows PowerShell
 
 .DESCRIPTION
-  Scans a GitHub repository for software bill of materials (SBOM) data,
+  Scans a GitHub repository for software bill of materials (DEPTIC) data,
   vulnerability information, and NTIA compliance using a disposable API key.
 
 .PARAMETER key
-  Your SBOM.io API key (sbomio_...)
+  Your DEPTIC.io API key (depticio_...)
 
 .PARAMETER repo
   GitHub repository URL (https://github.com/owner/repo)
 
 .EXAMPLE
-  .\sbom-scan.ps1 -key "sbomio_YOUR_KEY" -repo "https://github.com/owner/repo"
+  .\deptic-scan.ps1 -key "depticio_YOUR_KEY" -repo "https://github.com/owner/repo"
 #>
 
 param(
@@ -24,7 +24,7 @@ param(
   [string]$repo,
 
   [Parameter(Mandatory=$false)]
-  [string]$base = "https://api.sbom.io"
+  [string]$base = "https://api.deptic.io"
 )
 
 $API_BASE = $base
@@ -32,7 +32,7 @@ $API_BASE = $base
 
 
 Write-Host "  +---------------------------------+" -ForegroundColor Cyan
-Write-Host "  |        SBOM.io Scanner          |" -ForegroundColor Cyan
+Write-Host "  |        DEPTIC.io Scanner          |" -ForegroundColor Cyan
 Write-Host "  +---------------------------------+" -ForegroundColor Cyan
 Write-Host "  Repository : $repo"
 Write-Host "  Scanning… (this may take up to 2 minutes)"
@@ -107,26 +107,26 @@ $spd = $response.downloads.spdx
 
 if ($pdf) {
   try {
-    Invoke-WebRequest -Uri $pdf -OutFile "sbom-report.pdf" -UseBasicParsing
-    Write-Host "  [ok] sbom-report.pdf" -ForegroundColor Green
+    Invoke-WebRequest -Uri $pdf -OutFile "deptic-report.pdf" -UseBasicParsing
+    Write-Host "  [ok] deptic-report.pdf" -ForegroundColor Green
   } catch {
-    Write-Host "  [err] Failed to download sbom-report.pdf: $_" -ForegroundColor Red
+    Write-Host "  [err] Failed to download deptic-report.pdf: $_" -ForegroundColor Red
   }
 }
 if ($cdx) {
   try {
-    Invoke-WebRequest -Uri $cdx -OutFile "sbom.cyclonedx.json" -UseBasicParsing
-    Write-Host "  [ok] sbom.cyclonedx.json" -ForegroundColor Green
+    Invoke-WebRequest -Uri $cdx -OutFile "deptic.cyclonedx.json" -UseBasicParsing
+    Write-Host "  [ok] deptic.cyclonedx.json" -ForegroundColor Green
   } catch {
-    Write-Host "  [err] Failed to download sbom.cyclonedx.json: $_" -ForegroundColor Red
+    Write-Host "  [err] Failed to download deptic.cyclonedx.json: $_" -ForegroundColor Red
   }
 }
 if ($spd) {
   try {
-    Invoke-WebRequest -Uri $spd -OutFile "sbom.spdx" -UseBasicParsing
-    Write-Host "  [ok] sbom.spdx" -ForegroundColor Green
+    Invoke-WebRequest -Uri $spd -OutFile "deptic.spdx" -UseBasicParsing
+    Write-Host "  [ok] deptic.spdx" -ForegroundColor Green
   } catch {
-    Write-Host "  [err] Failed to download sbom.spdx: $_" -ForegroundColor Red
+    Write-Host "  [err] Failed to download deptic.spdx: $_" -ForegroundColor Red
   }
 }
 

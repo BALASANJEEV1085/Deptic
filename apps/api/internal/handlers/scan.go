@@ -16,17 +16,17 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/sbom-io/api/internal/compliance"
-	"github.com/sbom-io/api/internal/db"
-	"github.com/sbom-io/api/internal/github"
-	"github.com/sbom-io/api/internal/notify"
-	"github.com/sbom-io/api/internal/scanner"
-	"github.com/sbom-io/api/internal/vuln"
-	"github.com/sbom-io/api/internal/workspace"
+	"github.com/deptic-io/api/internal/compliance"
+	"github.com/deptic-io/api/internal/db"
+	"github.com/deptic-io/api/internal/github"
+	"github.com/deptic-io/api/internal/notify"
+	"github.com/deptic-io/api/internal/scanner"
+	"github.com/deptic-io/api/internal/vuln"
+	"github.com/deptic-io/api/internal/workspace"
 )
 
 // JWTAuthMiddleware validates Supabase JWTs using the JWKS endpoint (supports ES256)
-func JWTAuthMiddleware(database *sql.DB) fiber.Handler {
+func JWTAuthMiddleware(database *sql.DB, redisClient *redis.Client) fiber.Handler {
 	supabaseURL := os.Getenv("SUPABASE_URL")
 	// Supabase JWKS lives under /auth/v1/, NOT root /.well-known/
 	jwksURL := supabaseURL + "/auth/v1/.well-known/jwks.json"
@@ -54,6 +54,16 @@ func JWTAuthMiddleware(database *sql.DB) fiber.Handler {
 		if jwks != nil {
 			// Preferred: verify using Supabase JWKS (supports ES256 & RS256)
 			token, parseErr = jwt.Parse(tokenString, jwks.Keyfunc)
+			// Fallback for HS256 tokens (like service keys or locally generated demo tokens) which lack a 'kid'
+			if parseErr != nil && strings.Contains(parseErr.Error(), "kid") {
+				secret := os.Getenv("SUPABASE_JWT_SECRET")
+				token, parseErr = jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+					if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+						return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+					}
+					return []byte(secret), nil
+				})
+			}
 		} else {
 			// Fallback: HMAC secret
 			secret := os.Getenv("SUPABASE_JWT_SECRET")
@@ -84,12 +94,43 @@ func JWTAuthMiddleware(database *sql.DB) fiber.Handler {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Missing subject in token"})
 		}
 
+		// Demo fallback: if using the dummy ID, map it to the first available real user
+		if sub == "11111111-1111-1111-1111-111111111111" {
+			var realID string
+			// Try to get a real user ID to satisfy foreign key constraints
+			_ = database.QueryRowContext(c.Context(), "SELECT id FROM auth.users LIMIT 1").Scan(&realID)
+			if realID != "" {
+				sub = realID
+			}
+		}
+
 		c.Locals("user_id", sub)
 
 		// Auto-ensure personal workspace
 		email, _ := claims["email"].(string)
 		if err := EnsurePersonalWorkspace(c.Context(), database, sub, email); err != nil {
 			fmt.Printf("EnsurePersonalWorkspace error: %v\n", err)
+		}
+
+		// Detect new login session
+		sessionID, _ := claims["session_id"].(string)
+		if sessionID != "" && redisClient != nil {
+			isNew := redisClient.SetNX(c.Context(), "session_notified:"+sessionID, "1", 720*time.Hour).Val()
+			if isNew {
+				deviceName := "Browser"
+				userAgent := c.Get("User-Agent")
+				if strings.Contains(strings.ToLower(userAgent), "mobile") {
+					deviceName = "Mobile"
+				}
+				go notify.SendPushToUser(context.Background(), database, sub, notify.PushPayload{
+					Title: "New login to Deptic",
+					Body:  "Signed in from " + deviceName + " · " + time.Now().Format("Jan 2, 3:04 PM"),
+					URL:   "/dashboard/settings",
+					Tag:   "login-" + sessionID,
+					Type:  "new_login",
+					RequireInteraction: false,
+				})
+			}
 		}
 
 		return c.Next()
@@ -107,22 +148,40 @@ func RegisterRoutes(api fiber.Router, database *sql.DB, redisClient *redis.Clien
 	h := &ScanHandler{db: database, rdb: redisClient}
 	ih := NewIntegrationsHandler(database)
 	wh := NewWorkspaceHandler(database)
+	webh := NewWebhookHandler(database, redisClient, h)
+	pushh := NewPushHandler(database)
 
 	// Public routes (no auth)
+	api.Post("/webhooks/github", webh.HandleGitHubWebhook)
 	api.Get("/share/:token", h.HandleViewShareLink)
 	api.Get("/invite/:token", wh.HandleGetInvitationPublic)
+	api.Get("/notifications/unread", pushh.GetUnreadOffline)
+	api.Post("/notifications/:id/clicked", pushh.MarkClicked)
+	api.Post("/donate", HandleDonate)
 
 	// CLI scan — authenticated by X-API-Key header only, NO JWT
-	api.Post("/scan-cli", h.ScanCLI)
+	api.Post("/scan-local", h.ScanLocal)
 
 	// Apply JWT middleware to subsequent routes
-	api.Use(JWTAuthMiddleware(database))
+	api.Use(JWTAuthMiddleware(database, redisClient))
 
 	// Invitation accept route (JWT-protected)
 	api.Post("/invite/:token/accept", wh.HandleAcceptInvitation)
 
 	// Register Workspace routes
 	wh.RegisterRoutes(api)
+	
+	// Register Webhook routes
+	webh.RegisterRoutes(api)
+
+	// Register Push notification routes
+	api.Post("/push/subscribe", pushh.Subscribe)
+	api.Post("/push/unsubscribe", pushh.Unsubscribe)
+	api.Get("/push/status", pushh.GetStatus)
+	api.Get("/notifications", pushh.GetNotifications)
+	api.Post("/notifications/:id/read", pushh.MarkRead)
+	api.Get("/notifications/preferences", pushh.GetPreferences)
+	api.Put("/notifications/preferences", pushh.UpdatePreferences)
 
 	// API Key management routes
 	api.Post("/keys", h.HandleCreateKey)
@@ -139,19 +198,22 @@ func RegisterRoutes(api fiber.Router, database *sql.DB, redisClient *redis.Clien
 	api.Post("/scans/:scanID/fix-pr", h.HandleCreateFixPR)
 	api.Get("/scans/:scanID/fix-pr/status", h.HandleGetFixPRStatus)
 	api.Get("/scans/:scanID/fix-prs", h.HandleGetFixPRs)
-	api.Post("/scans/:scanID/sbom", h.HandleGenerateSBOM)
+	api.Post("/scans/:scanID/deptic", h.HandleGenerateDEPTIC)
 	api.Get("/vulnerabilities", h.HandleGetAllVulnerabilities)
 	api.Get("/projects", h.HandleListProjects)
 	api.Get("/projects/:projectID/scans", h.HandleListScans)
 	api.Get("/github/repos", h.HandleListGitHubRepos)
 	api.Get("/dashboard/stats", h.HandleGetDashboardStats)
-	api.Get("/sboms/:sbomID/download", h.HandleDownloadSBOM)
-	api.Post("/sboms/:sbomID/share", h.HandleCreateShareLink)
-	api.Get("/sboms/:sbomID/shares", h.HandleListShareLinks)
+	api.Get("/deptics/:depticID/download", h.HandleDownloadDEPTIC)
+	api.Post("/deptics/:depticID/share", h.HandleCreateShareLink)
+	api.Get("/deptics/:depticID/shares", h.HandleListShareLinks)
 	api.Get("/scans/:scanID/shares", h.HandleListScanShareLinks)
 	api.Get("/scans/:scanID/compliance", h.GetCompliance)
 	api.Get("/scans/:scanID/report/pdf", h.DownloadPDFReport)
-	api.Delete("/sboms/:sbomID/shares/:token", h.HandleRevokeShareLink)
+	api.Delete("/deptics/:depticID/shares/:token", h.HandleRevokeShareLink)
+
+	// Account deletion
+	api.Delete("/account", h.HandleDeleteAccount)
 }
 
 
@@ -192,20 +254,21 @@ func (h *ScanHandler) HandleCreateScan(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid GitHub URL"})
 	}
 
-	// Fetch GitHub OAuth token from Supabase auth.identities
-	var providerToken sql.NullString
-	err = h.db.QueryRowContext(c.Context(), `
-		SELECT identity_data->>'provider_token' 
-		FROM auth.identities 
-		WHERE user_id = $1 AND provider = 'github'
-		LIMIT 1
-	`, userID).Scan(&providerToken)
-
-	if err != nil && err != sql.ErrNoRows {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch GitHub token"})
+	// Fetch GitHub OAuth token - try multiple sources
+	githubToken := c.Get("X-GitHub-Token")
+	if githubToken == "" {
+		var providerToken sql.NullString
+		_ = h.db.QueryRowContext(c.Context(), `
+			SELECT identity_data->>'provider_token' 
+			FROM auth.identities 
+			WHERE user_id = $1 AND provider = 'github'
+			LIMIT 1
+		`, userID).Scan(&providerToken)
+		githubToken = providerToken.String
 	}
-
-	githubToken := providerToken.String
+	if githubToken == "" {
+		githubToken = os.Getenv("GITHUB_TOKEN")
+	}
 
 	wsID, err := workspace.VerifyWorkspaceAccess(c, h.db, workspace.PermCreateScan)
 	if err != nil {
@@ -235,7 +298,10 @@ func (h *ScanHandler) HandleCreateScan(c *fiber.Ctx) error {
 	}
 
 	// Create scan record in database
-	scanID, err := db.CreateScan(c.Context(), h.db, projectID, req.GithubURL)
+	scanID, err := db.CreateScan(c.Context(), h.db, &db.CreateScanParams{
+		ProjectID: projectID,
+		RepoURL:   req.GithubURL,
+	})
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create scan record"})
 	}
@@ -246,313 +312,364 @@ func (h *ScanHandler) HandleCreateScan(c *fiber.Ctx) error {
 	}
 
 	// Launch scan in background
-	go func() {
-		// Use a disconnected background context because Fiber context gets cancelled when response is sent
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-		defer cancel()
-
-		ghClient := github.NewClient(githubToken)
-
-		allManifests, err := ghClient.FindAllManifests(ctx, owner, repo)
-		if err != nil {
-			_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed", "")
-			fmt.Printf("FindAllManifests error: %v\n", err)
-			return
-		}
-
-		if len(allManifests) == 0 {
-			_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed", "")
-			fmt.Printf("No supported manifest files found\n")
-			return
-		}
-
-		manifestPaths := make([]string, len(allManifests))
-		for i, m := range allManifests {
-			manifestPaths[i] = m.Path
-		}
-		fmt.Printf("Found %d manifests: %v\n", len(allManifests), manifestPaths)
-
-		var allPackages []scanner.Package
-		var mu sync.Mutex
-		var wg sync.WaitGroup
-
-		// Scan each manifest
-		for _, m := range allManifests {
-			m := m
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				var pkgs []scanner.Package
-				var scanErr error
-
-				switch m.Type {
-				case "npm":
-					pkgs, scanErr = scanner.ScanNPM(ctx, h.rdb, m.Data)
-				case "pip":
-					// Pip scanner might need filename to decide between requirements.txt and pyproject.toml
-					filename := m.Path
-					if idx := strings.LastIndex(m.Path, "/"); idx >= 0 {
-						filename = m.Path[idx+1:]
-					}
-					pkgs, scanErr = scanner.ScanPip(ctx, h.rdb, m.Data, filename)
-				case "maven":
-					pkgs, scanErr = scanner.ScanMaven(ctx, h.rdb, m.Data)
-				}
-
-				if scanErr != nil {
-					fmt.Printf("Warning: failed to scan %s (%s): %v\n", m.Path, m.Type, scanErr)
-					return
-				}
-
-				// Tag with SourcePath
-				for i := range pkgs {
-					pkgs[i].SourcePath = m.Path
-				}
-
-				mu.Lock()
-				allPackages = append(allPackages, pkgs...)
-				mu.Unlock()
-			}()
-		}
-
-		wg.Wait()
-
-		if len(allPackages) == 0 {
-			_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed", "")
-			fmt.Printf("No components found in %d manifests\n", len(allManifests))
-			return
-		}
-
-		// Deduplicate packages by Name+Version+Ecosystem
-		type pkgKey struct {
-			Name      string
-			Version   string
-			Ecosystem string
-		}
-		uniquePkgs := make(map[pkgKey]scanner.Package)
-		for _, p := range allPackages {
-			key := pkgKey{Name: p.Name, Version: p.Version, Ecosystem: p.Ecosystem}
-			if existing, ok := uniquePkgs[key]; ok {
-				// Keep the shallower one
-				if p.Depth < existing.Depth {
-					uniquePkgs[key] = p
-				}
-			} else {
-				uniquePkgs[key] = p
-			}
-		}
-
-		allPackages = make([]scanner.Package, 0, len(uniquePkgs))
-		ecosystemsMap := make(map[string]bool)
-		for _, p := range uniquePkgs {
-			allPackages = append(allPackages, p)
-			ecosystemsMap[p.Ecosystem] = true
-		}
-
-		var ecosystemList []string
-		for e := range ecosystemsMap {
-			ecosystemList = append(ecosystemList, e)
-		}
-		ecosystemStr := strings.Join(ecosystemList, "+")
-
-		// 3. Save resolved components
-		if err := db.SaveComponents(ctx, h.db, scanID, allPackages); err != nil {
-			_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed", ecosystemStr)
-			fmt.Printf("Scan failed saving components: %v\n", err)
-			return
-		}
-
-		// 4. Vulnerability Matcher
-		vulns, err := vuln.MatchVulnerabilities(ctx, h.db, scanID)
-		var criticalCves, highCves, mediumCves, lowCves int
-		if err == nil && len(vulns) > 0 {
-			if err := vuln.SaveComponentVulns(ctx, h.db, vulns); err != nil {
-				fmt.Printf("Failed to save vulnerabilities: %v\n", err)
-			}
-			for _, v := range vulns {
-				switch v.Severity {
-				case "CRITICAL":
-					criticalCves++
-				case "HIGH":
-					highCves++
-				case "MEDIUM":
-					mediumCves++
-				case "LOW":
-					lowCves++
-				}
-			}
-		}
-
-		// 5. NTIA Compliance Check
-		sbomMeta := compliance.SBOMMeta{
-			AuthorName:  "SBOM.io",
-			AuthorTool:  "sbom-io-scanner v1.0.0",
-			GeneratedAt: time.Now(),
-			RepoName:    repo,
-		}
-
-		_, dbComps, err := db.GetScanWithComponents(ctx, h.db, scanID)
-		var checkPackages []scanner.Package
-		if err == nil {
-			for _, c := range dbComps {
-				checkPackages = append(checkPackages, scanner.Package{
-					Name:        c.Name,
-					Version:     c.Version,
-					VersionSpec: c.VersionSpec,
-					License:     c.License,
-					Ecosystem:   c.Ecosystem,
-					Depth:       c.Depth,
-					ParentName:  c.ParentName,
-					SourcePath:  c.SourcePath,
-				})
-			}
-		} else {
-			checkPackages = allPackages
-		}
-
-		log.Printf("CheckNTIA input: %d components", len(checkPackages))
-		ntiaResult := compliance.CheckNTIA(checkPackages, sbomMeta)
-		euCompliant := compliance.CheckEUCRA(ntiaResult)
-
-		detailBytes, _ := json.Marshal(ntiaResult)
-		if err := db.UpdateScanCompliance(ctx, h.db, scanID, ntiaResult.Score, ntiaResult.Compliant, euCompliant, detailBytes, req.GithubURL, ecosystemStr); err != nil {
-			fmt.Printf("Warning: failed to save scan compliance: %v\n", err)
-		}
-
-		// 6. Finalize scan status
-		_ = db.UpdateScanStatus(ctx, h.db, scanID, "done", ecosystemStr)
-		fmt.Printf("Scan done: %d components, ecosystems=%s\n", len(allPackages), ecosystemStr)
-
-		// 7. Send Notifications
-		var slackConfigJSON string
-		var slackEnabled bool
-		err = h.db.QueryRowContext(ctx, "SELECT config, enabled FROM integrations WHERE user_id = $1 AND type = 'slack'", userID).Scan(&slackConfigJSON, &slackEnabled)
-		if err == nil && slackEnabled && len(vulns) > 0 {
-			var cfg notify.SlackConfig
-			if err := json.Unmarshal([]byte(slackConfigJSON), &cfg); err == nil && cfg.WebhookURL != "" {
-				
-				// Sort vulns by severity before displaying
-				sortedVulns := make([]vuln.ComponentVuln, len(vulns))
-				copy(sortedVulns, vulns)
-				severityRank := map[string]int{"CRITICAL": 1, "HIGH": 2, "MEDIUM": 3, "LOW": 4}
-				for i := 0; i < len(sortedVulns)-1; i++ {
-					for j := i + 1; j < len(sortedVulns); j++ {
-						r1, ok1 := severityRank[sortedVulns[i].Severity]
-						r2, ok2 := severityRank[sortedVulns[j].Severity]
-						if !ok1 { r1 = 5 }
-						if !ok2 { r2 = 5 }
-						if r2 < r1 {
-							sortedVulns[i], sortedVulns[j] = sortedVulns[j], sortedVulns[i]
-						}
-					}
-				}
-
-				var threatDetails strings.Builder
-				threatDetails.WriteString("*Top Threats Found:*\n")
-				for i, v := range sortedVulns {
-					if i >= 5 {
-						threatDetails.WriteString(fmt.Sprintf("\n...and %d more\n", len(sortedVulns)-5))
-						break
-					}
-					var compName, compVersion string
-					h.db.QueryRowContext(ctx, "SELECT name, version FROM components WHERE id = $1", v.ComponentID).Scan(&compName, &compVersion)
-					threatDetails.WriteString(fmt.Sprintf("• `%s@%s` - %s (%s)\n", compName, compVersion, v.CVEID, v.Severity))
-				}
-
-				msg := notify.SlackMessage{
-					Blocks: []interface{}{
-						map[string]interface{}{"type": "header", "text": map[string]interface{}{"type": "plain_text", "text": "🚨 SBOM.io Security Alert"}},
-						map[string]interface{}{"type": "section", "fields": []interface{}{
-							map[string]interface{}{"type": "mrkdwn", "text": "*Repository:*\n" + repo},
-							map[string]interface{}{"type": "mrkdwn", "text": fmt.Sprintf("*Audit ID:*\n`%s`", scanID)},
-						}},
-						map[string]interface{}{"type": "section", "fields": []interface{}{
-							map[string]interface{}{"type": "mrkdwn", "text": fmt.Sprintf("*Critical:* %d", criticalCves)},
-							map[string]interface{}{"type": "mrkdwn", "text": fmt.Sprintf("*High:* %d", highCves)},
-							map[string]interface{}{"type": "mrkdwn", "text": fmt.Sprintf("*Medium:* %d", mediumCves)},
-							map[string]interface{}{"type": "mrkdwn", "text": fmt.Sprintf("*NTIA Score:* %d/100", ntiaResult.Score)},
-						}},
-						map[string]interface{}{"type": "section", "text": map[string]interface{}{"type": "mrkdwn", "text": threatDetails.String()}},
-						map[string]interface{}{"type": "actions", "elements": []interface{}{
-							map[string]interface{}{"type": "button", "text": map[string]interface{}{"type": "plain_text", "text": "View Report"}, "url": "https://sbom.io/dashboard/scans/" + scanID, "style": "primary"},
-							map[string]interface{}{"type": "button", "text": map[string]interface{}{"type": "plain_text", "text": "Fix with PR"}, "url": "https://sbom.io/dashboard/scans/" + scanID},
-						}},
-					},
-				}
-				notify.SendSlackNotification(ctx, cfg.WebhookURL, msg)
-			}
-		}
-
-		var jiraConfigJSON string
-		var jiraEnabled bool
-		err = h.db.QueryRowContext(ctx, "SELECT config, enabled FROM integrations WHERE user_id = $1 AND type = 'jira'", userID).Scan(&jiraConfigJSON, &jiraEnabled)
-		if err == nil && jiraEnabled && len(vulns) > 0 {
-			var cfg notify.JiraConfig
-			if err := json.Unmarshal([]byte(jiraConfigJSON), &cfg); err == nil && cfg.BaseURL != "" {
-				// Group by package
-				pkgVulns := make(map[string][]vuln.ComponentVuln)
-				for _, v := range vulns {
-					if v.Severity == "CRITICAL" || v.Severity == "HIGH" {
-						// Actually we need the component name
-						var compName string
-						h.db.QueryRowContext(ctx, "SELECT name FROM components WHERE id = $1", v.ComponentID).Scan(&compName)
-						if compName != "" {
-							pkgVulns[compName] = append(pkgVulns[compName], v)
-						}
-					}
-				}
-
-				for pkgName, pkgVs := range pkgVulns {
-					highestSev := "HIGH"
-					for _, v := range pkgVs {
-						if v.Severity == "CRITICAL" {
-							highestSev = "CRITICAL"
-						}
-					}
-
-					summary := fmt.Sprintf("[SBOM.io] %s CVE in %s — %s in %s", highestSev, repo, pkgVs[0].CVEID, pkgName)
-					content := fmt.Sprintf("SBOM.io detected vulnerabilities in %s (Audit ID: %s):\n", pkgName, scanID)
-					for _, v := range pkgVs {
-						content += fmt.Sprintf("- %s (%s): %s\n", v.CVEID, v.Severity, v.Summary)
-					}
-
-					issue := notify.JiraIssue{}
-					issue.Fields.Project = map[string]string{"key": cfg.ProjectKey}
-					issue.Fields.Summary = summary
-					issue.Fields.IssueType = map[string]string{"name": "Task"}
-					
-					issue.Fields.Labels = []string{"security", "sbom-io", "cve", strings.ToLower(highestSev)}
-					issue.Fields.Description = map[string]any{
-						"type": "doc", "version": 1,
-						"content": []map[string]any{
-							{
-								"type": "paragraph",
-								"content": []map[string]any{
-									{"type": "text", "text": content},
-								},
-							},
-						},
-					}
-
-					key, err := notify.CreateJiraTicket(ctx, cfg, issue)
-					if err != nil {
-						fmt.Printf("Failed to create Jira ticket for %s: %v\n", pkgName, err)
-					} else if key != "" {
-						fmt.Printf("Successfully created Jira ticket %s\n", key)
-						url := strings.TrimRight(cfg.BaseURL, "/") + "/browse/" + key
-						for _, v := range pkgVs {
-							h.db.ExecContext(ctx, "UPDATE component_vulnerabilities SET jira_ticket_key = $1, jira_ticket_url = $2 WHERE cve_id = $3 AND component_id = $4", key, url, v.CVEID, v.ComponentID)
-						}
-					}
-				}
-			}
-		}
-	}()
+	go h.RunFullScan(scanID, userID, githubToken, owner, repo, req.GithubURL)
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"scan_id": scanID,
 		"status":  "running",
 	})
+}
+
+func (h *ScanHandler) RunFullScan(scanID, userID, githubToken, owner, repo, repoURL string) {
+	// Use a disconnected background context because Fiber context gets cancelled when response is sent
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	ghClient := github.NewClient(githubToken)
+
+	// Step 1: Detect
+	_ = db.UpdateScanStatus(ctx, h.db, scanID, "detecting", "")
+
+	allManifests, err := ghClient.FindAllManifests(ctx, owner, repo)
+	if err != nil {
+		_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed", "")
+		fmt.Printf("FindAllManifests error: %v\n", err)
+		return
+	}
+
+	if len(allManifests) == 0 {
+		_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed", "")
+		fmt.Printf("No supported manifest files found\n")
+		return
+	}
+
+	manifestPaths := make([]string, len(allManifests))
+	for i, m := range allManifests {
+		manifestPaths[i] = m.Path
+	}
+	fmt.Printf("Found %d manifests: %v\n", len(allManifests), manifestPaths)
+
+	// Step 2: Scan (Resolve Dependencies)
+	_ = db.UpdateScanStatus(ctx, h.db, scanID, "scanning", "")
+
+	var allPackages []scanner.Package
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	manifestSem := make(chan struct{}, 2) // Limit to 2 concurrent manifests
+
+	// Scan each manifest
+	for _, m := range allManifests {
+		m := m
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			manifestSem <- struct{}{}
+			defer func() { <-manifestSem }()
+			
+			var pkgs []scanner.Package
+			var scanErr error
+
+			switch m.Type {
+			case "npm":
+				pkgs, scanErr = scanner.ScanNPM(ctx, h.rdb, m.Data)
+			case "pip":
+				// Pip scanner might need filename to decide between requirements.txt and pyproject.toml
+				filename := m.Path
+				if idx := strings.LastIndex(m.Path, "/"); idx >= 0 {
+					filename = m.Path[idx+1:]
+				}
+				pkgs, scanErr = scanner.ScanPip(ctx, h.rdb, m.Data, filename)
+			case "maven":
+				pkgs, scanErr = scanner.ScanMaven(ctx, h.rdb, m.Data)
+			case "go":
+				pkgs, scanErr = scanner.ScanGoMod(ctx, h.rdb, m.Data)
+			}
+
+			if scanErr != nil {
+				fmt.Printf("Warning: failed to scan %s (%s): %v\n", m.Path, m.Type, scanErr)
+				return
+			}
+
+			// Tag with SourcePath
+			for i := range pkgs {
+				pkgs[i].SourcePath = m.Path
+			}
+
+			mu.Lock()
+			allPackages = append(allPackages, pkgs...)
+			mu.Unlock()
+		}()
+	}
+
+	wg.Wait()
+
+	if len(allPackages) == 0 {
+		_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed", "")
+		fmt.Printf("No components found in %d manifests\n", len(allManifests))
+		return
+	}
+
+	// Deduplicate packages by Name+Version+Ecosystem
+	type pkgKey struct {
+		Name      string
+		Version   string
+		Ecosystem string
+	}
+	uniquePkgs := make(map[pkgKey]scanner.Package)
+	for _, p := range allPackages {
+		key := pkgKey{Name: p.Name, Version: p.Version, Ecosystem: p.Ecosystem}
+		if existing, ok := uniquePkgs[key]; ok {
+			// Keep the shallower one
+			if p.Depth < existing.Depth {
+				uniquePkgs[key] = p
+			}
+		} else {
+			uniquePkgs[key] = p
+		}
+	}
+
+	allPackages = make([]scanner.Package, 0, len(uniquePkgs))
+	ecosystemsMap := make(map[string]bool)
+	for _, p := range uniquePkgs {
+		allPackages = append(allPackages, p)
+		ecosystemsMap[p.Ecosystem] = true
+	}
+
+	var ecosystemList []string
+	for e := range ecosystemsMap {
+		ecosystemList = append(ecosystemList, e)
+	}
+	ecosystemStr := strings.Join(ecosystemList, "+")
+
+	// 3. Save resolved components
+	if err := db.SaveComponents(ctx, h.db, scanID, allPackages); err != nil {
+		_ = db.UpdateScanStatus(ctx, h.db, scanID, "failed", ecosystemStr)
+		fmt.Printf("Scan failed saving components: %v\n", err)
+		return
+	}
+
+	// 4. Vulnerability Matcher
+	_ = db.UpdateScanStatus(ctx, h.db, scanID, "analyzing", ecosystemStr)
+	vulns, err := vuln.MatchVulnerabilities(ctx, h.db, scanID)
+	var criticalCves, highCves, mediumCves, lowCves int
+	if err == nil && len(vulns) > 0 {
+		if err := vuln.SaveComponentVulns(ctx, h.db, vulns); err != nil {
+			fmt.Printf("Failed to save vulnerabilities: %v\n", err)
+		}
+		for _, v := range vulns {
+			switch v.Severity {
+			case "CRITICAL":
+				criticalCves++
+			case "HIGH":
+				highCves++
+			case "MEDIUM":
+				mediumCves++
+			case "LOW":
+				lowCves++
+			}
+		}
+
+		if criticalCves > 0 {
+			go notify.SendPushToUser(context.Background(), h.db, userID, notify.PushPayload{
+				Title: "🚨 Critical CVE in " + repo,
+				Body:  fmt.Sprintf("%d critical vulnerabilities detected · Immediate action required", criticalCves),
+				URL:   "/dashboard/scans/" + scanID + "?tab=vulnerabilities",
+				Tag:   "critical-cve-" + scanID,
+				Type:  "critical_cve",
+				RequireInteraction: true,
+				Vibrate: []int{300, 100, 300, 100, 300},
+				Actions: []notify.PushAction{
+					{Action: "view_scan", Title: "View CVEs"},
+				},
+			})
+		} else if highCves > 0 {
+			go notify.SendPushToUser(context.Background(), h.db, userID, notify.PushPayload{
+				Title: "⚠ High severity CVEs in " + repo,
+				Body:  fmt.Sprintf("%d high severity vulnerabilities · Review and patch recommended", highCves),
+				URL:   "/dashboard/scans/" + scanID + "?tab=vulnerabilities",
+				Tag:   "high-cve-" + scanID,
+				Type:  "high_cve",
+			})
+		}
+	}
+
+	// 5. NTIA Compliance Check
+	_ = db.UpdateScanStatus(ctx, h.db, scanID, "reporting", ecosystemStr)
+	depticMeta := compliance.DEPTICMeta{
+		AuthorName:  "DEPTIC.io",
+		AuthorTool:  "deptic-io-scanner v1.0.0",
+		GeneratedAt: time.Now(),
+		RepoName:    repo,
+	}
+
+	_, dbComps, err := db.GetScanWithComponents(ctx, h.db, scanID)
+	var checkPackages []scanner.Package
+	if err == nil {
+		for _, c := range dbComps {
+			checkPackages = append(checkPackages, scanner.Package{
+				Name:        c.Name,
+				Version:     c.Version,
+				VersionSpec: c.VersionSpec,
+				License:     c.License,
+				Ecosystem:   c.Ecosystem,
+				Depth:       c.Depth,
+				ParentName:  c.ParentName,
+				SourcePath:  c.SourcePath,
+			})
+		}
+	} else {
+		checkPackages = allPackages
+	}
+
+	log.Printf("CheckNTIA input: %d components", len(checkPackages))
+	ntiaResult := compliance.CheckNTIA(checkPackages, depticMeta)
+	euCompliant := compliance.CheckEUCRA(ntiaResult)
+
+	detailBytes, _ := json.Marshal(ntiaResult)
+	if err := db.UpdateScanCompliance(ctx, h.db, scanID, ntiaResult.Score, ntiaResult.Compliant, euCompliant, detailBytes, repoURL, ecosystemStr); err != nil {
+		fmt.Printf("Warning: failed to save scan compliance: %v\n", err)
+	}
+
+	// 6. Finalize scan status
+	_ = db.UpdateScanStatus(ctx, h.db, scanID, "done", ecosystemStr)
+	fmt.Printf("Scan done: %d components, ecosystems=%s\n", len(allPackages), ecosystemStr)
+
+	go notify.SendPushToUser(context.Background(), h.db, userID, notify.PushPayload{
+		Title: "Scan complete — " + repo,
+		Body:  fmt.Sprintf("%d components · %d threats · NTIA %d/100", len(allPackages), len(vulns), ntiaResult.Score),
+		URL:   "/dashboard/scans/" + scanID,
+		Tag:   "scan-" + scanID,
+		Type:  "scan_complete",
+		Actions: []notify.PushAction{
+			{Action: "view_scan", Title: "View Report"},
+			{Action: "dismiss", Title: "Dismiss"},
+		},
+	})
+
+	// 7. Send Notifications
+	var slackConfigJSON string
+	var slackEnabled bool
+	err = h.db.QueryRowContext(ctx, "SELECT config, enabled FROM integrations WHERE user_id = $1 AND type = 'slack'", userID).Scan(&slackConfigJSON, &slackEnabled)
+	if err == nil && slackEnabled && len(vulns) > 0 {
+		var cfg notify.SlackConfig
+		if err := json.Unmarshal([]byte(slackConfigJSON), &cfg); err == nil && cfg.WebhookURL != "" {
+			
+			// Sort vulns by severity before displaying
+			sortedVulns := make([]vuln.ComponentVuln, len(vulns))
+			copy(sortedVulns, vulns)
+			severityRank := map[string]int{"CRITICAL": 1, "HIGH": 2, "MEDIUM": 3, "LOW": 4}
+			for i := 0; i < len(sortedVulns)-1; i++ {
+				for j := i + 1; j < len(sortedVulns); j++ {
+					r1, ok1 := severityRank[sortedVulns[i].Severity]
+					r2, ok2 := severityRank[sortedVulns[j].Severity]
+					if !ok1 { r1 = 5 }
+					if !ok2 { r2 = 5 }
+					if r2 < r1 {
+						sortedVulns[i], sortedVulns[j] = sortedVulns[j], sortedVulns[i]
+					}
+				}
+			}
+
+			var threatDetails strings.Builder
+			threatDetails.WriteString("*Top Threats Found:*\n")
+			for i, v := range sortedVulns {
+				if i >= 5 {
+					threatDetails.WriteString(fmt.Sprintf("\n...and %d more\n", len(sortedVulns)-5))
+					break
+				}
+				var compName, compVersion string
+				h.db.QueryRowContext(ctx, "SELECT name, version FROM components WHERE id = $1", v.ComponentID).Scan(&compName, &compVersion)
+				threatDetails.WriteString(fmt.Sprintf("• `%s@%s` - %s (%s)\n", compName, compVersion, v.CVEID, v.Severity))
+			}
+
+			msg := notify.SlackMessage{
+				Blocks: []interface{}{
+					map[string]interface{}{"type": "header", "text": map[string]interface{}{"type": "plain_text", "text": "🚨 DEPTIC.io Security Alert"}},
+					map[string]interface{}{"type": "section", "fields": []interface{}{
+						map[string]interface{}{"type": "mrkdwn", "text": "*Repository:*\n" + repo},
+						map[string]interface{}{"type": "mrkdwn", "text": fmt.Sprintf("*Audit ID:*\n`%s`", scanID)},
+					}},
+					map[string]interface{}{"type": "section", "fields": []interface{}{
+						map[string]interface{}{"type": "mrkdwn", "text": fmt.Sprintf("*Critical:* %d", criticalCves)},
+						map[string]interface{}{"type": "mrkdwn", "text": fmt.Sprintf("*High:* %d", highCves)},
+						map[string]interface{}{"type": "mrkdwn", "text": fmt.Sprintf("*Medium:* %d", mediumCves)},
+						map[string]interface{}{"type": "mrkdwn", "text": fmt.Sprintf("*NTIA Score:* %d/100", ntiaResult.Score)},
+					}},
+					map[string]interface{}{"type": "section", "text": map[string]interface{}{"type": "mrkdwn", "text": threatDetails.String()}},
+					map[string]interface{}{"type": "actions", "elements": []interface{}{
+						map[string]interface{}{"type": "button", "text": map[string]interface{}{"type": "plain_text", "text": "View Report"}, "url": "https://deptic.io/dashboard/scans/" + scanID, "style": "primary"},
+						map[string]interface{}{"type": "button", "text": map[string]interface{}{"type": "plain_text", "text": "Fix with PR"}, "url": "https://deptic.io/dashboard/scans/" + scanID},
+					}},
+				},
+			}
+			notify.SendSlackNotification(ctx, cfg.WebhookURL, msg)
+		}
+	}
+
+	var jiraConfigJSON string
+	var jiraEnabled bool
+	err = h.db.QueryRowContext(ctx, "SELECT config, enabled FROM integrations WHERE user_id = $1 AND type = 'jira'", userID).Scan(&jiraConfigJSON, &jiraEnabled)
+	if err == nil && jiraEnabled && len(vulns) > 0 {
+		var cfg notify.JiraConfig
+		if err := json.Unmarshal([]byte(jiraConfigJSON), &cfg); err == nil && cfg.BaseURL != "" {
+			// Group by package
+			pkgVulns := make(map[string][]vuln.ComponentVuln)
+			for _, v := range vulns {
+				if v.Severity == "CRITICAL" || v.Severity == "HIGH" {
+					// Actually we need the component name
+					var compName string
+					h.db.QueryRowContext(ctx, "SELECT name FROM components WHERE id = $1", v.ComponentID).Scan(&compName)
+					if compName != "" {
+						pkgVulns[compName] = append(pkgVulns[compName], v)
+					}
+				}
+			}
+
+			for pkgName, pkgVs := range pkgVulns {
+				highestSev := "HIGH"
+				for _, v := range pkgVs {
+					if v.Severity == "CRITICAL" {
+						highestSev = "CRITICAL"
+					}
+				}
+
+				summary := fmt.Sprintf("[DEPTIC.io] %s CVE in %s — %s in %s", highestSev, repo, pkgVs[0].CVEID, pkgName)
+				content := fmt.Sprintf("DEPTIC.io detected vulnerabilities in %s (Audit ID: %s):\n", pkgName, scanID)
+				for _, v := range pkgVs {
+					content += fmt.Sprintf("- %s (%s): %s\n", v.CVEID, v.Severity, v.Summary)
+				}
+
+				issue := notify.JiraIssue{}
+				issue.Fields.Project = map[string]string{"key": cfg.ProjectKey}
+				issue.Fields.Summary = summary
+				issue.Fields.IssueType = map[string]string{"name": "Task"}
+				
+				issue.Fields.Labels = []string{"security", "deptic-io", "cve", strings.ToLower(highestSev)}
+				issue.Fields.Description = map[string]any{
+					"type": "doc", "version": 1,
+					"content": []map[string]any{
+						{
+							"type": "paragraph",
+							"content": []map[string]any{
+								{"type": "text", "text": content},
+							},
+						},
+					},
+				}
+
+				key, err := notify.CreateJiraTicket(ctx, cfg, issue)
+				if err != nil {
+					fmt.Printf("Failed to create Jira ticket for %s: %v\n", pkgName, err)
+				} else if key != "" {
+					fmt.Printf("Successfully created Jira ticket %s\n", key)
+					url := strings.TrimRight(cfg.BaseURL, "/") + "/browse/" + key
+					for _, v := range pkgVs {
+						h.db.ExecContext(ctx, "UPDATE component_vulnerabilities SET jira_ticket_key = $1, jira_ticket_url = $2 WHERE cve_id = $3 AND component_id = $4", key, url, v.CVEID, v.ComponentID)
+					}
+				}
+			}
+		}
+	}
 }
 
 // HandleGetScan handles GET /api/scans/:scanID
@@ -620,19 +737,52 @@ func (h *ScanHandler) HandleGetScan(c *fiber.Ctx) error {
 	}
 
 	var isOwner bool
+	var hasGitHubPushAccess bool
 	userID, ok := c.Locals("user_id").(string)
 	if ok && userID != "" {
 		h.db.QueryRowContext(c.Context(), "SELECT EXISTS(SELECT 1 FROM projects WHERE id=$1 AND user_id=$2)", scan.ProjectID, userID).Scan(&isOwner)
+
+		// Check if user has push access to the scanned GitHub repo.
+		// Prefer the live X-GitHub-Token header (sent from the active session by the frontend)
+		// over the potentially-stale token stored in auth.identities.
+		if scan.RepoURL != "" && strings.Contains(scan.RepoURL, "github.com") {
+			githubToken := c.Get("X-GitHub-Token") // live token from frontend session
+
+			if githubToken == "" {
+				// Fallback: try the token stored in Supabase auth.identities
+				var providerToken sql.NullString
+				if err := h.db.QueryRowContext(c.Context(), `
+					SELECT identity_data->>'provider_token'
+					FROM auth.identities
+					WHERE user_id = $1 AND provider = 'github'
+					LIMIT 1
+				`, userID).Scan(&providerToken); err == nil && providerToken.Valid {
+					githubToken = providerToken.String
+				}
+			}
+
+			if githubToken != "" {
+				owner, repo, parseErr := github.ParseRepoURL(scan.RepoURL)
+				if parseErr == nil {
+					ghClient := github.NewClient(githubToken)
+					pushAccess, accessErr := ghClient.CheckRepoPushAccess(c.Context(), owner, repo)
+					if accessErr == nil {
+						hasGitHubPushAccess = pushAccess
+					}
+				}
+			}
+		}
 	}
 
 	return c.JSON(fiber.Map{
-		"scan":                scan,
-		"components":          components,
-		"total":               len(components),
-		"ecosystems":          ecosystemList,
-		"ecosystem_breakdown": breakdown,
-		"manifest_files":      manifestFiles,
-		"is_owner":            isOwner,
+		"scan":                   scan,
+		"components":             components,
+		"total":                  len(components),
+		"ecosystems":             ecosystemList,
+		"ecosystem_breakdown":    breakdown,
+		"manifest_files":         manifestFiles,
+		"is_owner":               isOwner,
+		"has_github_push_access": hasGitHubPushAccess,
 	})
 }
 
@@ -1278,13 +1428,23 @@ func (h *ScanHandler) HandleListGitHubRepos(c *fiber.Ctx) error {
 			LIMIT 1
 		`, userID).Scan(&providerToken)
 
-		if dbErr != nil {
-			if dbErr == sql.ErrNoRows {
-				return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "GitHub not connected"})
-			}
+		if dbErr != nil && dbErr != sql.ErrNoRows {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch GitHub token"})
 		}
 		githubToken = providerToken.String
+	}
+
+	if githubToken == "" {
+		// Check if user logged in via GitHub - if so, use GITHUB_TOKEN env as fallback
+		var provider string
+		h.db.QueryRowContext(c.Context(), `
+			SELECT provider FROM auth.identities 
+			WHERE user_id = $1 AND provider = 'github' LIMIT 1
+		`, userID).Scan(&provider)
+
+		if provider == "github" {
+			githubToken = os.Getenv("GITHUB_TOKEN")
+		}
 	}
 
 	if githubToken == "" {
