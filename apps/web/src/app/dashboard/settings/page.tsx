@@ -106,7 +106,7 @@ export default function SettingsPage() {
         <div className="flex gap-8">
 
           {/* ── Sidebar ─────────────────────────────────────────── */}
-          <aside className="hidden lg:flex flex-col gap-1 w-[240px] shrink-0">
+          <aside className="hidden lg:flex flex-col gap-1 w-[240px] shrink-0 sticky top-6 self-start">
             <nav className="space-y-0.5">
               {filteredTabs.map(({ id, label, icon: Icon }) => (
                 <button
@@ -119,10 +119,6 @@ export default function SettingsPage() {
                       : "text-zinc-500 hover:text-foreground hover:bg-muted/40"
                   )}
                 >
-                  {/* Green left border for active */}
-                  {active === id && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full bg-[#ffffff] shadow-[0_0_8px_rgba(255, 255, 255,0.6)]" />
-                  )}
                   <Icon className={cn(
                     "h-4 w-4 transition-colors ml-1",
                     active === id ? "text-[#ffffff]" : "text-zinc-600 group-hover:text-muted-foreground"

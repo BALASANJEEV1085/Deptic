@@ -116,7 +116,7 @@ function StepIndicators({ scanStep }: { scanStep: number }) {
 }
 
 /* ── Page ─────────────────────────────────────────────────────────────── */
-export default function NewProjectPage() {
+function NewProjectContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialUrl = searchParams.get("url") || "";
@@ -466,5 +466,13 @@ export default function NewProjectPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function NewProjectPage() {
+  return (
+    <React.Suspense fallback={<div style={{ display: "flex", minHeight: "70vh", alignItems: "center", justifyContent: "center", color: "#6b7280" }}>Loading...</div>}>
+      <NewProjectContent />
+    </React.Suspense>
   );
 }

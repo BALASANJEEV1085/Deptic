@@ -12,25 +12,26 @@
 
   :root {
     /* ── Core palette ── */
-    --bg:          #090b0f;
-    --card:        #0e1015;
-    --card-hover:  #0e1015;
-    --border:      #16191f;
-    --border-hover: #1e2230;
+    --bg:          #0A0D14;
+    --card:        #111827;
+    --card-hover:  #1e293b;
+    --border:      #1f2937;
+    --border-hover: #334155;
 
     /* ── Text ── */
-    --text-primary:   #e8ecf4;
-    --text-secondary: #6b7280;
-    --text-tertiary:  #374151;
-    --text-label:     #4a5068;
+    --text-primary:   #F8FAFC;
+    --text-secondary: #94A3B8;
+    --text-tertiary:  #64748b;
+    --text-label:     #475569;
 
     /* ── Accents ── */
-    --green:  #ffffff;
-    --lp-green: #ffffff;
-    --red:    #ef4444;
-    --amber:  #f59e0b;
-    --blue:   #3b82f6;
-    --orange: #f97316;
+    --green:  #00E5A8;
+    --lp-green: #00E5A8;
+    --red:    #FF4D6D;
+    --amber:  #FFD166;
+    --blue:   #3B82F6;
+    --orange: #FF8A00;
+    --low:    #00E5A8;
 
     /* ── Tailwind shadcn compat vars ── */
     --background:         220 14% 6%;
@@ -85,10 +86,6 @@
   * {
     border-color: var(--border);
     box-sizing: border-box;
-  }
-
-  *:not([style*="border-radius"]) {
-    border-radius: var(--radius) !important;
   }
 
   body {
@@ -177,7 +174,7 @@
   .ds-card {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 8px !important;
+    border-radius: 6px !important;
     padding: 20px;
     transition: border-color 0.15s ease;
   }
@@ -304,7 +301,7 @@
   .sev-dot-critical { background: var(--red); }
   .sev-dot-high     { background: var(--orange); }
   .sev-dot-medium   { background: var(--amber); }
-  .sev-dot-low      { background: var(--text-secondary); }
+  .sev-dot-low      { background: var(--low); }
 
   /* ── Status dot ── */
   .status-dot-done    { background: #4ade80; }
@@ -330,7 +327,6 @@
   .ds-tab:hover { color: #9ca3af; }
   .ds-tab.active {
     color: var(--text-primary);
-    border-bottom-color: var(--green);
   }
 
   /* ── Nav item ── */
@@ -356,17 +352,6 @@
   .nav-item.active {
     background: #13171f;
     color: var(--text-primary);
-  }
-  .nav-item.active::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 2px;
-    height: 18px;
-    background: var(--green);
-    border-radius: 0 2px 2px 0 !important;
   }
 }
 
@@ -478,11 +463,6 @@
 /* ── No-scrollbar utility ── */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-/* ── Remove all corner radius globally, preserving spin animations ── */
-*:not(.animate-spin):not(.rounded-full) {
-  border-radius: 0 !important;
-}
 
 /* ── Custom Loader ── */
 .loader {

@@ -58,7 +58,7 @@ export function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: 
       onClick={() => onChange(!checked)}
       className={cn(
         "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ffffff]/50",
-        checked ? "bg-emerald-500" : "bg-zinc-700"
+        checked ? "bg-[var(--green)]" : "bg-zinc-700"
       )}
     >
       <span className={cn(

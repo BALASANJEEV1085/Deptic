@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
-import { Camera, Mail, Sun, Moon, Laptop, Save } from 'lucide-react'
+import { Camera, Mail, Save, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -26,6 +26,7 @@ export function ProfileSection({ user, loading }: Props) {
   const [emailModal, setEmailModal] = useState(false)
   const [newEmail, setNewEmail] = useState('')
   const [sendingEmail, setSendingEmail] = useState(false)
+  const [themeOpen, setThemeOpen] = useState(false)
 
   const handleAvatarUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -83,51 +84,52 @@ export function ProfileSection({ user, loading }: Props) {
   return (
     <div className="space-y-6">
       {/* Avatar + Name */}
-      <div className="rounded-xl border border-border bg-muted/20 overflow-hidden">
-        <div className="p-6 border-b border-border bg-muted/30 flex flex-col sm:flex-row items-center gap-5">
-          <div className="relative group">
-            <Avatar className="h-20 w-20 border-2 border-border ring-2 ring-black">
-              <AvatarImage src={avatarUrl} />
-              <AvatarFallback className="bg-[#ffffff]/10 text-[#ffffff] text-2xl font-black">{initials}</AvatarFallback>
-            </Avatar>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full cursor-pointer"
-            >
-              <Camera className="h-5 w-5 text-foreground" />
-            </button>
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
-          </div>
-          <div className="flex-1 text-center sm:text-left">
-            <h3 className="text-base font-bold text-foreground">
-              {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
-            </h3>
-            <p className="text-xs text-zinc-500 mt-0.5">{user?.email}</p>
-            <p className="text-[10px] text-zinc-600 mt-1">
-              Member since {user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '—'}
-            </p>
-          </div>
+      <div className="flex flex-col sm:flex-row items-center gap-5">
+        <div className="relative group shrink-0">
+          <Avatar className="h-16 w-16 border-2 border-border">
+            <AvatarImage src={avatarUrl} />
+            <AvatarFallback className="bg-muted text-muted-foreground text-xl font-bold">{initials}</AvatarFallback>
+          </Avatar>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full cursor-pointer"
+          >
+            <Camera className="h-4 w-4 text-foreground" />
+          </button>
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
         </div>
+        <div className="text-center sm:text-left">
+          <h3 className="text-base font-bold text-foreground">
+            {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">{user?.email}</p>
+          <p className="text-[10px] text-muted-foreground/50 mt-1">
+            Member since {user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '—'}
+          </p>
+        </div>
+      </div>
 
-        <div className="p-6 grid sm:grid-cols-2 gap-5">
+      {/* Fields */}
+      <div className="space-y-4">
+        <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Full Name</label>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Full Name</label>
             <Input
               value={fullName}
               onChange={e => setFullName(e.target.value)}
               placeholder="Jane Smith"
-              className="bg-muted/40 border-border focus:border-[#ffffff]/50 h-9 text-sm"
+              className="bg-muted/30 border-border h-9 text-sm"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Email</label>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Email</label>
             <div className="flex gap-2">
               <Input
                 value={user?.email || ''}
                 disabled
-                className="bg-muted border-border text-zinc-500 h-9 text-sm flex-1 cursor-not-allowed"
+                className="bg-muted border-border text-muted-foreground h-9 text-sm flex-1 cursor-not-allowed"
               />
               <Button
                 variant="outline"
@@ -138,46 +140,63 @@ export function ProfileSection({ user, loading }: Props) {
               </Button>
             </div>
           </div>
+        </div>
 
-          <div className="sm:col-span-2 space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Bio</label>
-            <textarea
-              value={bio}
-              onChange={e => setBio(e.target.value)}
-              rows={3}
-              placeholder="Tell us about yourself..."
-              className="w-full bg-muted/40 border border-border rounded-lg p-3 text-sm text-foreground focus:border-[#ffffff]/50 focus:outline-none resize-none transition-colors"
-            />
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Bio</label>
+          <textarea
+            value={bio}
+            onChange={e => setBio(e.target.value)}
+            rows={3}
+            placeholder="Tell us about yourself..."
+            className="w-full bg-muted/30 border border-border rounded-lg p-3 text-sm text-foreground focus:border-[var(--green)]/50 focus:outline-none resize-none transition-colors placeholder:text-muted-foreground/40"
+          />
+        </div>
+
+        {/* Appearance Dropdown */}
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Appearance</label>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setThemeOpen(!themeOpen)}
+                className="w-full h-9 bg-muted/30 border border-border rounded-lg px-3 pr-8 text-sm text-foreground text-left cursor-pointer focus:outline-none focus:border-[var(--green)]/50 transition-colors"
+              >
+                {theme === 'light' ? 'Light' : theme === 'dark' ? 'Dark' : 'System'}
+              </button>
+              <ChevronDown className={cn("absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none transition-transform", themeOpen && "rotate-180")} />
+              {themeOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setThemeOpen(false)} />
+                  <div className="absolute top-full left-0 mt-1 w-full bg-card border border-border rounded-lg shadow-xl z-50 overflow-hidden">
+                    {[
+                      { value: 'light', label: 'Light' },
+                      { value: 'dark', label: 'Dark' },
+                      { value: 'system', label: 'System' },
+                    ].map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => { setTheme(opt.value); setThemeOpen(false) }}
+                        className={cn(
+                          "w-full px-3 py-2 text-sm text-left transition-colors",
+                          theme === opt.value
+                            ? "bg-[var(--green)]/10 text-[var(--green)] font-semibold"
+                            : "text-foreground hover:bg-muted/50"
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Theme */}
-      <div className="rounded-xl border border-border bg-muted/20 p-6 space-y-3">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Appearance</p>
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { value: 'light', label: 'Light', icon: Sun },
-            { value: 'dark', label: 'Dark', icon: Moon },
-            { value: 'system', label: 'System', icon: Laptop },
-          ].map(({ value, label, icon: Icon }) => (
-            <button
-              key={value}
-              onClick={() => setTheme(value)}
-              className={cn(
-                "flex items-center justify-center gap-2 p-3 rounded-lg border text-sm font-semibold transition-all",
-                theme === value
-                  ? "border-[#ffffff] bg-[#ffffff]/10 text-[#ffffff]"
-                  : "border-border bg-muted/30 text-muted-foreground hover:text-foreground hover:border-zinc-600"
-              )}
-            >
-              <Icon className="h-4 w-4" /> {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <Button onClick={handleSave} disabled={saving} className="bg-[#ffffff] hover:bg-[#ffffff]/90 text-black font-bold h-9 px-6">
+      <Button onClick={handleSave} disabled={saving} className="bg-[var(--green)] hover:bg-[var(--green)]/90 text-black font-bold h-9 px-6">
         <Save className="h-3.5 w-3.5 mr-2" />
         {saving ? 'Saving…' : 'Save Profile'}
       </Button>
@@ -198,7 +217,7 @@ export function ProfileSection({ user, loading }: Props) {
           </div>
           <div className="flex gap-2 justify-end pt-1">
             <Button variant="outline" onClick={() => setEmailModal(false)} className="border-border text-xs h-9">Cancel</Button>
-            <Button onClick={handleEmailChange} disabled={sendingEmail || !newEmail} className="bg-[#ffffff] hover:bg-[#ffffff]/90 text-black font-bold text-xs h-9">
+            <Button onClick={handleEmailChange} disabled={sendingEmail || !newEmail} className="bg-[var(--green)] hover:bg-[var(--green)]/90 text-black font-bold text-xs h-9">
               {sendingEmail ? 'Sending…' : 'Send Confirmation'}
             </Button>
           </div>

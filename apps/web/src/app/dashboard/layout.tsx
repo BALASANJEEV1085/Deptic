@@ -6,7 +6,7 @@ import { Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { WorkspaceProvider } from '@/lib/contexts/workspace-context'
 import { PushPrompt } from '@/components/push-prompt'
-import { NotificationBell } from '@/components/notification-bell'
+
 
 export default function DashboardLayout({
   children,
@@ -120,14 +120,11 @@ export default function DashboardLayout({
               DEPTIC.io
             </span>
             <div className="ml-auto">
-              <NotificationBell />
             </div>
           </header>
 
           <main className="flex-1 overflow-y-auto relative">
-            <div className="hidden md:block absolute top-4 right-6 z-10">
-              <NotificationBell />
-            </div>
+
             <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 24px 80px' }}>
 
               {children}

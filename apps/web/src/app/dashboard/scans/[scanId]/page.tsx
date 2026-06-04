@@ -346,7 +346,7 @@ export default function ScanResultsPage() {
           className={cn(
             "px-5 py-2.5 rounded-t-lg text-[11px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 relative",
             activeTab === 'vulnerabilities' 
-              ? "bg-muted text-foreground border-b-2 border-[#ffffff]" 
+              ? "bg-muted text-foreground" 
               : "text-muted-foreground hover:text-foreground"
           )}
         >
@@ -358,7 +358,7 @@ export default function ScanResultsPage() {
           className={cn(
             "px-5 py-2.5 rounded-t-lg text-[11px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 relative",
             activeTab === 'compliance' 
-              ? "bg-muted text-foreground border-b-2 border-[#ffffff]" 
+              ? "bg-muted text-foreground" 
               : "text-muted-foreground hover:text-foreground"
           )}
         >
@@ -370,7 +370,7 @@ export default function ScanResultsPage() {
           className={cn(
             "px-5 py-2.5 rounded-t-lg text-[11px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 relative",
             activeTab === 'bom' 
-              ? "bg-muted text-foreground border-b-2 border-[#ffffff]" 
+              ? "bg-muted text-foreground" 
               : "text-muted-foreground hover:text-foreground"
           )}
         >
@@ -383,7 +383,7 @@ export default function ScanResultsPage() {
         <div className="space-y-4">
           {(() => {
             const fixableVulns = vulnData.grouped?.filter(v => v.clean_version) || [];
-            const hasFixableVulns = fixableVulns.length > 0 && (data?.has_github_push_access === true);
+            const hasFixableVulns = fixableVulns.length > 0 && (data?.is_owner === true || data?.has_github_push_access === true);
 
             const fixedPackageNames = new Set<string>();
             createdPRs.forEach(pr => {
@@ -820,7 +820,7 @@ export default function ScanResultsPage() {
                       </div>
                     ) : (
                       <Button 
-                        disabled={badgeLoading || !data?.has_github_push_access}
+                        disabled={badgeLoading || (!data?.is_owner && !data?.has_github_push_access)}
                         onClick={async () => {
                           if (!data?.scan?.repo_name) return;
                           setBadgeLoading(true);
@@ -854,7 +854,7 @@ export default function ScanResultsPage() {
                       </Button>
                     )}
                     
-                    {!data?.has_github_push_access && !badgeStatus && (
+                    {!data?.is_owner && !data?.has_github_push_access && !badgeStatus && (
                       <p className="text-[10px] text-orange-400 mt-2 text-center">
                         You don't have push access to this repository.
                       </p>
