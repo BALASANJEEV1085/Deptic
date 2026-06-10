@@ -119,7 +119,7 @@ function StepIndicators({ scanStep }: { scanStep: number }) {
 function NewProjectContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialUrl = searchParams.get("url") || "";
+  const initialUrl = searchParams.get("repoUrl") || searchParams.get("url") || "";
   const [githubUrl, setGithubUrl] = useState(initialUrl);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

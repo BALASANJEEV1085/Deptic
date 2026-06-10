@@ -1,114 +1,144 @@
-"use client";
+import React from 'react';
+import { Navbar } from '@/components/navbar';
+import { Footer } from '@/components/footer';
+import { ContactCards } from './ContactCards';
 
-import * as React from "react";
-import Link from "next/link";
-import { ArrowLeft, Shield, Zap, Globe, Package, Layers, Search, CheckCircle2 } from "lucide-react";
+export const metadata = {
+  title: 'About | Deptic',
+};
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-[var(--lp-bg)] text-[var(--lp-text)] font-sans selection:bg-[var(--lp-green)]/30 selection:text-[var(--lp-green)]">
-      {/* NAV */}
-      <nav className="fixed top-0 left-0 right-0 z-[100] px-6 md:px-12 py-6 flex items-center justify-between border-b border-[var(--lp-border)] bg-[var(--lp-bg)]/90 backdrop-blur-xl">
-        <Link href="/" className="flex items-center gap-3 font-syne font-bold text-xl text-foreground group">
-          <div className="lp-logo-icon group-hover:scale-110 transition-transform">
-            <svg width="18" height="18" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-black">
-              <path d="M60 30L90 60" stroke="currentColor" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M90 60L60 90" stroke="currentColor" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M60 90L30 60" stroke="currentColor" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M30 60L60 30" stroke="currentColor" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
-              <g transform="translate(48, 18)"><path d="M12 2L22 7L12 12L2 7L12 2Z" fill="currentColor" fillOpacity="0.1" stroke="currentColor" strokeWidth="8" strokeLinejoin="round" /><path d="M22 7V17L12 22V12L22 7Z" fill="currentColor" fillOpacity="0.05" stroke="currentColor" strokeWidth="8" strokeLinejoin="round" /><path d="M2 7V17L12 22V12L2 7Z" fill="currentColor" fillOpacity="0.08" stroke="currentColor" strokeWidth="8" strokeLinejoin="round" /></g>
-              <g transform="translate(78, 48)"><path d="M12 2L22 7L12 12L2 7L12 2Z" fill="currentColor" fillOpacity="0.1" stroke="currentColor" strokeWidth="8" strokeLinejoin="round" /><path d="M22 7V17L12 22V12L22 7Z" fill="currentColor" fillOpacity="0.05" stroke="currentColor" strokeWidth="8" strokeLinejoin="round" /><path d="M2 7V17L12 22V12L2 7Z" fill="currentColor" fillOpacity="0.08" stroke="currentColor" strokeWidth="8" strokeLinejoin="round" /></g>
-              <g transform="translate(48, 78)"><path d="M12 2L22 7L12 12L2 7L12 12L2 7L12 2Z" fill="currentColor" fillOpacity="0.1" stroke="currentColor" strokeWidth="8" strokeLinejoin="round" /><path d="M22 7V17L12 22V12L22 7Z" fill="currentColor" fillOpacity="0.05" stroke="currentColor" strokeWidth="8" strokeLinejoin="round" /><path d="M2 7V17L12 22V12L2 7Z" fill="currentColor" fillOpacity="0.08" stroke="currentColor" strokeWidth="8" strokeLinejoin="round" /></g>
-              <g transform="translate(18, 48)"><path d="M12 2L22 7L12 12L2 7L12 2Z" fill="currentColor" fillOpacity="0.1" stroke="currentColor" strokeWidth="8" strokeLinejoin="round" /><path d="M22 7V17L12 22V12L22 7Z" fill="currentColor" fillOpacity="0.05" stroke="currentColor" strokeWidth="8" strokeLinejoin="round" /><path d="M2 7V17L12 22V12L2 7Z" fill="currentColor" fillOpacity="0.08" stroke="currentColor" strokeWidth="8" strokeLinejoin="round" /></g>
-            </svg>
-          </div>
-          DEPTIC.io
-        </Link>
-        <Link href="/" className="text-sm font-medium text-[var(--lp-text2)] hover:text-foreground transition-colors flex items-center gap-2">
-          <ArrowLeft size={16} /> Back to home
-        </Link>
-      </nav>
-
-      <main className="pt-32 pb-20 px-6 max-w-4xl mx-auto">
-        <header className="mb-20">
-          <div className="text-[var(--lp-green)] text-xs font-bold uppercase tracking-[0.2em] mb-4">Our Mission</div>
-          <h1 className="font-syne text-5xl md:text-6xl font-extrabold tracking-tight text-foreground mb-8">Standardizing software transparency.</h1>
-          <p className="text-xl text-[var(--lp-text2)] font-light leading-relaxed">
-            In an era where software supply chain attacks are increasing by 700% annually, knowing what's inside your code isn't just a best practice—it's a necessity for survival.
+    <div className="min-h-screen bg-[#000000] text-[#ffffff] font-sans selection:bg-white/10 selection:text-white flex flex-col">
+      <Navbar />
+      
+      <main className="flex-1 pt-32 pb-24 px-6 md:px-[48px] w-full max-w-[860px] mx-auto">
+        <header className="mb-16">
+          <div className="text-[#888888] text-[12px] font-mono uppercase tracking-[0.1em] mb-4">About Deptic</div>
+          <h1 className="font-syne text-[40px] md:text-[56px] font-bold tracking-[-1.5px] text-[#ffffff] mb-6 leading-[1.1] max-w-[700px]">
+            Built to make software supply chains transparent
+          </h1>
+          <p className="text-[#888888] text-[20px] leading-[1.8] font-light">
+            Deptic started with one question: how can a developer know exactly what their software is made of? We built the answer.
           </p>
+          <div className="w-full h-px bg-[#1a1a1a] mt-[64px] mb-0"></div>
         </header>
 
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-24">
-          <div>
-            <h2 className="font-syne text-2xl font-bold text-foreground mb-4">Who we are</h2>
-            <p className="text-[var(--lp-text2)] font-light leading-relaxed mb-6">
-              DEPTIC.io was founded by a group of security engineers and open-source contributors who realized that compliance is the biggest bottleneck in modern software delivery. 
+        <section className="mb-20">
+          <h2 className="font-syne text-[32px] font-bold text-[#ffffff] mb-8 pb-4 border-b border-[#1a1a1a]">The problem we're solving</h2>
+          <div className="text-[#888888] text-[16px] leading-[1.85] space-y-6">
+            <p>
+              Modern software doesn't exist in isolation. A typical web application depends on hundreds — sometimes thousands — of third-party packages. A React frontend alone can have 1,200+ transitive dependencies. A Spring Boot backend routinely pulls in 300+ Maven artifacts. Most developers have no idea what's inside their stack.
             </p>
-            <p className="text-[var(--lp-text2)] font-light leading-relaxed">
-              We built this platform to automate the tedious parts of security—generating reports, tracking CVEs, and verifying licenses—so developers can get back to building what matters.
+            <p>
+              This isn't a theoretical risk. In December 2021, a single vulnerability in <code className="font-mono text-[#ffffff] bg-[#111111] px-1.5 py-0.5 rounded border border-[#1a1a1a]">log4j-core@2.14.1</code> — a logging library buried deep in the transitive dependency tree of millions of Java applications — became the most critical security incident in a decade. The majority of affected teams didn't even know they were using log4j.
             </p>
+            <p>
+              US Executive Order 14028 (May 2021) and the EU Cyber Resilience Act (2024) now legally require software vendors selling to government and enterprise to provide a complete Software Bill of Materials — a full inventory of every component in their product. Most teams have no way to generate one.
+            </p>
+            <p className="text-white font-medium">Deptic solves this.</p>
           </div>
-          <div className="bg-[var(--lp-card)] border border-[var(--lp-border)] rounded-2xl p-8">
-            <div className="space-y-6">
-              <div className="flex gap-4">
-                <div className="w-10 h-10 bg-[var(--lp-green)]/10 rounded-lg flex items-center justify-center shrink-0">
-                  <Shield className="text-[var(--lp-green)]" size={20} />
-                </div>
-                <div>
-                  <h4 className="font-bold text-foreground mb-1">Precision</h4>
-                  <p className="text-xs text-[var(--lp-text2)] font-light">Deep-first dependency resolution that leaves no package unmapped.</p>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="w-10 h-10 bg-[#3b82f6]/10 rounded-lg flex items-center justify-center shrink-0">
-                  <Layers className="text-[#3b82f6]" size={20} />
-                </div>
-                <div>
-                  <h4 className="font-bold text-foreground mb-1">Community First</h4>
-                  <p className="text-xs text-[var(--lp-text2)] font-light">Always free for open-source projects and independent researchers.</p>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="w-10 h-10 bg-[#8b5cf6]/10 rounded-lg flex items-center justify-center shrink-0">
-                  <Shield className="text-[#8b5cf6]" size={20} />
-                </div>
-                <div>
-                  <h4 className="font-bold text-foreground mb-1">Security by Design</h4>
-                  <p className="text-xs text-[var(--lp-text2)] font-light">Built on the foundation of CycloneDX and SPDX standards.</p>
-                </div>
-              </div>
+        </section>
+
+        <section className="mb-20">
+          <h2 className="font-syne text-[32px] font-bold text-[#ffffff] mb-8 pb-4 border-b border-[#1a1a1a]">What Deptic does</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-[10px] p-[28px]">
+              <h3 className="text-[#ffffff] text-[18px] font-bold mb-3">Complete dependency visibility</h3>
+              <p className="text-[#888888] text-[16px] leading-[1.85]">
+                Deptic scans any GitHub repository and resolves the full dependency tree — direct and transitive — across npm, pip, Maven, Go, Rust, Ruby, PHP, and .NET. A scan of <code className="font-mono text-[#ffffff] bg-[#111111] px-1 py-0.5 rounded border border-[#1a1a1a] text-[13px]">spring-projects/spring-petclinic</code> returns 63 components. <code className="font-mono text-[#ffffff] bg-[#111111] px-1 py-0.5 rounded border border-[#1a1a1a] text-[13px]">facebook/react</code> returns 845. <code className="font-mono text-[#ffffff] bg-[#111111] px-1 py-0.5 rounded border border-[#1a1a1a] text-[13px]">gin-gonic/gin</code> returns 35. Every package, every version, every license.
+              </p>
+            </div>
+            <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-[10px] p-[28px]">
+              <h3 className="text-[#ffffff] text-[18px] font-bold mb-3">Real vulnerability detection</h3>
+              <p className="text-[#888888] text-[16px] leading-[1.85]">
+                Every component is matched against OSV.dev and NVD — two authoritative CVE databases. Deptic doesn't use fuzzy name matching. It uses Package URLs (PURLs) for precise identification. CVEs are returned with severity scores, affected version ranges, and the exact version you need to upgrade to.
+              </p>
+            </div>
+            <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-[10px] p-[28px]">
+              <h3 className="text-[#ffffff] text-[18px] font-bold mb-3">Government-grade compliance</h3>
+              <p className="text-[#888888] text-[16px] leading-[1.85]">
+                Deptic automatically checks all 7 NTIA minimum elements defined in EO14028: supplier name, component name, version, unique identifiers, dependency relationships, SBOM author, and timestamp. It exports machine-readable SBOMs in CycloneDX 1.5 and SPDX 2.3 formats — both accepted by US federal agencies.
+              </p>
+            </div>
+            <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-[10px] p-[28px]">
+              <h3 className="text-[#ffffff] text-[18px] font-bold mb-3">Automated remediation</h3>
+              <p className="text-[#888888] text-[16px] leading-[1.85]">
+                When a vulnerability is found, Deptic doesn't just report it — it fixes it. The Fix with PR feature queries OSV for the complete affected version history, finds the latest release with zero known CVEs, and opens a GitHub Pull Request with the exact version bump needed. One click. Every CVE patched.
+              </p>
             </div>
           </div>
         </section>
 
-        <section className="border-t border-[var(--lp-border)] pt-16">
-          <h2 className="font-syne text-3xl font-bold text-foreground mb-12 text-center">Built for the future of compliance</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="text-4xl font-syne font-bold text-foreground mb-2">24/7</div>
-              <div className="text-xs text-[var(--lp-text3)] uppercase tracking-widest font-bold">CVE Monitoring</div>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl font-syne font-bold text-foreground mb-2">100%</div>
-              <div className="text-xs text-[var(--lp-text3)] uppercase tracking-widest font-bold">NTIA Compliant</div>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl font-syne font-bold text-foreground mb-2">0</div>
-              <div className="text-xs text-[var(--lp-text3)] uppercase tracking-widest font-bold">Agents required</div>
-            </div>
+        <section className="mb-20">
+          <h2 className="font-syne text-[32px] font-bold text-[#ffffff] mb-8 pb-4 border-b border-[#1a1a1a]">Who built Deptic</h2>
+          <div className="text-[#888888] text-[16px] leading-[1.85] space-y-6">
+            <p>
+              Deptic was built by Balasanjeev C, a computer science engineering student at Nandha Engnerring Collge, TamilNadu, India. What started as a final year capstone project grew into a production-grade platform after months of real engineering work — building Go scanners that call Maven Central, writing CVE resolution algorithms that cross-reference OSV.dev, and designing a UI that makes complex security data readable to non-security engineers.
+            </p>
+            <p>
+              The name Deptic comes from dependency + diagnostic — the core of what the product does.
+            </p>
+            <p>
+              Deptic is built on a modern stack: Go + Fiber for the backend API, Next.js 14 for the frontend, PostgreSQL via Supabase for persistence, Redis via Upstash for caching, and iDrive E2 (S3-compatible) for SBOM file storage. The scanner architecture supports all 8 major package ecosystems with transitive dependency resolution and PURL-based CVE matching.
+            </p>
           </div>
         </section>
+
+        <section className="mb-20">
+          <h2 className="font-syne text-[32px] font-bold text-[#ffffff] mb-8 pb-4 border-b border-[#1a1a1a]">Why this matters now</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div>
+              <div className="font-syne text-[48px] text-[#ffffff] font-bold leading-none mb-3">EO 14028</div>
+              <div className="text-[#888888] text-[14px] leading-relaxed">US federal mandate requiring SBOMs for all government software vendors (2021)</div>
+            </div>
+            <div>
+              <div className="font-syne text-[48px] text-[#ffffff] font-bold leading-none mb-3">EU CRA</div>
+              <div className="text-[#888888] text-[14px] leading-relaxed">EU Cyber Resilience Act requiring SBOMs for all software sold in the EU (2024)</div>
+            </div>
+            <div>
+              <div className="font-syne text-[48px] text-[#ffffff] font-bold leading-none mb-3">1 in 5</div>
+              <div className="text-[#888888] text-[14px] leading-relaxed">npm packages have at least one known vulnerability in their transitive tree</div>
+            </div>
+          </div>
+          <div className="text-[#888888] text-[16px] leading-[1.85] space-y-6">
+            <p>
+              The regulatory window is closing. US federal agencies have begun requiring CycloneDX or SPDX SBOMs as part of procurement. The EU CRA enforcement began in 2024. Companies that cannot produce a signed, compliant SBOM on demand are losing contracts.
+            </p>
+            <p>
+              Deptic makes compliance the default — not an afterthought.
+            </p>
+          </div>
+        </section>
+
+        <section className="mb-20">
+          <h2 className="font-syne text-[32px] font-bold text-[#ffffff] mb-8 pb-4 border-b border-[#1a1a1a]">How it's built</h2>
+          <div className="flex flex-wrap gap-3 mb-8">
+            {[
+              "Go 1.22 + Fiber", "Next.js 14", "PostgreSQL (Supabase)", 
+              "Redis (Upstash)", "iDrive E2 (S3)", "OSV.dev API", 
+              "GitHub OAuth", "CycloneDX 1.5", "SPDX 2.3", "Web Push (VAPID)"
+            ].map((tech) => (
+              <div key={tech} className="bg-[#111111] border border-[#1a1a1a] rounded-[8px] px-[18px] py-[10px] text-[#ffffff] text-[14px] font-medium">
+                {tech}
+              </div>
+            ))}
+          </div>
+          <div className="text-[#888888] text-[16px] leading-[1.85]">
+            <p>
+              The scanner core is written in Go for performance — resolving 1,000+ transitive npm dependencies takes under 30 seconds using a semaphore-controlled goroutine pool with Redis caching. The CVE matching engine sends batched parallel queries to OSV.dev, caching results by package+version with a 24-hour TTL. Every SBOM file is SHA-256 signed before being stored in object storage with pre-signed URLs that expire in 1 hour.
+            </p>
+          </div>
+        </section>
+
+        <section className="mb-20">
+          <h2 className="font-syne text-[32px] font-bold text-[#ffffff] mb-8 pb-4 border-b border-[#1a1a1a]">Get in touch</h2>
+          <ContactCards />
+        </section>
+
       </main>
 
-      <footer className="border-t border-[var(--lp-border)] py-12 px-6">
-        <div className="max-w-4xl mx-auto flex justify-between items-center opacity-50">
-          <div className="text-xs">© 2026 DEPTIC.io</div>
-          <div className="flex gap-6 text-xs">
-            <Link href="/privacy">Privacy</Link>
-            <Link href="/terms">Terms</Link>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

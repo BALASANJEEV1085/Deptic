@@ -1,20 +1,37 @@
-import React from 'react';
-import { Navbar } from './_components/Navbar';
-import { Hero } from './_components/Hero';
-import { FeaturesScrollytelling } from './_components/FeaturesScrollytelling';
-import { ApiSection } from './_components/ApiSection';
-import { PricingSection } from './_components/PricingSection';
-import { Footer } from './_components/Footer';
+import { Navbar } from '@/components/navbar'
+import { Hero } from '@/components/sections/hero'
 
-export default function Home() {
+import { StickyStory } from '@/components/sections/sticky-story'
+import { BentoFeatures } from '@/components/sections/bento-features'
+import { HorizontalScroll } from '@/components/sections/horizontal-scroll'
+import { Metrics } from '@/components/sections/metrics'
+import { BeforeAfter } from '@/components/sections/before-after'
+import { FeatureWalkthrough } from '@/components/sections/feature-walkthrough'
+
+import { ApiSection } from '@/components/sections/api-section'
+import { Pricing } from '@/components/sections/pricing'
+import { Testimonials } from '@/components/sections/testimonials'
+import { FinalCta } from '@/components/sections/final-cta'
+import { Footer } from '@/components/footer'
+
+export default function Page() {
   return (
-    <main className="min-h-screen bg-[#0a0a0a] w-full">
+    <main className="relative bg-black">
       <Navbar />
       <Hero />
-      <FeaturesScrollytelling />
+
+      <StickyStory />
+      <BentoFeatures />
+      <HorizontalScroll />
+      <Metrics />
+      <BeforeAfter />
+      <FeatureWalkthrough />
+
       <ApiSection />
-      <PricingSection />
+      <Pricing />
+      <Testimonials />
+      <FinalCta />
       <Footer />
     </main>
-  );
+  )
 }
