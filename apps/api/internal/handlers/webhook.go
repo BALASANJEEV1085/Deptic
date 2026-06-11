@@ -111,8 +111,26 @@ func (wh *WebhookHandler) HandleGitHubWebhook(c *fiber.Ctx) error {
 	}
 
 	branch := strings.TrimPrefix(event.Ref, "refs/heads/")
+
+	// Create event record initially as processing
+	eventRecord := &db.WebhookEvent{
+		WebhookID: reg.ID,
+		EventType: "push",
+		Branch:    branch,
+		CommitSHA: event.After,
+		Pusher:    event.Pusher.Name,
+		Status:    "processing",
+		Payload:   string(payload),
+	}
+	eventID, err := db.CreateWebhookEvent(c.Context(), wh.db, eventRecord)
+	if err != nil {
+		fmt.Printf("Webhook Error creating event: %v\n", err)
+		return c.SendStatus(fiber.StatusOK)
+	}
+
 	if !reg.ScanOnAllBranches && branch != reg.AutoScanBranch {
 		fmt.Printf("Webhook skipped for %s: branch %s does not match auto_scan_branch %s\n", repoFullName, branch, reg.AutoScanBranch)
+		db.UpdateWebhookEvent(c.Context(), wh.db, eventID, "", "skipped: branch does not match auto_scan_branch")
 		return c.SendStatus(fiber.StatusOK)
 	}
 
@@ -144,6 +162,7 @@ func (wh *WebhookHandler) HandleGitHubWebhook(c *fiber.Ctx) error {
 
 	if !isScanNeeded {
 		fmt.Printf("Webhook skipped for %s: no manifest files changed and no [deptic-scan] in commit message\n", repoFullName)
+		db.UpdateWebhookEvent(c.Context(), wh.db, eventID, "", "skipped: no manifest files changed and no [deptic-scan] in commit")
 		return c.SendStatus(fiber.StatusOK)
 	}
 
@@ -151,10 +170,12 @@ func (wh *WebhookHandler) HandleGitHubWebhook(c *fiber.Ctx) error {
 	recentCount, err := db.CountRecentWebhookScans(c.Context(), wh.db, reg.UserID)
 	if err == nil && recentCount >= 10 {
 		fmt.Printf("Skipping webhook scan for %s: daily limit reached\n", repoFullName)
+		db.UpdateWebhookEvent(c.Context(), wh.db, eventID, "", "skipped: daily limit reached")
 		return c.SendStatus(fiber.StatusOK)
 	}
 	if reg.LastTriggeredAt != nil && time.Since(*reg.LastTriggeredAt) < 5*time.Minute {
 		fmt.Printf("Skipping webhook scan for %s: 5 minute cooldown\n", repoFullName)
+		db.UpdateWebhookEvent(c.Context(), wh.db, eventID, "", "skipped: 5 minute cooldown")
 		return c.SendStatus(fiber.StatusOK)
 	}
 
@@ -163,22 +184,7 @@ func (wh *WebhookHandler) HandleGitHubWebhook(c *fiber.Ctx) error {
 	wh.db.QueryRowContext(c.Context(), "SELECT id FROM scans WHERE commit_sha = $1 AND trigger_type = 'webhook' LIMIT 1", event.After).Scan(&existingScan)
 	if existingScan != "" {
 		fmt.Printf("Skipping webhook scan for %s: commit already scanned\n", repoFullName)
-		return c.SendStatus(fiber.StatusOK)
-	}
-
-	// Create event record
-	eventRecord := &db.WebhookEvent{
-		WebhookID: reg.ID,
-		EventType: "push",
-		Branch:    branch,
-		CommitSHA: event.After,
-		Pusher:    event.Pusher.Name,
-		Status:    "processing",
-		Payload:   string(payload),
-	}
-	eventID, err := db.CreateWebhookEvent(c.Context(), wh.db, eventRecord)
-	if err != nil {
-		fmt.Printf("Webhook Error creating event: %v\n", err)
+		db.UpdateWebhookEvent(c.Context(), wh.db, eventID, "", "skipped: commit already scanned")
 		return c.SendStatus(fiber.StatusOK)
 	}
 

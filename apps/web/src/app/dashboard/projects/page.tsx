@@ -116,29 +116,46 @@ function RepoRow({ repo, webhook, onToggleWebhook, onScan }: { repo: GitHubRepo;
 
       {/* Auto-Scan */}
       <td className="px-4 py-3.5 hidden md:table-cell">
-        <div className="flex items-center gap-2">
-          <button
-            disabled={isToggling}
-            onClick={handleToggle}
-            className={cn(
-              "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ffffff]/50 disabled:opacity-50",
-              webhook?.enabled ? "bg-[var(--green)]" : "bg-zinc-700"
-            )}
-          >
-            <span className="sr-only">Toggle auto-scan</span>
-            <span
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2">
+            <button
+              disabled={isToggling}
+              onClick={handleToggle}
               className={cn(
-                "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition duration-200 ease-in-out",
-                webhook?.enabled ? "translate-x-4" : "translate-x-0"
+                "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ffffff]/50 disabled:opacity-50",
+                webhook?.enabled ? "bg-[var(--green)]" : "bg-zinc-700"
               )}
-            />
-          </button>
-          <span className={cn(
-            "text-[10px] font-semibold uppercase tracking-wider",
-            webhook?.enabled ? "text-[#ffffff]" : "text-zinc-500"
-          )}>
-            {webhook?.enabled ? 'Active' : 'Off'}
-          </span>
+            >
+              <span className="sr-only">Toggle auto-scan</span>
+              <span
+                className={cn(
+                  "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition duration-200 ease-in-out",
+                  webhook?.enabled ? "translate-x-4" : "translate-x-0"
+                )}
+              />
+            </button>
+            <span className={cn(
+              "text-[10px] font-semibold uppercase tracking-wider",
+              webhook?.enabled ? "text-[#ffffff]" : "text-zinc-500"
+            )}>
+              {webhook?.enabled ? 'Active' : 'Off'}
+            </span>
+          </div>
+          {webhook?.last_event_status && (
+            <div className="flex items-center gap-1.5 mt-0.5">
+              {webhook.last_event_status === 'processing' && <CustomLoader size={10} className="text-[var(--green)]" />}
+              <span className={cn(
+                "text-[9px] max-w-[140px] truncate",
+                webhook.last_event_status === 'processing' ? "text-[var(--green)] animate-pulse" : 
+                webhook.last_event_status.startsWith('failed') ? "text-red-400" :
+                "text-zinc-500"
+              )} title={webhook.last_event_status}>
+                {webhook.last_event_status.startsWith('skipped:') ? 'Skipped: ' + webhook.last_event_status.split(':')[1] :
+                 webhook.last_event_status === 'processing' ? 'Scanning...' : 
+                 webhook.last_event_status.charAt(0).toUpperCase() + webhook.last_event_status.slice(1)}
+              </span>
+            </div>
+          )}
         </div>
       </td>
 
@@ -264,7 +281,23 @@ export default function ProjectsPage() {
     }
   }, []);
 
-  useEffect(() => { fetchRepos(); }, [fetchRepos, activeWorkspace?.id]);
+  const pollWebhooks = useCallback(async () => {
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const webhookData = await listWebhooks().catch(() => []);
+      setWebhooks(webhookData);
+    } catch (e) {
+      // Silent ignore for background polling
+    }
+  }, []);
+
+  useEffect(() => { 
+    fetchRepos(); 
+    const interval = setInterval(pollWebhooks, 5000);
+    return () => clearInterval(interval);
+  }, [fetchRepos, pollWebhooks, activeWorkspace?.id]);
 
 
   const handleConnect = useCallback(async () => {

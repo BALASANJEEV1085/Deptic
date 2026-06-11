@@ -136,45 +136,27 @@ func (h *ScanHandler) HandleGenerateDEPTIC(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to generate DEPTIC", "details": err.Error()})
 	}
 
-	// 3. Upload to E2
-	e2Client, err := storage.NewE2Client()
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to initialize storage client", "details": err.Error()})
-	}
-
-	timestamp := time.Now().UTC().Format("20060102150405")
-	filename := fmt.Sprintf("%s-%s.%s", req.Format, timestamp, ext)
-	fileKey := storage.BuildDEPTICKey(scanID, filename)
-
-	err = storage.UploadFile(c.Context(), e2Client, fileKey, fileBytes, contentType)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to upload DEPTIC", "details": err.Error()})
-	}
-
-	// 4. Save to database
+	// 3. Save to database (skip E2 upload — serve file directly)
 	depticID := uuid.New().String()
-	_, err = h.db.ExecContext(c.Context(), `
+	fileKey := fmt.Sprintf("deptics/%s/%s-%s.%s", scanID, req.Format, time.Now().UTC().Format("20060102150405"), ext)
+
+	_, dbErr := h.db.ExecContext(c.Context(), `
 		INSERT INTO deptics (id, scan_id, format, spec_version, file_key, sha256_hash, component_count)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
 		depticID, scanID, req.Format, specVersion, fileKey, sha256Hash, len(components))
-	
-	if err != nil {
-		// Log but don't fail if we uploaded successfully
-		fmt.Printf("Failed to insert deptic into db: %v\n", err)
+
+	if dbErr != nil {
+		fmt.Printf("Failed to insert deptic into db: %v\n", dbErr)
 	}
 
-	// 5. Generate presigned URL
-	downloadURL, err := storage.GetPresignedURL(context.Background(), e2Client, fileKey, time.Hour)
-	if err != nil {
-		fmt.Printf("Failed to generate presigned URL: %v\n", err)
-	}
-
-	return c.JSON(fiber.Map{
-		"deptic_id":         depticID,
-		"sha256":          sha256Hash,
-		"download_url":    downloadURL,
-		"component_count": len(components),
-	})
+	// 4. Return file directly as download
+	filename := fmt.Sprintf("%s-%s.%s", req.Format, scanID[:8], ext)
+	c.Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	c.Set("Content-Type", contentType)
+	c.Set("X-Deptic-ID", depticID)
+	c.Set("X-Deptic-SHA256", sha256Hash)
+	c.Set("X-Component-Count", fmt.Sprintf("%d", len(components)))
+	return c.Send(fileBytes)
 }
 
 // HandleDownloadDEPTIC handles GET /api/deptics/:depticID/download

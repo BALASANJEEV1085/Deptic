@@ -23,6 +23,7 @@ type WebhookRegistration struct {
 	ScanOnAllBranches  bool      `json:"scan_on_all_branches"`
 	LastTriggeredAt    *time.Time`json:"last_triggered_at"`
 	LastScanID         *string   `json:"last_scan_id"`
+	LastEventStatus    *string   `json:"last_event_status"`
 	CreatedAt          time.Time `json:"created_at"`
 }
 
@@ -83,10 +84,13 @@ func GetWebhookRegistration(ctx context.Context, db *sql.DB, id, userID string) 
 
 func GetWebhookRegistrations(ctx context.Context, db *sql.DB, userID string) ([]WebhookRegistration, error) {
 	rows, err := db.QueryContext(ctx, `
-		SELECT id, user_id, workspace_id, repo_owner, repo_name, github_hook_id, webhook_secret, enabled, auto_scan_branch, scan_on_all_branches, last_triggered_at, last_scan_id, created_at
-		FROM webhook_registrations
-		WHERE user_id = $1
-		ORDER BY created_at DESC
+		SELECT w.id, w.user_id, w.workspace_id, w.repo_owner, w.repo_name, w.github_hook_id, w.webhook_secret, w.enabled, w.auto_scan_branch, w.scan_on_all_branches, w.last_triggered_at, w.last_scan_id, w.created_at, e.status
+		FROM webhook_registrations w
+		LEFT JOIN LATERAL (
+			SELECT status FROM webhook_events WHERE webhook_id = w.id ORDER BY received_at DESC LIMIT 1
+		) e ON true
+		WHERE w.user_id = $1
+		ORDER BY w.created_at DESC
 	`, userID)
 	if err != nil {
 		return nil, fmt.Errorf("GetWebhookRegistrations: %w", err)
@@ -96,7 +100,7 @@ func GetWebhookRegistrations(ctx context.Context, db *sql.DB, userID string) ([]
 	var results []WebhookRegistration
 	for rows.Next() {
 		var r WebhookRegistration
-		if err := rows.Scan(&r.ID, &r.UserID, &r.WorkspaceID, &r.RepoOwner, &r.RepoName, &r.GithubHookID, &r.WebhookSecret, &r.Enabled, &r.AutoScanBranch, &r.ScanOnAllBranches, &r.LastTriggeredAt, &r.LastScanID, &r.CreatedAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.UserID, &r.WorkspaceID, &r.RepoOwner, &r.RepoName, &r.GithubHookID, &r.WebhookSecret, &r.Enabled, &r.AutoScanBranch, &r.ScanOnAllBranches, &r.LastTriggeredAt, &r.LastScanID, &r.CreatedAt, &r.LastEventStatus); err != nil {
 			return nil, err
 		}
 		results = append(results, r)

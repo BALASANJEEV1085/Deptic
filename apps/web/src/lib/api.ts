@@ -341,7 +341,7 @@ export async function getAllVulnerabilities(): Promise<AllVulnerabilitiesRespons
   return response.json();
 }
 
-export async function generateDEPTIC(scanId: string, format: string): Promise<{ deptic_id: string; sha256: string; download_url: string; component_count: number }> {
+export async function generateDEPTIC(scanId: string, format: string): Promise<{ deptic_id: string; sha256: string; blob: Blob; filename: string; component_count: number }> {
   const headers = await getAuthHeaders();
   const response = await fetch(`${API_URL}/scans/${scanId}/deptic`, {
     method: 'POST',
@@ -349,7 +349,17 @@ export async function generateDEPTIC(scanId: string, format: string): Promise<{ 
     body: JSON.stringify({ format })
   });
   if (!response.ok) throw new Error('Failed to generate DEPTIC');
-  return response.json();
+  const blob = await response.blob();
+  const cd = response.headers.get('Content-Disposition') || '';
+  const match = cd.match(/filename="([^"]+)"/);
+  const filename = match?.[1] ?? `${format}-${scanId.slice(0, 8)}.${format === 'spdx' ? 'spdx' : 'json'}`;
+  return {
+    deptic_id: response.headers.get('X-Deptic-ID') || '',
+    sha256: response.headers.get('X-Deptic-SHA256') || '',
+    blob,
+    filename,
+    component_count: parseInt(response.headers.get('X-Component-Count') || '0', 10),
+  };
 }
 
 export async function createShareLink(depticId: string, label: string, expiresInDays: number): Promise<{ share_url: string; expires_at: string; label: string }> {
@@ -751,11 +761,13 @@ export interface WebhookRegistration {
   id: string;
   repo_owner: string;
   repo_name: string;
+  github_hook_id: number;
   enabled: boolean;
   auto_scan_branch: string;
   scan_on_all_branches: boolean;
   last_triggered_at: string | null;
   last_scan_id: string | null;
+  last_event_status?: string;
   created_at: string;
 }
 

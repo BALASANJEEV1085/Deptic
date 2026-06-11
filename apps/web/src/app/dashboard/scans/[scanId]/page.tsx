@@ -116,12 +116,14 @@ export default function ScanResultsPage() {
       } else {
         const res = await generateDEPTIC(scanId, format);
         setLastDepticId(res.deptic_id);
+        const url = URL.createObjectURL(res.blob);
         const link = document.createElement("a");
-        link.href = res.download_url;
-        link.setAttribute("download", "");
+        link.href = url;
+        link.setAttribute("download", res.filename);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(url);
         showToast("Artifact generated successfully");
       }
     } catch (err: any) {
