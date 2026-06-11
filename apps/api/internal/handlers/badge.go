@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -239,15 +238,7 @@ func (h *BadgeHandler) AddBadgeToReadme(c *fiber.Ctx) error {
 	repo := req.RepoName
 
 	// 1. Get GitHub Token
-	githubToken := c.Get("X-GitHub-Token")
-	if githubToken == "" {
-		var providerToken sql.NullString
-		h.db.QueryRowContext(c.Context(), "SELECT identity_data->>'provider_token' FROM auth.identities WHERE user_id = $1 AND provider = 'github' LIMIT 1", userID).Scan(&providerToken)
-		githubToken = providerToken.String
-	}
-	if githubToken == "" {
-		githubToken = os.Getenv("GITHUB_TOKEN")
-	}
+	githubToken := ResolveGitHubToken(c, h.db, userID)
 	if githubToken == "" {
 		return c.Status(401).JSON(fiber.Map{"error": "GitHub not connected"})
 	}

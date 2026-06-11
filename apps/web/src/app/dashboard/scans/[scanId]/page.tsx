@@ -487,7 +487,7 @@ export default function ScanResultsPage() {
               </div>
             </div>
           ) : (
-            <div className="rounded-xl border border-border bg-card overflow-x-auto shadow-2xl">
+            <div className="rounded-xl border border-border bg-background overflow-x-auto shadow-2xl">
               <Table>
                 <TableHeader className="bg-muted/20">
                   <TableRow className="border-border">
@@ -511,7 +511,7 @@ export default function ScanResultsPage() {
           {createdPRs.length > 0 && (
             <div className="mt-8 space-y-4">
               <h2 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] px-1">Fix PRs Created</h2>
-              <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <div className="rounded-xl border border-border bg-background overflow-hidden">
                 <Table>
                   <TableHeader className="bg-muted/20">
                     <TableRow className="border-border">
@@ -918,7 +918,7 @@ export default function ScanResultsPage() {
             </div>
           )}
 
-          <div className="rounded-xl border border-border bg-card overflow-x-auto shadow-2xl">
+          <div className="rounded-xl border border-border bg-background overflow-x-auto shadow-2xl">
             <Table>
               <TableHeader className="bg-muted/20">
                 <TableRow className="border-border">

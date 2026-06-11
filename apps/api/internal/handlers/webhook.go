@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -188,12 +187,7 @@ func (wh *WebhookHandler) HandleGitHubWebhook(c *fiber.Ctx) error {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 		defer cancel()
 
-		var providerToken sql.NullString
-		wh.db.QueryRowContext(ctx, "SELECT identity_data->>'provider_token' FROM auth.identities WHERE user_id = $1 AND provider = 'github' LIMIT 1", reg.UserID).Scan(&providerToken)
-		githubToken := providerToken.String
-		if githubToken == "" {
-			githubToken = os.Getenv("GITHUB_TOKEN")
-		}
+		githubToken := ResolveGitHubToken(nil, wh.db, reg.UserID)
 		if githubToken == "" {
 			fmt.Printf("Webhook scan failed for %s/%s: no github token available\n", owner, repo)
 			db.UpdateWebhookEvent(ctx, wh.db, eventID, "", "failed: no github token")
@@ -246,13 +240,7 @@ func (wh *WebhookHandler) HandleRegisterWebhook(c *fiber.Ctx) error {
 	}
 
 	// Fetch GitHub OAuth token
-	githubToken := c.Get("X-GitHub-Token")
-	if githubToken == "" {
-		var providerToken sql.NullString
-		if err := wh.db.QueryRowContext(c.Context(), "SELECT identity_data->>'provider_token' FROM auth.identities WHERE user_id = $1 AND provider = 'github' LIMIT 1", userID).Scan(&providerToken); err == nil {
-			githubToken = providerToken.String
-		}
-	}
+	githubToken := ResolveGitHubToken(c, wh.db, userID)
 	if githubToken == "" {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "No GitHub token found. Please log in with GitHub again."})
 	}
@@ -313,13 +301,7 @@ func (wh *WebhookHandler) HandleDeleteWebhook(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Webhook not found"})
 	}
 
-	githubToken := c.Get("X-GitHub-Token")
-	if githubToken == "" {
-		var providerToken sql.NullString
-		wh.db.QueryRowContext(c.Context(), "SELECT identity_data->>'provider_token' FROM auth.identities WHERE user_id = $1 AND provider = 'github' LIMIT 1", userID).Scan(&providerToken)
-		githubToken = providerToken.String
-	}
-
+	githubToken := ResolveGitHubToken(c, wh.db, userID)
 	if githubToken != "" {
 		ghClient := github.NewClient(githubToken)
 		_ = ghClient.DeleteWebhook(c.Context(), reg.RepoOwner, reg.RepoName, reg.GithubHookID)
@@ -348,13 +330,7 @@ func (wh *WebhookHandler) HandleToggleWebhook(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Webhook not found"})
 	}
 
-	githubToken := c.Get("X-GitHub-Token")
-	if githubToken == "" {
-		var providerToken sql.NullString
-		wh.db.QueryRowContext(c.Context(), "SELECT identity_data->>'provider_token' FROM auth.identities WHERE user_id = $1 AND provider = 'github' LIMIT 1", userID).Scan(&providerToken)
-		githubToken = providerToken.String
-	}
-
+	githubToken := ResolveGitHubToken(c, wh.db, userID)
 	if githubToken != "" {
 		ghClient := github.NewClient(githubToken)
 		if err := ghClient.UpdateWebhookStatus(c.Context(), reg.RepoOwner, reg.RepoName, reg.GithubHookID, req.Active); err != nil {

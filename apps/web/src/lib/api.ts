@@ -129,6 +129,7 @@ export interface WorkspaceInvitation {
   invited_by: string;
   expires_at: string;
   created_at: string;
+  declined?: boolean;
 }
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api';
@@ -153,7 +154,7 @@ export async function getAuthHeaders() {
     }
   }
 
-  if (session?.provider_token) {
+  if (typeof session?.provider_token === 'string' && session.provider_token.startsWith('gh')) {
     headers['X-GitHub-Token'] = session.provider_token;
   }
 
@@ -197,7 +198,7 @@ export async function getScan(scanId: string): Promise<GetScanResponse> {
 
   // Pass the live GitHub OAuth token so the backend can verify push access
   // using a fresh token rather than the potentially-stale one in the DB
-  if (session?.provider_token) {
+  if (typeof session?.provider_token === 'string' && session.provider_token.startsWith('gh')) {
     headers['X-GitHub-Token'] = session.provider_token;
   }
 
@@ -465,7 +466,7 @@ export async function listGitHubRepos(): Promise<{ repositories: GitHubRepositor
 
   // Pass the live provider_token (GitHub OAuth) so backend doesn't use the stale DB token
   const headers: Record<string, string> = { ...authHeaders };
-  if (session?.provider_token) {
+  if (typeof session?.provider_token === 'string' && session.provider_token.startsWith('gh')) {
     headers['X-GitHub-Token'] = session.provider_token;
   }
 
@@ -497,7 +498,7 @@ export async function addBadgeToReadme(repo_owner: string, repo_name: string): P
     'Content-Type': 'application/json' 
   };
   
-  if (session?.provider_token) {
+  if (typeof session?.provider_token === 'string' && session.provider_token.startsWith('gh')) {
     headers['X-GitHub-Token'] = session.provider_token;
   }
 
@@ -727,6 +728,19 @@ export async function acceptInvitation(token: string): Promise<{ workspace_id: s
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || 'Failed to accept invitation');
+  }
+  return res.json();
+}
+
+export async function declineInvitation(token: string): Promise<{ success: boolean }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/invite/${token}/decline`, {
+    method: 'POST',
+    headers,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to decline invitation');
   }
   return res.json();
 }

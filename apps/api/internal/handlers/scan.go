@@ -167,6 +167,7 @@ func RegisterRoutes(api fiber.Router, database *sql.DB, redisClient *redis.Clien
 
 	// Invitation accept route (JWT-protected)
 	api.Post("/invite/:token/accept", wh.HandleAcceptInvitation)
+	api.Post("/invite/:token/decline", wh.HandleDeclineInvitation)
 
 	// Register Workspace routes
 	wh.RegisterRoutes(api)
@@ -203,6 +204,7 @@ func RegisterRoutes(api fiber.Router, database *sql.DB, redisClient *redis.Clien
 	api.Get("/projects", h.HandleListProjects)
 	api.Get("/projects/:projectID/scans", h.HandleListScans)
 	api.Get("/github/repos", h.HandleListGitHubRepos)
+	api.Post("/github/save-token", h.HandleSaveGitHubToken)
 	api.Get("/dashboard/stats", h.HandleGetDashboardStats)
 	api.Get("/deptics/:depticID/download", h.HandleDownloadDEPTIC)
 	api.Post("/deptics/:depticID/share", h.HandleCreateShareLink)
@@ -254,21 +256,7 @@ func (h *ScanHandler) HandleCreateScan(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid GitHub URL"})
 	}
 
-	// Fetch GitHub OAuth token - try multiple sources
-	githubToken := c.Get("X-GitHub-Token")
-	if githubToken == "" {
-		var providerToken sql.NullString
-		_ = h.db.QueryRowContext(c.Context(), `
-			SELECT identity_data->>'provider_token' 
-			FROM auth.identities 
-			WHERE user_id = $1 AND provider = 'github'
-			LIMIT 1
-		`, userID).Scan(&providerToken)
-		githubToken = providerToken.String
-	}
-	if githubToken == "" {
-		githubToken = os.Getenv("GITHUB_TOKEN")
-	}
+	githubToken := ResolveGitHubToken(c, h.db, userID)
 
 	wsID, err := workspace.VerifyWorkspaceAccess(c, h.db, workspace.PermCreateScan)
 	if err != nil {
@@ -743,23 +731,8 @@ func (h *ScanHandler) HandleGetScan(c *fiber.Ctx) error {
 		h.db.QueryRowContext(c.Context(), "SELECT EXISTS(SELECT 1 FROM projects WHERE id=$1 AND user_id=$2)", scan.ProjectID, userID).Scan(&isOwner)
 
 		// Check if user has push access to the scanned GitHub repo.
-		// Prefer the live X-GitHub-Token header (sent from the active session by the frontend)
-		// over the potentially-stale token stored in auth.identities.
 		if scan.RepoURL != "" && strings.Contains(scan.RepoURL, "github.com") {
-			githubToken := c.Get("X-GitHub-Token") // live token from frontend session
-
-			if githubToken == "" {
-				// Fallback: try the token stored in Supabase auth.identities
-				var providerToken sql.NullString
-				if err := h.db.QueryRowContext(c.Context(), `
-					SELECT identity_data->>'provider_token'
-					FROM auth.identities
-					WHERE user_id = $1 AND provider = 'github'
-					LIMIT 1
-				`, userID).Scan(&providerToken); err == nil && providerToken.Valid {
-					githubToken = providerToken.String
-				}
-			}
+			githubToken := ResolveGitHubToken(c, h.db, userID)
 
 			if githubToken != "" {
 				owner, repo, parseErr := github.ParseRepoURL(scan.RepoURL)
@@ -1415,37 +1388,7 @@ func (h *ScanHandler) HandleGetAllVulnerabilities(c *fiber.Ctx) error {
 func (h *ScanHandler) HandleListGitHubRepos(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 
-	// Prefer fresh token passed from the frontend session (avoids stale DB token)
-	githubToken := c.Get("X-GitHub-Token")
-
-	if githubToken == "" {
-		// Fallback: fetch from Supabase auth.identities
-		var providerToken sql.NullString
-		dbErr := h.db.QueryRowContext(c.Context(), `
-			SELECT identity_data->>'provider_token' 
-			FROM auth.identities 
-			WHERE user_id = $1 AND provider = 'github'
-			LIMIT 1
-		`, userID).Scan(&providerToken)
-
-		if dbErr != nil && dbErr != sql.ErrNoRows {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch GitHub token"})
-		}
-		githubToken = providerToken.String
-	}
-
-	if githubToken == "" {
-		// Check if user logged in via GitHub - if so, use GITHUB_TOKEN env as fallback
-		var provider string
-		h.db.QueryRowContext(c.Context(), `
-			SELECT provider FROM auth.identities 
-			WHERE user_id = $1 AND provider = 'github' LIMIT 1
-		`, userID).Scan(&provider)
-
-		if provider == "github" {
-			githubToken = os.Getenv("GITHUB_TOKEN")
-		}
-	}
+	githubToken := ResolveGitHubToken(c, h.db, userID)
 
 	if githubToken == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "GitHub not connected"})
@@ -1465,3 +1408,88 @@ func (h *ScanHandler) HandleListGitHubRepos(c *fiber.Ctx) error {
 		"repositories": repos,
 	})
 }
+
+// ResolveGitHubToken attempts to retrieve a valid GitHub OAuth token for the user
+func ResolveGitHubToken(c *fiber.Ctx, db *sql.DB, userID string) string {
+	// 1. Prefer live token passed from frontend session
+	var githubToken string
+	if c != nil {
+		githubToken = c.Get("X-GitHub-Token")
+	}
+	if githubToken != "" {
+		return githubToken
+	}
+
+	var ctx context.Context
+	if c != nil {
+		ctx = c.Context()
+	} else {
+		ctx = context.Background()
+	}
+
+	// 2. Check our persisted tokens table
+	var storedToken string
+	err := db.QueryRowContext(ctx, `SELECT token FROM user_github_tokens WHERE user_id = $1`, userID).Scan(&storedToken)
+	if err == nil && storedToken != "" {
+		fmt.Printf("[DEBUG] ResolveGitHubToken: Found token in user_github_tokens for user %s\n", userID)
+		return storedToken
+	} else {
+		fmt.Printf("[DEBUG] ResolveGitHubToken: No token in user_github_tokens for user %s (err: %v)\n", userID, err)
+	}
+
+	// 3. Fallback: fetch from Supabase auth.identities (legacy)
+	var providerToken sql.NullString
+	_ = db.QueryRowContext(ctx, `
+		SELECT identity_data->>'provider_token' 
+		FROM auth.identities 
+		WHERE user_id = $1 AND provider = 'github'
+		LIMIT 1
+	`, userID).Scan(&providerToken)
+	
+	if providerToken.String != "" {
+		fmt.Printf("[DEBUG] ResolveGitHubToken: Found legacy token in auth.identities for user %s\n", userID)
+		return providerToken.String
+	}
+
+	// 4. Final Fallback: environment variable if the user has connected GitHub
+	var provider string
+	_ = db.QueryRowContext(ctx, `
+		SELECT provider FROM auth.identities 
+		WHERE user_id = $1 AND provider = 'github' LIMIT 1
+	`, userID).Scan(&provider)
+
+	if provider == "github" {
+		return os.Getenv("GITHUB_TOKEN")
+	}
+
+	return ""
+}
+
+// HandleSaveGitHubToken handles POST /api/github/save-token
+func (h *ScanHandler) HandleSaveGitHubToken(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	
+	var req struct {
+		Token string `json:"token"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	if req.Token == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "token is required"})
+	}
+
+	_, err := h.db.ExecContext(c.Context(), `
+		INSERT INTO user_github_tokens (user_id, token, updated_at)
+		VALUES ($1, $2, NOW())
+		ON CONFLICT (user_id) DO UPDATE SET token = EXCLUDED.token, updated_at = NOW()
+	`, userID, req.Token)
+
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to save token"})
+	}
+
+	return c.JSON(fiber.Map{"success": true})
+}
+

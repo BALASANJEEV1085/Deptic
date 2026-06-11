@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { getInvitationPublic, acceptInvitation } from '@/lib/api'
+import { getInvitationPublic, acceptInvitation, declineInvitation } from '@/lib/api'
 import { Users, Building, ShieldAlert, CheckCircle, Mail, Shield } from 'lucide-react'
 import { CustomLoader } from '@/components/custom-loader'
 import { Button } from '@/components/ui/button'
@@ -24,6 +24,8 @@ export default function InvitationPage() {
   } | null>(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [declined, setDeclined] = useState(false)
+  const [declining, setDeclining] = useState(false)
 
   useEffect(() => {
     const init = async () => {
@@ -121,6 +123,16 @@ export default function InvitationPage() {
               Redirecting you to your dashboard...
             </p>
           </div>
+        ) : declined ? (
+          <div className="text-center py-6">
+            <div className="h-12 w-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
+              <ShieldAlert className="h-6 w-6 text-red-400" />
+            </div>
+            <h2 className="text-base font-bold text-foreground mb-2">Invitation Declined</h2>
+            <p className="text-xs text-zinc-500 font-mono">
+              Redirecting you to your dashboard...
+            </p>
+          </div>
         ) : (
           <div className="text-center">
             <div className="h-12 w-12 rounded-full bg-[#ffffff]/10 border border-[#ffffff]/20 flex items-center justify-center mx-auto mb-6">
@@ -173,9 +185,21 @@ export default function InvitationPage() {
               </Button>
               <Button
                 variant="ghost"
-                onClick={() => router.push('/dashboard')}
+                onClick={async () => {
+                  setDeclining(true)
+                  try {
+                    await declineInvitation(token)
+                    setDeclined(true)
+                    setTimeout(() => router.push('/dashboard'), 1500)
+                  } catch (err: any) {
+                    setError(err.message || 'Failed to decline invitation')
+                    setDeclining(false)
+                  }
+                }}
+                disabled={declining}
                 className="w-full hover:bg-muted text-zinc-500 hover:text-foreground text-xs h-9"
               >
+                {declining && <CustomLoader size={14} className="mr-2" />}
                 Decline
               </Button>
             </div>

@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -99,18 +98,7 @@ func (h *ScanHandler) HandleCreateFixPR(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid repository URL in scan"})
 	}
 
-	var providerToken sql.NullString
-	err = h.db.QueryRowContext(c.Context(), `
-		SELECT identity_data->>'provider_token' 
-		FROM auth.identities 
-		WHERE user_id = $1 AND provider = 'github'
-		LIMIT 1
-	`, userID).Scan(&providerToken)
-	
-	ghToken := providerToken.String
-	if !providerToken.Valid || ghToken == "" {
-		ghToken = os.Getenv("GITHUB_TOKEN")
-	}
+	ghToken := ResolveGitHubToken(c, h.db, userID)
 	if ghToken == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "GitHub account not connected. Please sign in with GitHub."})
 	}

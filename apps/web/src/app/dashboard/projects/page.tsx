@@ -246,7 +246,10 @@ export default function ProjectsPage() {
 
       const [repoData, webhookData] = await Promise.all([
         listGitHubRepos(),
-        listWebhooks().catch(() => []) // Webhooks might fail if no permissions, we can just return []
+        listWebhooks().catch((err) => {
+          console.error("Failed to fetch webhooks:", err);
+          return [];
+        })
       ]);
       setRepos(repoData.repositories as GitHubRepo[]);
       setWebhooks(webhookData);
@@ -266,16 +269,26 @@ export default function ProjectsPage() {
 
   const handleConnect = useCallback(async () => {
     setConnectingOAuth(true);
-    const supabase = createClient();
-    const { error: e } = await supabase.auth.signInWithOAuth({
-      provider: 'github',
-      options: {
-        redirectTo: `${window.location.origin}/dashboard/projects`,
-        scopes: 'repo read:user read:org admin:repo_hook',
-        queryParams: { prompt: 'consent' },
-      },
-    });
-    if (e) { setError(e.message); setConnectingOAuth(false); }
+    try {
+      const supabase = createClient();
+      const { data, error: e } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=/dashboard/projects`,
+          scopes: 'repo read:user read:org admin:repo_hook',
+          queryParams: { prompt: 'consent' },
+        },
+      });
+      if (e) {
+        setError(e.message);
+        setConnectingOAuth(false);
+      } else if (data?.url) {
+        window.location.assign(data.url);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to connect GitHub');
+      setConnectingOAuth(false);
+    }
   }, []);
 
   const handleScan = useCallback((url: string) => {
@@ -472,7 +485,10 @@ export default function ProjectsPage() {
                 <tbody className="divide-y divide-white/[0.03]">
                   {visible.map(repo => {
                     const [owner, name] = repo.full_name.split('/');
-                    const wh = webhooks.find(w => w.repo_owner === owner && w.repo_name === name);
+                    const wh = webhooks.find(w => 
+                      w.repo_owner.toLowerCase() === owner.toLowerCase() && 
+                      w.repo_name.toLowerCase() === name.toLowerCase()
+                    );
                     return (
                       <RepoRow key={repo.id} repo={repo} webhook={wh} onToggleWebhook={handleToggleWebhook} onScan={handleScan} />
                     );

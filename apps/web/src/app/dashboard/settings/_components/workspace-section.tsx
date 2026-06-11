@@ -401,7 +401,14 @@ export function WorkspaceSettingsSection() {
             {invitations.map(invite => (
               <div key={invite.id} className="flex items-center justify-between p-3 bg-background/30">
                 <div>
-                  <p className="text-xs font-medium text-foreground">{invite.email}</p>
+                  <p className="text-xs font-medium text-foreground flex items-center gap-2">
+                    {invite.email}
+                    {invite.declined && (
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded">
+                        Declined
+                      </span>
+                    )}
+                  </p>
                   <p className="text-[9px] text-zinc-500 mt-0.5">Role: <span className="capitalize">{invite.role}</span></p>
                 </div>
                 {canManage && (

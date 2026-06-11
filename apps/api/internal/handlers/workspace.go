@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/big"
 	"regexp"
 	"strings"
@@ -677,12 +678,18 @@ func (h *WorkspaceHandler) HandleListInvitations(c *fiber.Ctx) error {
 	wsID := c.Locals("workspace_id").(string)
 
 	rows, err := h.db.QueryContext(c.Context(), `
-		SELECT id, email, role, invited_by, created_at, expires_at
-		FROM workspace_invitations
-		WHERE workspace_id = $1 AND accepted = FALSE AND expires_at > NOW()
-		ORDER BY created_at DESC
+		SELECT i.id, i.email, i.role, i.invited_by, i.created_at, i.expires_at, i.declined_at
+		FROM workspace_invitations i
+		WHERE i.workspace_id = $1 AND i.accepted = FALSE AND i.expires_at > NOW()
+		  AND NOT EXISTS (
+		      SELECT 1 FROM workspace_members wm 
+		      JOIN auth.users u ON wm.user_id = u.id 
+		      WHERE wm.workspace_id = i.workspace_id AND u.email = i.email
+		  )
+		ORDER BY i.created_at DESC
 	`, wsID)
 	if err != nil {
+		log.Printf("HandleListInvitations Query Error: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch invitations"})
 	}
 	defer rows.Close()
@@ -690,7 +697,9 @@ func (h *WorkspaceHandler) HandleListInvitations(c *fiber.Ctx) error {
 	var list []fiber.Map
 	for rows.Next() {
 		var id, email, role, invitedBy, createdAt, expiresAt string
-		if err := rows.Scan(&id, &email, &role, &invitedBy, &createdAt, &expiresAt); err == nil {
+		var declinedAt sql.NullString
+		if err := rows.Scan(&id, &email, &role, &invitedBy, &createdAt, &expiresAt, &declinedAt); err == nil {
+			isDeclined := declinedAt.Valid && declinedAt.String != ""
 			list = append(list, fiber.Map{
 				"id":         id,
 				"email":      email,
@@ -698,6 +707,7 @@ func (h *WorkspaceHandler) HandleListInvitations(c *fiber.Ctx) error {
 				"invited_by": invitedBy,
 				"created_at": createdAt,
 				"expires_at": expiresAt,
+				"declined":   isDeclined,
 			})
 		}
 	}
@@ -806,6 +816,14 @@ func (h *WorkspaceHandler) HandleAcceptInvitation(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to join workspace: " + err.Error()})
 	}
 
+	// Mark invitation as accepted
+	_, err = tx.ExecContext(c.Context(), `
+		UPDATE workspace_invitations SET accepted = TRUE WHERE token = $1
+	`, token)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to mark invitation as accepted: " + err.Error()})
+	}
+
 	// Log activity
 	_, _ = tx.ExecContext(c.Context(), `
 		INSERT INTO workspace_activity (workspace_id, user_id, action, resource_type, resource_id, metadata)
@@ -841,6 +859,36 @@ func (h *WorkspaceHandler) HandleAcceptInvitation(c *fiber.Ctx) error {
 	}()
 
 	return c.JSON(fiber.Map{"success": true, "workspace_id": wsID})
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// POST /api/invite/:token/decline (JWT-protected)
+// ────────────────────────────────────────────────────────────────────────────
+
+func (h *WorkspaceHandler) HandleDeclineInvitation(c *fiber.Ctx) error {
+	token := c.Params("token")
+
+	var expiresAt time.Time
+	err := h.db.QueryRowContext(c.Context(), `
+		SELECT expires_at FROM workspace_invitations WHERE token = $1
+	`, token).Scan(&expiresAt)
+
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Invalid invitation token"})
+	}
+
+	if time.Now().After(expiresAt) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invitation has expired"})
+	}
+
+	_, err = h.db.ExecContext(c.Context(), `
+		UPDATE workspace_invitations SET declined_at = NOW() WHERE token = $1
+	`, token)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to decline invitation"})
+	}
+
+	return c.JSON(fiber.Map{"success": true})
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -952,6 +1000,11 @@ func (h *WorkspaceHandler) HandleListWorkspaceIntegrations(c *fiber.Ctx) error {
 func (h *WorkspaceHandler) HandleSaveWorkspaceSlack(c *fiber.Ctx) error {
 	wsID := c.Locals("workspace_id").(string)
 	userID := c.Locals("user_id").(string)
+	role := c.Locals("workspace_role").(string)
+
+	if role != string(workspace.RoleOwner) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Only the workspace owner can manage integrations"})
+	}
 
 	var req notify.SlackConfig
 	if err := c.BodyParser(&req); err != nil || req.WebhookURL == "" || req.Channel == "" {
@@ -986,6 +1039,11 @@ func (h *WorkspaceHandler) HandleSaveWorkspaceSlack(c *fiber.Ctx) error {
 func (h *WorkspaceHandler) HandleSaveWorkspaceJira(c *fiber.Ctx) error {
 	wsID := c.Locals("workspace_id").(string)
 	userID := c.Locals("user_id").(string)
+	role := c.Locals("workspace_role").(string)
+
+	if role != string(workspace.RoleOwner) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Only the workspace owner can manage integrations"})
+	}
 
 	var req notify.JiraConfig
 	if err := c.BodyParser(&req); err != nil || req.BaseURL == "" || req.Email == "" || req.ProjectKey == "" {

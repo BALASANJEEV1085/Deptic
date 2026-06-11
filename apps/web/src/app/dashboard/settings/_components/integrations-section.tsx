@@ -6,11 +6,17 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
-import { ExternalLink, CheckCircle2, XCircle } from 'lucide-react'
+import { ExternalLink, CheckCircle2, XCircle, Lock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useWorkspace } from '@/lib/contexts/workspace-context'
 
 export function IntegrationsSection({ user, loading }: { user: User | null; loading: boolean }) {
   const supabase = createClient()
+  const { activeWorkspace } = useWorkspace()
+  const isPersonal = activeWorkspace?.is_personal === true || activeWorkspace?.description === 'Default Personal Workspace'
+  const userRole = activeWorkspace?.role || 'viewer'
+  const isOwner = userRole === 'owner'
+  const canManage = isPersonal || isOwner
   const [integrations, setIntegrations] = useState<any[]>([])
   const [slackUrl, setSlackUrl] = useState('')
   const [slackChannel, setSlackChannel] = useState('')
@@ -24,13 +30,19 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
 
   useEffect(() => {
     fetchIntegrations()
-  }, [user])
+  }, [user, activeWorkspace?.id])
 
   const fetchIntegrations = async () => {
     if (!user) return
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch('http://localhost:8081/api/integrations', {
+      let url: string
+      if (!isPersonal && activeWorkspace) {
+        url = `http://localhost:8081/api/workspaces/${activeWorkspace.id}/integrations`
+      } else {
+        url = 'http://localhost:8081/api/integrations'
+      }
+      const res = await fetch(url, {
         headers: { 'Authorization': `Bearer ${session?.access_token}` }
       })
       if (res.ok) {
@@ -54,7 +66,13 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
         ? { webhook_url: integrations.find(i => i.type === 'slack').config.webhook_url, channel: integrations.find(i => i.type === 'slack').config.channel }
         : { webhook_url: slackUrl, channel: slackChannel }
 
-      const res = await fetch('http://localhost:8081/api/integrations/slack', {
+      let url: string
+      if (!isPersonal && activeWorkspace) {
+        url = `http://localhost:8081/api/workspaces/${activeWorkspace.id}/integrations/slack`
+      } else {
+        url = 'http://localhost:8081/api/integrations/slack'
+      }
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -95,7 +113,13 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
           }
         : { base_url: jiraUrl, email: jiraEmail, api_token: jiraToken, project_key: jiraProject }
 
-      const res = await fetch('http://localhost:8081/api/integrations/jira', {
+      let url: string
+      if (!isPersonal && activeWorkspace) {
+        url = `http://localhost:8081/api/workspaces/${activeWorkspace.id}/integrations/jira`
+      } else {
+        url = 'http://localhost:8081/api/integrations/jira'
+      }
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -119,9 +143,16 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
   }
 
   const handleDisconnect = async (type: string) => {
+    if (!canManage) return
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`http://localhost:8081/api/integrations/${type}`, {
+      let url: string
+      if (!isPersonal && activeWorkspace) {
+        url = `http://localhost:8081/api/workspaces/${activeWorkspace.id}/integrations/${type}`
+      } else {
+        url = `http://localhost:8081/api/integrations/${type}`
+      }
+      const res = await fetch(url, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${session?.access_token}` }
       })
@@ -132,9 +163,16 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
   }
 
   const handleToggle = async (type: string) => {
+    if (!canManage) return
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`http://localhost:8081/api/integrations/${type}/toggle`, {
+      let url: string
+      if (!isPersonal && activeWorkspace) {
+        url = `http://localhost:8081/api/workspaces/${activeWorkspace.id}/integrations/${type}/toggle`
+      } else {
+        url = `http://localhost:8081/api/integrations/${type}/toggle`
+      }
+      const res = await fetch(url, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${session?.access_token}` }
       })
@@ -153,6 +191,12 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
 
   return (
     <div className="space-y-6">
+      {!canManage && (
+        <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 p-4 rounded-xl text-sm font-medium flex items-center gap-3">
+          <Lock className="h-5 w-5 shrink-0" />
+          <span>Only the workspace owner can manage integrations. You can view the current configuration below.</span>
+        </div>
+      )}
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl text-sm font-medium flex items-center gap-3">
           <XCircle className="h-5 w-5" />
@@ -168,7 +212,7 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Slack Integration */}
-        <Card className="bg-card border-border shadow-xl overflow-hidden group hover:border-[#ffffff]/30 transition-colors">
+        <Card className="bg-background border-border shadow-xl overflow-hidden group hover:border-[#ffffff]/30 transition-colors">
           <CardHeader className="border-b border-border bg-muted/20">
             <div className="flex items-start justify-between">
               <div>
@@ -202,16 +246,21 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
                   <Switch 
                     checked={slackConfig.enabled} 
                     onCheckedChange={() => handleToggle('slack')}
+                    disabled={!canManage}
                     className="data-[state=checked]:bg-[#4ade80]"
                   />
                 </div>
                 <div className="pt-2 flex items-center justify-between">
-                  <Button variant="outline" className="h-8 text-xs font-semibold bg-muted border-border text-foreground hover:bg-muted hover:text-foreground" onClick={handleConnectSlack}>
-                    Send Test Message
-                  </Button>
-                  <button onClick={() => handleDisconnect('slack')} className="text-[11px] text-red-400 hover:text-red-300 font-semibold tracking-wide transition-colors">
-                    Disconnect
-                  </button>
+                  {canManage && (
+                    <Button variant="outline" className="h-8 text-xs font-semibold bg-muted border-border text-foreground hover:bg-muted hover:text-foreground" onClick={handleConnectSlack}>
+                      Send Test Message
+                    </Button>
+                  )}
+                  {canManage && (
+                    <button onClick={() => handleDisconnect('slack')} className="text-[11px] text-red-400 hover:text-red-300 font-semibold tracking-wide transition-colors">
+                      Disconnect
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
@@ -239,7 +288,7 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
                   />
                 </div>
                 <div className="pt-2">
-                  <Button type="submit" disabled={saving} className="w-full bg-white text-black hover:bg-zinc-200 font-bold h-10 shadow-[0_0_20px_rgba(255,255,255,0.1)]">
+                  <Button type="submit" disabled={saving || !canManage} className="w-full bg-white text-black hover:bg-zinc-200 font-bold h-10 shadow-[0_0_20px_rgba(255,255,255,0.1)] disabled:opacity-50">
                     {saving ? 'Connecting...' : 'Connect Slack'}
                   </Button>
                   <a href="https://api.slack.com/messaging/webhooks" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 mt-4 text-[11px] text-zinc-500 hover:text-[#ffffff] transition-colors">
@@ -252,7 +301,7 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
         </Card>
 
         {/* Jira Integration */}
-        <Card className="bg-card border-border shadow-xl overflow-hidden group hover:border-blue-500/30 transition-colors">
+        <Card className="bg-background border-border shadow-xl overflow-hidden group hover:border-blue-500/30 transition-colors">
           <CardHeader className="border-b border-border bg-muted/20">
             <div className="flex items-start justify-between">
               <div>
@@ -286,16 +335,21 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
                   <Switch 
                     checked={jiraConfig.enabled} 
                     onCheckedChange={() => handleToggle('jira')}
+                    disabled={!canManage}
                     className="data-[state=checked]:bg-blue-500"
                   />
                 </div>
                 <div className="pt-2 flex items-center justify-between">
-                  <Button variant="outline" className="h-8 text-xs font-semibold bg-muted border-border text-foreground hover:bg-muted hover:text-foreground" onClick={handleConnectJira}>
-                    Create Test Ticket
-                  </Button>
-                  <button onClick={() => handleDisconnect('jira')} className="text-[11px] text-red-400 hover:text-red-300 font-semibold tracking-wide transition-colors">
-                    Disconnect
-                  </button>
+                  {canManage && (
+                    <Button variant="outline" className="h-8 text-xs font-semibold bg-muted border-border text-foreground hover:bg-muted hover:text-foreground" onClick={handleConnectJira}>
+                      Create Test Ticket
+                    </Button>
+                  )}
+                  {canManage && (
+                    <button onClick={() => handleDisconnect('jira')} className="text-[11px] text-red-400 hover:text-red-300 font-semibold tracking-wide transition-colors">
+                      Disconnect
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
@@ -347,7 +401,7 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
                   />
                 </div>
                 <div className="pt-2">
-                  <Button type="submit" disabled={saving} className="w-full bg-blue-600 hover:bg-blue-500 text-foreground font-bold h-10 shadow-[0_0_20px_rgba(37,99,235,0.2)]">
+                  <Button type="submit" disabled={saving || !canManage} className="w-full bg-blue-600 hover:bg-blue-500 text-foreground font-bold h-10 shadow-[0_0_20px_rgba(37,99,235,0.2)] disabled:opacity-50">
                     {saving ? 'Connecting...' : 'Connect Jira'}
                   </Button>
                   <a href="https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 mt-4 text-[11px] text-zinc-500 hover:text-blue-400 transition-colors">
