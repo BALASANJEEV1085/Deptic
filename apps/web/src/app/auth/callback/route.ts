@@ -34,7 +34,7 @@ export async function GET(request: Request) {
       
       if (session.provider_token && isGitHubToken) {
         try {
-          const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api';
+          const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'https://deptic-api.onrender.com/api';
           await fetch(`${backendUrl}/github/save-token`, {
             method: 'POST',
             headers: {

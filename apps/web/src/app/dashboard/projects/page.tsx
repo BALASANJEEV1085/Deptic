@@ -170,10 +170,10 @@ function RepoRow({ repo, webhook, onToggleWebhook, onScan }: { repo: GitHubRepo;
       <td className="px-4 py-3.5 hidden xl:table-cell">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img 
-          src={`http://localhost:8081/badge/github/${repo.full_name}`} 
+          src={`https://deptic-api.onrender.com/badge/github/${repo.full_name}`} 
           alt="Badge preview" 
           className="h-5 rounded opacity-80 hover:opacity-100 transition-opacity cursor-pointer"
-          onClick={() => window.open(`http://localhost:8081/badge/github/${repo.full_name}/embed`, '_blank')}
+          onClick={() => window.open(`https://deptic-api.onrender.com/badge/github/${repo.full_name}/embed`, '_blank')}
           title="Click to get badge snippets"
         />
       </td>

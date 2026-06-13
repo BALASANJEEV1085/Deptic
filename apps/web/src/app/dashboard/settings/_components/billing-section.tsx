@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { SectionSkeleton, showToast } from './shared'
 import { cn } from '@/lib/utils'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://deptic-api.onrender.com/api'
 const FREE_SCAN_LIMIT = 5
 
 interface UsageStats { scans_used: number; components_scanned: number }

@@ -46,7 +46,7 @@ export function DonationModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
     setError('');
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://deptic-api.onrender.com';
       const res = await fetch(`${apiUrl}/api/donate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

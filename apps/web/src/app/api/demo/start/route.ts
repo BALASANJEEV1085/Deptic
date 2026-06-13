@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDemoToken } from '../auth';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://deptic-api.onrender.com/api';
 
 export async function POST(req: NextRequest) {
   try {

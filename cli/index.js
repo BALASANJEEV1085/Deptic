@@ -6,7 +6,7 @@ const http     = require('http')
 const fs       = require('fs')
 const path     = require('path')
 
-const API_BASE = process.env.DEPTIC_API || 'http://localhost:8081'
+const API_BASE = process.env.DEPTIC_API || 'https://deptic-api.onrender.com'
 
 // ── ANSI colors ──────────────────────────────────────────────────────────────
 const c = {

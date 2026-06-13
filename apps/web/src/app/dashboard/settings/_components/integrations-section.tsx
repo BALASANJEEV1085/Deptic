@@ -38,9 +38,9 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
       const { data: { session } } = await supabase.auth.getSession()
       let url: string
       if (!isPersonal && activeWorkspace) {
-        url = `http://localhost:8081/api/workspaces/${activeWorkspace.id}/integrations`
+        url = `https://deptic-api.onrender.com/api/workspaces/${activeWorkspace.id}/integrations`
       } else {
-        url = 'http://localhost:8081/api/integrations'
+        url = 'https://deptic-api.onrender.com/api/integrations'
       }
       const res = await fetch(url, {
         headers: { 'Authorization': `Bearer ${session?.access_token}` }
@@ -68,9 +68,9 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
 
       let url: string
       if (!isPersonal && activeWorkspace) {
-        url = `http://localhost:8081/api/workspaces/${activeWorkspace.id}/integrations/slack`
+        url = `https://deptic-api.onrender.com/api/workspaces/${activeWorkspace.id}/integrations/slack`
       } else {
-        url = 'http://localhost:8081/api/integrations/slack'
+        url = 'https://deptic-api.onrender.com/api/integrations/slack'
       }
       const res = await fetch(url, {
         method: 'POST',
@@ -115,9 +115,9 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
 
       let url: string
       if (!isPersonal && activeWorkspace) {
-        url = `http://localhost:8081/api/workspaces/${activeWorkspace.id}/integrations/jira`
+        url = `https://deptic-api.onrender.com/api/workspaces/${activeWorkspace.id}/integrations/jira`
       } else {
-        url = 'http://localhost:8081/api/integrations/jira'
+        url = 'https://deptic-api.onrender.com/api/integrations/jira'
       }
       const res = await fetch(url, {
         method: 'POST',
@@ -148,9 +148,9 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
       const { data: { session } } = await supabase.auth.getSession()
       let url: string
       if (!isPersonal && activeWorkspace) {
-        url = `http://localhost:8081/api/workspaces/${activeWorkspace.id}/integrations/${type}`
+        url = `https://deptic-api.onrender.com/api/workspaces/${activeWorkspace.id}/integrations/${type}`
       } else {
-        url = `http://localhost:8081/api/integrations/${type}`
+        url = `https://deptic-api.onrender.com/api/integrations/${type}`
       }
       const res = await fetch(url, {
         method: 'DELETE',
@@ -168,9 +168,9 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
       const { data: { session } } = await supabase.auth.getSession()
       let url: string
       if (!isPersonal && activeWorkspace) {
-        url = `http://localhost:8081/api/workspaces/${activeWorkspace.id}/integrations/${type}/toggle`
+        url = `https://deptic-api.onrender.com/api/workspaces/${activeWorkspace.id}/integrations/${type}/toggle`
       } else {
-        url = `http://localhost:8081/api/integrations/${type}/toggle`
+        url = `https://deptic-api.onrender.com/api/integrations/${type}/toggle`
       }
       const res = await fetch(url, {
         method: 'PUT',

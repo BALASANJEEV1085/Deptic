@@ -132,7 +132,7 @@ export interface WorkspaceInvitation {
   declined?: boolean;
 }
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api';
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://deptic-api.onrender.com/api';
 
 export async function getAuthHeaders() {
   const supabase = createClient();

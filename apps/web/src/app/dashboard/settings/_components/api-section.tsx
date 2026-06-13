@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Modal, SectionSkeleton, showToast } from './shared'
 import { cn } from '@/lib/utils'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://deptic-api.onrender.com/api'
 
 interface ApiKey {
   id: string

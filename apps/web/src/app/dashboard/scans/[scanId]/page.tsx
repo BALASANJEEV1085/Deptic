@@ -748,7 +748,7 @@ export default function ScanResultsPage() {
                       {data?.scan?.repo_name && (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img 
-                          src={`http://localhost:8081/badge/github/${data.scan.repo_name}`} 
+                          src={`https://deptic-api.onrender.com/badge/github/${data.scan.repo_name}`} 
                           alt="Deptic badge" 
                           className="shadow-sm"
                         />
@@ -760,7 +760,7 @@ export default function ScanResultsPage() {
                         size="sm" 
                         className="flex-1 text-xs"
                         onClick={() => {
-                          navigator.clipboard.writeText(`[![Deptic Security](http://localhost:8081/badge/github/${data?.scan?.repo_name})](http://localhost:3000/dashboard)`);
+                          navigator.clipboard.writeText(`[![Deptic Security](https://deptic-api.onrender.com/badge/github/${data?.scan?.repo_name})](http://localhost:3000/dashboard)`);
                           showToast("Markdown copied to clipboard");
                         }}
                       >
@@ -771,7 +771,7 @@ export default function ScanResultsPage() {
                         size="sm" 
                         className="flex-1 text-xs"
                         onClick={() => {
-                          navigator.clipboard.writeText(`<a href="http://localhost:3000/dashboard"><img src="http://localhost:8081/badge/github/${data?.scan?.repo_name}" alt="Deptic Security" /></a>`);
+                          navigator.clipboard.writeText(`<a href="http://localhost:3000/dashboard"><img src="https://deptic-api.onrender.com/badge/github/${data?.scan?.repo_name}" alt="Deptic Security" /></a>`);
                           showToast("HTML copied to clipboard");
                         }}
                       >
