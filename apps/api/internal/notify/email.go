@@ -59,7 +59,7 @@ func SendEmail(ctx context.Context, toEmail, subject, htmlBody string) error {
 
 func SendInvitationEmail(ctx context.Context, toEmail, inviterName, workspaceName, role, token string) error {
 	subject := fmt.Sprintf("%s invited you to %s on DEPTIC.io", inviterName, workspaceName)
-	acceptURL := fmt.Sprintf("http://localhost:3000/invite/%s", token)
+	acceptURL := fmt.Sprintf("https://deptic.netlify.app/invite/%s", token)
 
 	if siteURL := os.Getenv("NEXT_PUBLIC_SITE_URL"); siteURL != "" {
 		acceptURL = fmt.Sprintf("%s/invite/%s", siteURL, token)

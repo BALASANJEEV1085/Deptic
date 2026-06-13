@@ -28,7 +28,7 @@ type shareLinkResponse struct {
 func getFrontendURL() string {
 	url := os.Getenv("FRONTEND_URL")
 	if url == "" {
-		return "http://localhost:3000"
+		return "https://deptic.netlify.app"
 	}
 	return url
 }

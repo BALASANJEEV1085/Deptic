@@ -760,7 +760,7 @@ export default function ScanResultsPage() {
                         size="sm" 
                         className="flex-1 text-xs"
                         onClick={() => {
-                          navigator.clipboard.writeText(`[![Deptic Security](https://deptic-api.onrender.com/badge/github/${data?.scan?.repo_name})](http://localhost:3000/dashboard)`);
+                          navigator.clipboard.writeText(`[![Deptic Security](https://deptic-api.onrender.com/badge/github/${data?.scan?.repo_name})](https://deptic.netlify.app/dashboard)`);
                           showToast("Markdown copied to clipboard");
                         }}
                       >
@@ -771,7 +771,7 @@ export default function ScanResultsPage() {
                         size="sm" 
                         className="flex-1 text-xs"
                         onClick={() => {
-                          navigator.clipboard.writeText(`<a href="http://localhost:3000/dashboard"><img src="https://deptic-api.onrender.com/badge/github/${data?.scan?.repo_name}" alt="Deptic Security" /></a>`);
+                          navigator.clipboard.writeText(`<a href="https://deptic.netlify.app/dashboard"><img src="https://deptic-api.onrender.com/badge/github/${data?.scan?.repo_name}" alt="Deptic Security" /></a>`);
                           showToast("HTML copied to clipboard");
                         }}
                       >
