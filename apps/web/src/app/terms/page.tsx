@@ -38,9 +38,10 @@ export default function TermsPage() {
     { id: 'section-8', title: '8. Disclaimers' },
     { id: 'section-9', title: '9. Limitation of liability' },
     { id: 'section-10', title: '10. Termination' },
-    { id: 'section-11', title: '11. Changes to these terms' },
-    { id: 'section-12', title: '12. Governing law' },
-    { id: 'section-13', title: '13. Contact' },
+    { id: 'section-11', title: '11. Refunds and cancellations' },
+    { id: 'section-12', title: '12. Changes to these terms' },
+    { id: 'section-13', title: '13. Governing law' },
+    { id: 'section-14', title: '14. Contact' },
   ];
 
   return (
@@ -219,25 +220,33 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h2 id="section-11" className="font-syne text-[28px] font-bold text-[#ffffff] border-b border-[#1a1a1a] pb-4 mt-[56px] print:text-black print:border-gray-300">11. Changes to these terms</h2>
+              <h2 id="section-11" className="font-syne text-[28px] font-bold text-[#ffffff] border-b border-[#1a1a1a] pb-4 mt-[56px] print:text-black print:border-gray-300">11. Refunds and cancellations</h2>
+              <div className="space-y-4 mt-6 text-[#888888] text-[16px] leading-[1.85] print:text-black">
+                <p>11.1 <strong>Cancellations:</strong> You may cancel your paid subscription at any time from your account settings. Cancellation will take effect at the end of your current billing cycle.</p>
+                <p>11.2 <strong>Refunds:</strong> Since Deptic is a digital service, all purchases are final. We do not offer refunds or credits for partial billing periods or unused time.</p>
+                <p>11.3 <strong>Exceptions:</strong> If you believe you were charged in error, please contact us within 7 days of the charge at balasnjeev1085@gmail.com. We will review requests on a case-by-case basis.</p>
+              </div>
+            </section>
+
+            <section>
+              <h2 id="section-12" className="font-syne text-[28px] font-bold text-[#ffffff] border-b border-[#1a1a1a] pb-4 mt-[56px] print:text-black print:border-gray-300">12. Changes to these terms</h2>
               <p className="text-[#888888] text-[16px] leading-[1.85] mt-6 print:text-black">
                 We will notify users of material changes to these Terms of Service via email at least 14 days before they take effect. Continued use of Deptic after the effective date constitutes acceptance of the updated terms.
               </p>
             </section>
 
             <section>
-              <h2 id="section-12" className="font-syne text-[28px] font-bold text-[#ffffff] border-b border-[#1a1a1a] pb-4 mt-[56px] print:text-black print:border-gray-300">12. Governing law</h2>
+              <h2 id="section-13" className="font-syne text-[28px] font-bold text-[#ffffff] border-b border-[#1a1a1a] pb-4 mt-[56px] print:text-black print:border-gray-300">13. Governing law</h2>
               <p className="text-[#888888] text-[16px] leading-[1.85] mt-6 print:text-black">
                 These Terms are governed by the laws of India. Any disputes arising from these Terms or your use of Deptic shall be subject to the exclusive jurisdiction of the courts of Andhra Pradesh, India.
               </p>
             </section>
 
             <section>
-              <h2 id="section-13" className="font-syne text-[28px] font-bold text-[#ffffff] border-b border-[#1a1a1a] pb-4 mt-[56px] print:text-black print:border-gray-300">13. Contact</h2>
+              <h2 id="section-14" className="font-syne text-[28px] font-bold text-[#ffffff] border-b border-[#1a1a1a] pb-4 mt-[56px] print:text-black print:border-gray-300">14. Contact</h2>
               <ul className="text-[#888888] text-[16px] leading-[1.85] space-y-2 mt-6 print:text-black">
-                <li>For questions about these Terms: <a href="mailto:legal@deptic.in" className="text-[#ffffff] hover:underline font-mono ml-2 print:text-black">legal@deptic.in</a></li>
-                <li>For privacy questions: <a href="mailto:privacy@deptic.in" className="text-[#ffffff] hover:underline font-mono ml-2 print:text-black">privacy@deptic.in</a></li>
-                <li>For security issues: <a href="mailto:security@deptic.in" className="text-[#ffffff] hover:underline font-mono ml-2 print:text-black">security@deptic.in</a></li>
+                <li>Contact me: <a href="mailto:balasnjeev1085@gmail.com" className="text-[#ffffff] hover:underline font-mono ml-2 print:text-black">balasnjeev1085@gmail.com</a></li>
+
               </ul>
             </section>
 

@@ -372,9 +372,8 @@ export default function PrivacyPage() {
             <section>
               <h2 id="section-9" className="font-syne text-[28px] font-bold text-[#ffffff] border-b border-[#1a1a1a] pb-4 mt-[56px] print:text-black print:border-gray-300">9. Contact</h2>
               <ul className="text-[#888888] text-[16px] leading-[1.85] space-y-2 mt-6 print:text-black">
-                <li>For privacy questions: <a href="mailto:privacy@deptic.in" className="text-[#ffffff] hover:underline font-mono ml-2 print:text-black">privacy@deptic.in</a></li>
-                <li>For security issues: <a href="mailto:security@deptic.in" className="text-[#ffffff] hover:underline font-mono ml-2 print:text-black">security@deptic.in</a></li>
-                <li>For general enquiries: <a href="mailto:contact@deptic.in" className="text-[#ffffff] hover:underline font-mono ml-2 print:text-black">contact@deptic.in</a></li>
+                <li>Contact me: <a href="mailto:balasnjeev1085@gmail.com" className="text-[#ffffff] hover:underline font-mono ml-2 print:text-black">balasnjeev1085@gmail.com</a></li>
+                
               </ul>
             </section>
           </div>
