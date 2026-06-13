@@ -5,16 +5,13 @@ const COLUMNS = [
       { label: 'Features', href: '/#features' },
       { label: 'API', href: '/#api' },
       { label: 'Pricing', href: '/#pricing' },
-      { label: 'Docs', href: '/docs' },
-      { label: 'Blog', href: '/blog' }
+      { label: 'Docs', href: '/docs' }
     ],
   },
   {
     title: 'Resources',
     links: [
-      { label: 'Documentation', href: '/docs' },
-      { label: 'GitHub', href: '#' },
-      { label: 'Changelog', href: '#' }
+      { label: 'Documentation', href: '/docs' }
     ],
   },
   {

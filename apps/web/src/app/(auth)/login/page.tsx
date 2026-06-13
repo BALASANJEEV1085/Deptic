@@ -52,11 +52,7 @@ function LoginContent() {
       {/* Absolute Logo Top Left */}
       <div className="absolute top-8 left-8">
         <Link href="/" className="flex items-center gap-3 font-syne font-bold text-xl hover:opacity-80 transition-opacity">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[var(--green)] to-emerald-400 flex items-center justify-center text-black">
-            <svg width="18" height="18" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M60 30L90 60L60 90L30 60L60 30" stroke="currentColor" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
+          <img src="/logo.png" alt="Deptic Logo" className="w-8 h-8 rounded-lg" />
           <span>DEPTIC</span>
         </Link>
       </div>

@@ -103,7 +103,9 @@ export function Pricing() {
                   <span className="font-heading text-4xl font-bold text-[var(--lp-text)]">
                     ₹{annual ? plan.annual : plan.monthly}
                   </span>
-                  <span className="mb-1 text-sm text-[var(--lp-text-muted)]">/mo</span>
+                  <span className="mb-1 text-sm text-[var(--lp-text-muted)]">
+                    {annual ? '/yr' : '/mo'}
+                  </span>
                 </div>
                 <a
                   href="#cta"

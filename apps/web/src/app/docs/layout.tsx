@@ -172,13 +172,9 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
           >
             <Menu size={20} />
           </button>
-          <Link href="/docs" className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-[var(--logo-bg)] rounded flex items-center justify-center shrink-0">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.25C16.5 22.15 20 17.25 20 12V6L12 2z" stroke="var(--logo-icon)" strokeWidth="2" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <span className="font-heading font-bold text-[15px] tracking-tight">Deptic Docs</span>
+          <Link href="/" className="flex items-center gap-2">
+            <img src="/logo.png" alt="Deptic Logo" className="w-6 h-6 rounded-md" />
+            <span className="font-heading font-bold text-[15px] tracking-tight">Deptic</span>
           </Link>
         </div>
 
@@ -206,12 +202,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
         </button>
 
         <div className="flex items-center gap-4">
-          <a href="https://deptic.in" className="hidden sm:block text-sm font-medium text-[var(--lp-text-muted)] hover:text-[var(--lp-text)] transition-colors">
-            deptic.in
-          </a>
-          <a href="#" className="text-[var(--lp-text-muted)] hover:text-[var(--lp-text)] transition-colors">
-            <GithubIcon size={18} />
-          </a>
+
           <button
             className="text-[var(--lp-text-muted)] hover:text-[var(--lp-text)] transition-colors"
             onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
@@ -312,11 +303,6 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
 
             {/* Footer */}
             <div className="mt-16 pt-8 border-t border-[var(--lp-border)] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--lp-text-muted)]">
-              <span>Last updated: May 2026</span>
-              <a href="#" className="hover:text-[var(--lp-text)] transition-colors flex items-center gap-1.5">
-                <GithubIcon size={12} />
-                Edit this page on GitHub
-              </a>
             </div>
           </div>
         </main>
@@ -348,15 +334,6 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
               </ul>
 
               <div className="mt-8 pt-6 border-t border-[var(--lp-border)]">
-                <p className="text-xs font-medium text-[var(--lp-text)] mb-3">Was this helpful?</p>
-                <div className="flex gap-2">
-                  <button className="flex-1 py-1.5 rounded-md border border-[var(--lp-border)] bg-[var(--lp-surface)] hover:bg-[var(--lp-surface-2)] text-xs text-[var(--lp-text-muted)] hover:text-[var(--lp-text)] transition-colors">
-                    Yes
-                  </button>
-                  <button className="flex-1 py-1.5 rounded-md border border-[var(--lp-border)] bg-[var(--lp-surface)] hover:bg-[var(--lp-surface-2)] text-xs text-[var(--lp-text-muted)] hover:text-[var(--lp-text)] transition-colors">
-                    No
-                  </button>
-                </div>
               </div>
             </div>
           )}

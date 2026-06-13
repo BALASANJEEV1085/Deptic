@@ -37,7 +37,8 @@ export function Navbar() {
       }`}
     >
       <nav className="mx-auto flex h-14 max-w-7xl items-center justify-between px-5 md:px-8">
-        <a href="/" className="text-[17px] font-bold tracking-tight text-[var(--lp-text)]">
+        <a href="/" className="flex items-center gap-2 text-[17px] font-bold tracking-tight text-[var(--lp-text)]">
+          <img src="/logo.png" alt="Deptic Logo" className="w-6 h-6 rounded-md" />
           Deptic
         </a>
 
