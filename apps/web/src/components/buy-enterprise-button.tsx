@@ -76,7 +76,7 @@ export function BuyEnterpriseButton() {
 					transition: 'all 0.2s',
 				}}
 			>
-				{loading ? 'Processing...' : 'Buy Now — ₹999/mo'}
+				{loading ? 'Processing...' : 'Buy Now — ₹2/mo'}
 			</button>
 			{error && (
 				<div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, fontSize: 13, color: '#ef4444' }}>

@@ -61,7 +61,7 @@ export default function PricingPage() {
 						<div className="mb-8">
 							<h2 className="text-2xl font-semibold mb-2">Enterprise</h2>
 							<div className="flex items-baseline gap-2 mb-4">
-								<span className="text-5xl font-bold">₹999</span>
+								<span className="text-5xl font-bold">₹2</span>
 								<span className="text-zinc-500">/month</span>
 							</div>
 							<p className="text-zinc-400">For organizations at scale</p>

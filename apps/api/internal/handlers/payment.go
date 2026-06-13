@@ -23,9 +23,9 @@ func (h *ScanHandler) CreatePaymentOrder(c *fiber.Ctx) error {
 		os.Getenv("RAZORPAY_KEY_SECRET"),
 	)
 
-	// Amount: 999 INR = 99900 paise
+	// Amount: 2 INR = 200 paise
 	data := map[string]interface{}{
-		"amount":   99900,
+		"amount":   200,
 		"currency": "INR",
 		"receipt":  "deptic_enterprise_" + userID[:8] + "_" + strconv.FormatInt(time.Now().Unix(), 10),
 		"notes": map[string]interface{}{
@@ -43,7 +43,7 @@ func (h *ScanHandler) CreatePaymentOrder(c *fiber.Ctx) error {
 	// Save pending order to DB
 	_, _ = h.db.ExecContext(c.Context(), `
     INSERT INTO user_subscriptions (user_id, plan, razorpay_order_id, status, amount_paid, currency)
-    VALUES ($1, 'enterprise', $2, 'pending', 99900, 'INR')
+    VALUES ($1, 'enterprise', $2, 'pending', 200, 'INR')
     ON CONFLICT (user_id) DO UPDATE SET
       razorpay_order_id=$2, status='pending', updated_at=NOW()
   `, userID, order["id"])
@@ -56,7 +56,7 @@ func (h *ScanHandler) CreatePaymentOrder(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"order_id":   order["id"],
-		"amount":     99900,
+		"amount":     200,
 		"currency":   "INR",
 		"key_id":     os.Getenv("RAZORPAY_KEY_ID"),
 		"user_email": userEmail,
@@ -100,7 +100,7 @@ func (h *ScanHandler) VerifyPayment(c *fiber.Ctx) error {
 		})
 	}
 
-	if int(payment["amount"].(float64)) != 99900 {
+	if int(payment["amount"].(float64)) != 200 {
 		return c.Status(400).JSON(fiber.Map{"error": "Payment amount mismatch"})
 	}
 
@@ -115,13 +115,13 @@ func (h *ScanHandler) VerifyPayment(c *fiber.Ctx) error {
 	_, err = h.db.ExecContext(c.Context(), `
     INSERT INTO user_subscriptions
       (user_id, plan, razorpay_payment_id, razorpay_order_id, status, amount_paid, currency, started_at, expires_at)
-    VALUES ($1, 'enterprise', $2, $3, 'active', 99900, 'INR', NOW(), $4)
+    VALUES ($1, 'enterprise', $2, $3, 'active', 200, 'INR', NOW(), $4)
     ON CONFLICT (user_id) DO UPDATE SET
       plan='enterprise',
       razorpay_payment_id=$2,
       razorpay_order_id=$3,
       status='active',
-      amount_paid=99900,
+      amount_paid=200,
       started_at=NOW(),
       expires_at=$4,
       updated_at=NOW()
