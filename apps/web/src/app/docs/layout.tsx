@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Menu, X, Search as SearchIcon, Sun, Moon } from 'lucide-react'
+import { useTheme } from 'next-themes'
 import { SearchPalette } from './search-palette'
 
 function GithubIcon({ size = 24, className = "" }: { size?: number, className?: string }) {
@@ -94,10 +95,14 @@ const NAV_GROUPS = [
 
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const { resolvedTheme, setTheme } = useTheme()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [headings, setHeadings] = useState<{ id: string, title: string, level: number }[]>([])
   const [activeId, setActiveId] = useState<string>('')
+  const [themeMounted, setThemeMounted] = useState(false)
+
+  useEffect(() => setThemeMounted(true), [])
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -156,21 +161,21 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
   }, [])
 
   return (
-    <div className="min-h-screen bg-[#000000] text-white selection:bg-[#333333] font-sans">
+    <div className="min-h-screen bg-[var(--lp-bg)] text-[var(--lp-text)] selection:bg-[var(--green)]/20 font-sans">
       
       {/* Top Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-[#000000]/95 backdrop-blur border-b border-[#1a1a1a] flex items-center justify-between px-4 lg:px-6">
+      <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-[var(--lp-bg)]/95 backdrop-blur border-b border-[var(--lp-border)] flex items-center justify-between px-4 lg:px-6">
         <div className="flex items-center gap-4">
           <button 
-            className="lg:hidden p-1.5 -ml-1.5 text-[#888888] hover:text-white"
+            className="lg:hidden p-1.5 -ml-1.5 text-[var(--lp-text-muted)] hover:text-[var(--lp-text)]"
             onClick={() => setMobileMenuOpen(true)}
           >
             <Menu size={20} />
           </button>
           <Link href="/docs" className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-white rounded flex items-center justify-center shrink-0">
+            <div className="w-6 h-6 bg-[var(--logo-bg)] rounded flex items-center justify-center shrink-0">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.25C16.5 22.15 20 17.25 20 12V6L12 2z" stroke="#000" strokeWidth="2" strokeLinejoin="round" />
+                <path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.25C16.5 22.15 20 17.25 20 12V6L12 2z" stroke="var(--logo-icon)" strokeWidth="2" strokeLinejoin="round" />
               </svg>
             </div>
             <span className="font-heading font-bold text-[15px] tracking-tight">Deptic Docs</span>
@@ -181,34 +186,38 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
         <div className="hidden md:flex flex-1 max-w-[480px] mx-8">
           <button 
             onClick={() => setSearchOpen(true)}
-            className="flex w-full items-center gap-2 h-9 rounded-md border border-[#1a1a1a] bg-[#0a0a0a] hover:bg-[#111111] px-3 text-sm text-[#666666] transition-colors shadow-sm"
+            className="flex w-full items-center gap-2 h-9 rounded-md border border-[var(--lp-border)] bg-[var(--lp-surface)] hover:bg-[var(--lp-surface-2)] px-3 text-sm text-[var(--lp-text-muted)] transition-colors shadow-sm"
           >
             <SearchIcon size={14} />
             <span className="flex-1 text-left">Search documentation...</span>
             <div className="flex items-center gap-1 font-mono text-[10px]">
-              <kbd className="rounded bg-[#1a1a1a] px-1.5 py-0.5 text-[#888888]">⌘</kbd>
-              <kbd className="rounded bg-[#1a1a1a] px-1.5 py-0.5 text-[#888888]">K</kbd>
+              <kbd className="rounded bg-[var(--lp-surface-2)] px-1.5 py-0.5 text-[var(--lp-text-muted)]">⌘</kbd>
+              <kbd className="rounded bg-[var(--lp-surface-2)] px-1.5 py-0.5 text-[var(--lp-text-muted)]">K</kbd>
             </div>
           </button>
         </div>
 
         {/* Search Icon (Mobile) */}
         <button 
-          className="md:hidden p-1.5 text-[#888888] hover:text-white"
+          className="md:hidden p-1.5 text-[var(--lp-text-muted)] hover:text-[var(--lp-text)]"
           onClick={() => setSearchOpen(true)}
         >
           <SearchIcon size={18} />
         </button>
 
         <div className="flex items-center gap-4">
-          <a href="https://deptic.in" className="hidden sm:block text-sm font-medium text-[#888888] hover:text-white transition-colors">
+          <a href="https://deptic.in" className="hidden sm:block text-sm font-medium text-[var(--lp-text-muted)] hover:text-[var(--lp-text)] transition-colors">
             deptic.in
           </a>
-          <a href="#" className="text-[#888888] hover:text-white transition-colors">
+          <a href="#" className="text-[var(--lp-text-muted)] hover:text-[var(--lp-text)] transition-colors">
             <GithubIcon size={18} />
           </a>
-          <button className="text-[#888888] hover:text-white transition-colors" disabled>
-            <Moon size={18} />
+          <button
+            className="text-[var(--lp-text-muted)] hover:text-[var(--lp-text)] transition-colors"
+            onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+            aria-label="Toggle theme"
+          >
+            {themeMounted && resolvedTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
         </div>
       </header>
@@ -217,16 +226,16 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
       <div className="max-w-[1440px] mx-auto w-full flex pt-14">
         
         {/* Left Sidebar (Desktop) */}
-        <aside className="hidden lg:block w-[260px] shrink-0 border-r border-[#1a1a1a] bg-[#0a0a0a] h-[calc(100vh-56px)] sticky top-14 overflow-y-auto no-scrollbar pb-10">
-          <div className="p-5 flex items-center justify-between border-b border-[#1a1a1a] mb-4">
-            <span className="font-heading font-bold text-sm tracking-tight text-white">Deptic Docs</span>
-            <span className="text-[10px] font-mono font-medium text-[#888888] bg-[#111111] border border-[#1a1a1a] rounded-full px-2 py-0.5">v1.2.0</span>
+        <aside className="hidden lg:block w-[260px] shrink-0 border-r border-[var(--lp-border)] bg-[var(--lp-surface)] h-[calc(100vh-56px)] sticky top-14 overflow-y-auto no-scrollbar pb-10">
+          <div className="p-5 flex items-center justify-between border-b border-[var(--lp-border)] mb-4">
+            <span className="font-heading font-bold text-sm tracking-tight text-[var(--lp-text)]">Deptic Docs</span>
+            <span className="text-[10px] font-mono font-medium text-[var(--lp-text-muted)] bg-[var(--lp-surface-2)] border border-[var(--lp-border)] rounded-full px-2 py-0.5">v1.2.0</span>
           </div>
 
           <nav className="px-3 pb-8">
             {NAV_GROUPS.map((group, i) => (
               <div key={i} className="mb-6">
-                <h4 className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-white">
+                <h4 className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--lp-text)]">
                   {group.title}
                 </h4>
                 <div className="flex flex-col gap-0.5">
@@ -238,8 +247,8 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
                         href={link.href}
                         className={`text-[13px] px-3 py-1.5 rounded transition-colors border-l-2 ${
                           isActive 
-                            ? 'text-white border-white bg-[#111111]/50 font-medium' 
-                            : 'text-[#888888] border-transparent hover:text-white hover:bg-[#111111]/30'
+                            ? 'text-[var(--lp-text)] border-[var(--green)] bg-[var(--lp-surface-2)]/80 font-medium' 
+                            : 'text-[var(--lp-text-muted)] border-transparent hover:text-[var(--lp-text)] hover:bg-[var(--lp-surface-2)]/50'
                         }`}
                       >
                         {link.title}
@@ -255,18 +264,18 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
         {/* Mobile Sidebar Overlay */}
         {mobileMenuOpen && (
           <div className="fixed inset-0 z-[100] lg:hidden">
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
-            <div className="absolute inset-y-0 left-0 w-[280px] bg-[#0a0a0a] border-r border-[#1a1a1a] shadow-2xl flex flex-col">
-              <div className="h-14 border-b border-[#1a1a1a] flex items-center justify-between px-4">
+            <div className="absolute inset-0 bg-[var(--overlay)] backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
+            <div className="absolute inset-y-0 left-0 w-[280px] bg-[var(--lp-surface)] border-r border-[var(--lp-border)] shadow-2xl flex flex-col">
+              <div className="h-14 border-b border-[var(--lp-border)] flex items-center justify-between px-4">
                 <span className="font-heading font-bold text-sm">Deptic Docs</span>
-                <button onClick={() => setMobileMenuOpen(false)} className="p-1.5 -mr-1.5 text-[#888888] hover:text-white">
+                <button onClick={() => setMobileMenuOpen(false)} className="p-1.5 -mr-1.5 text-[var(--lp-text-muted)] hover:text-[var(--lp-text)]">
                   <X size={20} />
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-4 no-scrollbar">
                 {NAV_GROUPS.map((group, i) => (
                   <div key={i} className="mb-6">
-                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-white">
+                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--lp-text)]">
                       {group.title}
                     </h4>
                     <div className="flex flex-col gap-1">
@@ -278,8 +287,8 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
                             href={link.href}
                             className={`text-sm px-2 py-1.5 rounded transition-colors border-l-2 ${
                               isActive 
-                                ? 'text-white border-white bg-[#111111]' 
-                                : 'text-[#888888] border-transparent'
+                                ? 'text-[var(--lp-text)] border-[var(--green)] bg-[var(--lp-surface-2)]' 
+                                : 'text-[var(--lp-text-muted)] border-transparent'
                             }`}
                           >
                             {link.title}
@@ -302,9 +311,9 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
             </div>
 
             {/* Footer */}
-            <div className="mt-16 pt-8 border-t border-[#1a1a1a] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#666666]">
+            <div className="mt-16 pt-8 border-t border-[var(--lp-border)] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--lp-text-muted)]">
               <span>Last updated: May 2026</span>
-              <a href="#" className="hover:text-white transition-colors flex items-center gap-1.5">
+              <a href="#" className="hover:text-[var(--lp-text)] transition-colors flex items-center gap-1.5">
                 <GithubIcon size={12} />
                 Edit this page on GitHub
               </a>
@@ -316,7 +325,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
         <aside className="hidden xl:block w-[220px] shrink-0 sticky top-14 h-[calc(100vh-56px)] overflow-y-auto no-scrollbar py-12 pr-6">
           {headings.length > 0 && (
             <div>
-              <h4 className="text-xs font-semibold text-white mb-3">On this page</h4>
+              <h4 className="text-xs font-semibold text-[var(--lp-text)] mb-3">On this page</h4>
               <ul className="flex flex-col gap-2">
                 {headings.map(h => (
                   <li key={h.id} className={h.level === 3 ? 'pl-3' : ''}>
@@ -329,7 +338,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
                         window.history.pushState(null, '', `#${h.id}`)
                       }}
                       className={`text-[13px] leading-snug block transition-colors ${
-                        activeId === h.id ? 'text-white font-medium' : 'text-[#666666] hover:text-[#aaaaaa]'
+                        activeId === h.id ? 'text-[var(--lp-text)] font-medium' : 'text-[var(--lp-text-muted)] hover:text-[var(--lp-text)]'
                       }`}
                     >
                       {h.title}
@@ -338,13 +347,13 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
                 ))}
               </ul>
 
-              <div className="mt-8 pt-6 border-t border-[#1a1a1a]">
-                <p className="text-xs font-medium text-white mb-3">Was this helpful?</p>
+              <div className="mt-8 pt-6 border-t border-[var(--lp-border)]">
+                <p className="text-xs font-medium text-[var(--lp-text)] mb-3">Was this helpful?</p>
                 <div className="flex gap-2">
-                  <button className="flex-1 py-1.5 rounded-md border border-[#1a1a1a] bg-[#0a0a0a] hover:bg-[#111111] text-xs text-[#888888] hover:text-white transition-colors">
+                  <button className="flex-1 py-1.5 rounded-md border border-[var(--lp-border)] bg-[var(--lp-surface)] hover:bg-[var(--lp-surface-2)] text-xs text-[var(--lp-text-muted)] hover:text-[var(--lp-text)] transition-colors">
                     Yes
                   </button>
-                  <button className="flex-1 py-1.5 rounded-md border border-[#1a1a1a] bg-[#0a0a0a] hover:bg-[#111111] text-xs text-[#888888] hover:text-white transition-colors">
+                  <button className="flex-1 py-1.5 rounded-md border border-[var(--lp-border)] bg-[var(--lp-surface)] hover:bg-[var(--lp-surface-2)] text-xs text-[var(--lp-text-muted)] hover:text-[var(--lp-text)] transition-colors">
                     No
                   </button>
                 </div>

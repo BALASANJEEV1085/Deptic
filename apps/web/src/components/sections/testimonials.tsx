@@ -160,13 +160,13 @@ const TESTIMONIALS = [
 
 function Card({ t }: { t: (typeof TESTIMONIALS)[number] }) {
   return (
-    <figure className="w-80 shrink-0 rounded-2xl border border-[#1a1a1a] bg-[#0a0a0a] p-6 transition-colors duration-300 hover:border-[#333333]">
-      <blockquote className="text-sm italic leading-relaxed text-white">
+    <figure className="w-80 shrink-0 rounded-2xl border border-[var(--lp-border)] bg-[var(--lp-surface)] p-6 transition-colors duration-300 hover:border-[var(--lp-border-2)]">
+      <blockquote className="text-sm italic leading-relaxed text-[var(--lp-text)]">
         &ldquo;{t.quote}&rdquo;
       </blockquote>
       <figcaption className="mt-4">
-        <p className="text-[13px] font-bold text-white">{t.name}</p>
-        <p className="text-xs text-[#888888]">{t.role}</p>
+        <p className="text-[13px] font-bold text-[var(--lp-text)]">{t.name}</p>
+        <p className="text-xs text-[var(--lp-text-muted)]">{t.role}</p>
       </figcaption>
     </figure>
   )
@@ -198,9 +198,9 @@ function Row({
 
 export function Testimonials() {
   return (
-    <section className="bg-black py-24 md:py-28">
+    <section className="bg-[var(--lp-bg)] py-24 md:py-28">
       <div className="mx-auto mb-12 max-w-7xl px-5">
-        <h2 className="text-center font-heading text-3xl font-bold tracking-[-0.02em] text-white md:text-4xl">
+        <h2 className="text-center font-heading text-3xl font-bold tracking-[-0.02em] text-[var(--lp-text)] md:text-4xl">
           Trusted by security-first teams
         </h2>
       </div>

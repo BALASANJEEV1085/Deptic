@@ -479,13 +479,13 @@ export default function ScanResultsPage() {
           </div>
 
           {(vulnData.summary.critical + vulnData.summary.high + vulnData.summary.medium + vulnData.summary.low) === 0 ? (
-            <div className="bg-[#ffffff]/[0.02] border border-[#ffffff]/10 text-[#ffffff] p-6 rounded-xl flex items-center gap-4">
-              <div className="h-10 w-10 rounded-xl bg-[#ffffff]/10 flex items-center justify-center border border-[#ffffff]/20">
-                <ShieldCheck className="h-5 w-5" />
+            <div className="bg-[var(--green)]/5 border border-[var(--green)]/20 p-6 rounded-xl flex items-center gap-4">
+              <div className="h-10 w-10 rounded-xl bg-[var(--green)]/10 flex items-center justify-center border border-[var(--green)]/20">
+                <ShieldCheck className="h-5 w-5 text-[var(--green)]" />
               </div>
               <div>
                 <p className="font-bold text-foreground text-[13px] mb-0.5">Authenticated Environment Clean</p>
-                <p className="text-[11px] opacity-60">No vulnerabilities detected matching the specified inventory baseline.</p>
+                <p className="text-[11px] text-muted-foreground">No vulnerabilities detected matching the specified inventory baseline.</p>
               </div>
             </div>
           ) : (
@@ -640,7 +640,7 @@ export default function ScanResultsPage() {
                          <circle cx="40" cy="40" r="36" 
                            className={cn(
                              "transition-all duration-1000 ease-out",
-                             complianceData.ntia.score >= 95 ? "stroke-[#ffffff]" :
+                             complianceData.ntia.score >= 95 ? "stroke-[var(--green)]" :
                              complianceData.ntia.score >= 75 ? "stroke-amber-500" : "stroke-red-500"
                            )}
                            strokeWidth="6" fill="none"
@@ -663,7 +663,7 @@ export default function ScanResultsPage() {
                           return (
                             <Badge variant="outline" className={cn(
                               "text-[9px] font-bold px-1.5 py-0 uppercase tracking-widest border",
-                              status.color === 'green' ? "bg-[#ffffff]/10 text-[#ffffff] border-[#ffffff]/20" :
+                              status.color === 'green' ? "bg-[var(--green)]/10 text-[var(--green)] border-[var(--green)]/20" :
                               status.color === 'amber' ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
                               "bg-red-500/10 text-red-500 border-red-500/20"
                             )}>
@@ -673,7 +673,7 @@ export default function ScanResultsPage() {
                         })()}
                         <Badge variant="outline" className={cn(
                           "text-[9px] font-bold px-1.5 py-0 uppercase tracking-widest border",
-                          complianceData.eu_cra_compliant ? "bg-[#ffffff]/10 text-[#ffffff] border-[#ffffff]/20" : "bg-red-500/10 text-red-500 border-red-500/20"
+                          complianceData.eu_cra_compliant ? "bg-[var(--green)]/10 text-[var(--green)] border-[var(--green)]/20" : "bg-red-500/10 text-red-500 border-red-500/20"
                         )}>
                           EU CRA {complianceData.eu_cra_compliant ? 'COMPLIANT' : 'NON-COMPLIANT'}
                         </Badge>
@@ -687,14 +687,14 @@ export default function ScanResultsPage() {
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-0">
                           <div className={cn(
                             "flex items-center gap-2 text-[10px] sm:text-xs font-bold uppercase tracking-widest",
-                            el.passed ? "text-[#ffffff]" : "text-red-500"
+                            el.passed ? "text-[var(--green)]" : "text-red-500"
                           )}>
                             {el.passed ? <Check className="h-3 w-3 shrink-0" /> : <X className="h-3 w-3 shrink-0" />}
                             <span className="truncate">{el.name}</span>
                           </div>
                           <span className={cn(
                             "text-[9px] sm:text-[10px] font-bold ml-5 sm:ml-0",
-                            el.passed ? "text-[#ffffff]" : "text-red-500"
+                            el.passed ? "text-[var(--green)]" : "text-red-500"
                           )}>
                             {el.coverage}% coverage
                           </span>
@@ -703,7 +703,7 @@ export default function ScanResultsPage() {
                           <div 
                             className={cn(
                               "h-full rounded-full transition-all duration-1000",
-                              el.passed ? "bg-[#ffffff]" : "bg-red-500"
+                              el.passed ? "bg-[var(--green)]" : "bg-red-500"
                             )}
                             style={{ width: `${el.coverage}%` }}
                           />
@@ -780,9 +780,9 @@ export default function ScanResultsPage() {
                     </div>
                   </div>
                   
-                  <div className="flex-1 bg-zinc-900/50 p-4 rounded-lg border border-zinc-800/50">
-                    <h4 className="text-xs font-bold text-zinc-300 mb-2">Automated Setup</h4>
-                    <p className="text-[11px] text-zinc-500 mb-4">
+                  <div className="flex-1 bg-muted/40 p-4 rounded-lg border border-border">
+                    <h4 className="text-xs font-bold text-foreground mb-2">Automated Setup</h4>
+                    <p className="text-[11px] text-muted-foreground mb-4">
                       We can automatically create a Pull Request to add this badge to your repository's README.md file.
                     </p>
                     
@@ -951,7 +951,7 @@ export default function ScanResultsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="px-4 py-3">
-                        <code className="text-[10px] text-muted-foreground bg-card border border-[#1e2230] px-1.5 py-0.5 rounded font-mono font-bold">{c.version}</code>
+                        <code className="text-[10px] text-muted-foreground bg-card border border-[var(--border-hover)] px-1.5 py-0.5 rounded font-mono font-bold">{c.version}</code>
                       </TableCell>
                       <TableCell className="px-4 py-3">
                         <LicenseBadge license={c.license} />
@@ -968,9 +968,9 @@ export default function ScanResultsPage() {
                       </TableCell>
                       <TableCell className="px-4 py-3 text-right">
                         {c.depth === 0 ? (
-                          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-[#ffffff]/10 text-[#ffffff] border border-[#ffffff]/20 uppercase">Direct</span>
+                          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-[var(--green)]/10 text-[var(--green)] border border-[var(--green)]/25 uppercase">Direct</span>
                         ) : (
-                          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 border border-zinc-700/30 uppercase">Transitive</span>
+                          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border uppercase">Transitive</span>
                         )}
                       </TableCell>
                     </TableRow>
@@ -984,7 +984,7 @@ export default function ScanResultsPage() {
 
       {showShareModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-           <div className="absolute inset-0 bg-black/80" onClick={() => setShowShareModal(false)} />
+           <div className="absolute inset-0 bg-[var(--lp-bg)]/80" onClick={() => setShowShareModal(false)} />
            <div className="relative bg-card border-border rounded-2xl w-full max-w-sm p-6 border animate-in zoom-in-95 duration-200">
               <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#ffffff] to-transparent" />
               <h2 className="text-xl font-bold text-foreground mb-1.5 tracking-tight">Generate Secure Share Link</h2>
@@ -1078,7 +1078,7 @@ function GroupedVulnRow({ v, fixedPackageNames }: { v: any, fixedPackageNames: S
           <p className="font-bold text-zinc-100 text-xs mb-0.5">{v.component_name}</p>
         </TableCell>
         <TableCell className="px-4 py-3">
-          <code className="text-[10px] text-muted-foreground bg-card border border-[#1e2230] px-1.5 py-0.5 rounded font-mono font-bold">v{v.component_version}</code>
+          <code className="text-[10px] text-muted-foreground bg-card border border-[var(--border-hover)] px-1.5 py-0.5 rounded font-mono font-bold">v{v.component_version}</code>
         </TableCell>
         <TableCell className="px-4 py-3">
           <div className="flex flex-col gap-1.5 items-start">

@@ -23,7 +23,7 @@ import {
 /* ── Helpers ──────────────────────────────────────────────────────────── */
 function StatusDot({ status }: { status: string }) {
   const color =
-    status === "done" ? "#ffffff" : status === "failed" ? "#ef4444" : "#f59e0b";
+    status === "done" ? "var(--green)" : status === "failed" ? "#ef4444" : "#f59e0b";
   return (
     <span
       style={{
@@ -54,14 +54,14 @@ function EcoBadge({ eco, status }: { eco: string; status?: string }) {
   return (
     <span
       style={{
-        background: "#16191f",
-        color: "#6b7280",
+        background: "var(--border)",
+        color: "var(--text-secondary)",
         fontFamily: "DM Sans, sans-serif",
         fontSize: 11,
         fontWeight: 500,
         padding: "2px 8px",
         borderRadius: 4,
-        border: "1px solid #1e2230",
+        border: "1px solid var(--border-hover)",
         display: "inline-block",
       }}
     >
@@ -79,7 +79,7 @@ function SeverityCompact({
   if (total === 0)
     return (
       <span
-        style={{ fontFamily: "DM Mono, monospace", fontSize: 12, color: "#374151" }}
+        style={{ fontFamily: "DM Mono, monospace", fontSize: 12, color: "var(--text-label)" }}
       >
         —
       </span>
@@ -116,7 +116,7 @@ function CopyId({ id }: { id: string }) {
       className="group/copy"
     >
       <span
-        style={{ fontFamily: "DM Mono, monospace", fontSize: 10, color: "#374151" }}
+        style={{ fontFamily: "DM Mono, monospace", fontSize: 10, color: "var(--text-label)" }}
       >
         {shortId(id)}
       </span>
@@ -124,7 +124,7 @@ function CopyId({ id }: { id: string }) {
         onClick={copy}
         style={{
           opacity: 0,
-          color: "#374151",
+          color: "var(--text-label)",
           background: "none",
           border: "none",
           cursor: "pointer",
@@ -134,7 +134,7 @@ function CopyId({ id }: { id: string }) {
         className="group-hover/copy:opacity-100 transition-opacity"
       >
         {copied ? (
-          <Check size={10} color="#ffffff" />
+          <Check size={10} color="var(--text-active)" />
         ) : (
           <Copy size={10} />
         )}
@@ -146,19 +146,19 @@ function CopyId({ id }: { id: string }) {
 function NtiaCell({ score, status }: { score?: number; status: string }) {
   if (status !== "done")
     return (
-      <span style={{ fontFamily: "DM Mono, monospace", fontSize: 12, color: "#374151" }}>
+      <span style={{ fontFamily: "DM Mono, monospace", fontSize: 12, color: "var(--text-label)" }}>
         —
       </span>
     );
   if (score === undefined)
     return (
-      <span style={{ fontFamily: "DM Mono, monospace", fontSize: 12, color: "#374151" }}>
+      <span style={{ fontFamily: "DM Mono, monospace", fontSize: 12, color: "var(--text-label)" }}>
         N/A
       </span>
     );
   const s = getComplianceStatus(score);
   const color =
-    s.color === "green" ? "#ffffff" : s.color === "amber" ? "#f59e0b" : "#ef4444";
+    s.color === "green" ? "var(--green)" : s.color === "amber" ? "#f59e0b" : "#ef4444";
   return (
     <span
       style={{
@@ -184,7 +184,7 @@ function SkeletonRow() {
             style={{
               height: 10,
               width: w,
-              background: "#16191f",
+              background: "var(--border)",
               borderRadius: 4,
             }}
           />
@@ -215,12 +215,12 @@ function FilterDropdown({
           gap: 6,
           padding: "0 12px",
           height: 34,
-          background: "#0e1015",
-          border: "1px solid #16191f",
+          background: "var(--card)",
+          border: "1px solid var(--border)",
           borderRadius: 6,
           fontFamily: "DM Sans, sans-serif",
           fontSize: 13,
-          color: "#6b7280",
+          color: "var(--text-secondary)",
           cursor: "pointer",
           minWidth: 130,
           justifyContent: "space-between",
@@ -233,8 +233,8 @@ function FilterDropdown({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         style={{
-          background: "#0e1015",
-          border: "1px solid #16191f",
+          background: "var(--card)",
+          border: "1px solid var(--border)",
           padding: 4,
           minWidth: 130,
         }}
@@ -246,7 +246,7 @@ function FilterDropdown({
             style={{
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13,
-              color: value === o ? "#ffffff" : "#c9d1e0",
+              color: value === o ? "#ffffff" : "var(--table-cell)",
               padding: "6px 10px",
               cursor: "pointer",
               borderRadius: 4,
@@ -314,7 +314,7 @@ export default function ScansPage() {
             fontSize: 24,
             fontWeight: 700,
             letterSpacing: "-0.5px",
-            color: "#e8ecf4",
+            color: "var(--text-primary)",
             margin: "0 0 4px",
           }}
         >
@@ -324,7 +324,7 @@ export default function ScansPage() {
           style={{
             fontFamily: "DM Sans, sans-serif",
             fontSize: 14,
-            color: "#6b7280",
+            color: "var(--text-secondary)",
             margin: 0,
           }}
         >
@@ -343,7 +343,7 @@ export default function ScansPage() {
               left: 10,
               top: "50%",
               transform: "translateY(-50%)",
-              color: "#374151",
+              color: "var(--text-label)",
               pointerEvents: "none",
             }}
           />
@@ -357,17 +357,17 @@ export default function ScansPage() {
               height: 34,
               paddingLeft: 34,
               paddingRight: 12,
-              background: "#0e1015",
-              border: "1px solid #16191f",
+              background: "var(--card)",
+              border: "1px solid var(--border)",
               borderRadius: 6,
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13,
-              color: "#e8ecf4",
+              color: "var(--text-primary)",
               outline: "none",
               transition: "border-color 0.15s ease",
             }}
-            onFocus={(e) => (e.target.style.borderColor = "#ffffff")}
-            onBlur={(e) => (e.target.style.borderColor = "#16191f")}
+            onFocus={(e) => (e.target.style.borderColor = "var(--green)")}
+            onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
           />
         </div>
 
@@ -388,7 +388,7 @@ export default function ScansPage() {
           style={{
             fontFamily: "DM Mono, monospace",
             fontSize: 11,
-            color: "#374151",
+            color: "var(--text-label)",
             marginLeft: "auto",
           }}
         >
@@ -399,8 +399,8 @@ export default function ScansPage() {
       {/* Table */}
       <div
         style={{
-          background: "#0e1015",
-          border: "1px solid #16191f",
+          background: "var(--card)",
+          border: "1px solid var(--border)",
           borderRadius: 8,
           overflow: "hidden",
         }}
@@ -429,11 +429,11 @@ export default function ScansPage() {
                     style={{
                       textAlign: "center",
                       padding: "64px 16px",
-                      color: "#374151",
+                      color: "var(--text-label)",
                     }}
                   >
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-                      <ScanSearch size={32} color="#1e2230" />
+                      <ScanSearch size={32} color="var(--border-hover)" />
                       <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13 }}>
                         {search ? `No scans matching "${search}"` : "No scans found."}
                       </span>
@@ -450,7 +450,7 @@ export default function ScansPage() {
                             fontFamily: "DM Sans, sans-serif",
                             fontSize: 13,
                             fontWeight: 500,
-                            color: "#e8ecf4",
+                            color: "var(--text-primary)",
                             margin: "0 0 2px",
                           }}
                         >
@@ -470,7 +470,7 @@ export default function ScansPage() {
                         style={{
                           fontFamily: "DM Mono, monospace",
                           fontSize: 13,
-                          color: "#c9d1e0",
+                          color: "var(--table-cell)",
                         }}
                       >
                         {(scan.component_count ?? 0).toLocaleString()}
@@ -492,7 +492,7 @@ export default function ScansPage() {
                         style={{
                           fontFamily: "DM Mono, monospace",
                           fontSize: 12,
-                          color: "#6b7280",
+                          color: "var(--text-secondary)",
                         }}
                         title={new Date(scan.created_at).toLocaleString()}
                       >
@@ -514,7 +514,7 @@ export default function ScansPage() {
                             fontFamily: "DM Sans, sans-serif",
                             fontSize: 13,
                             fontWeight: 500,
-                            color: "#ffffff",
+                            color: "var(--text-active)",
                             textDecoration: "none",
                           }}
                         >
@@ -527,7 +527,7 @@ export default function ScansPage() {
                               fontFamily: "DM Sans, sans-serif",
                               fontSize: 13,
                               fontWeight: 500,
-                              color: "#6b7280",
+                              color: "var(--text-secondary)",
                               background: "none",
                               border: "none",
                               cursor: "pointer",

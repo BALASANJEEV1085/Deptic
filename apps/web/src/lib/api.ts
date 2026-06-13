@@ -369,8 +369,11 @@ export async function createShareLink(depticId: string, label: string, expiresIn
     headers,
     body: JSON.stringify({ label, expires_in_days: expiresInDays })
   });
-  if (!response.ok) throw new Error('Failed to create share link');
-  return response.json();
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.error ? `${data.error}: ${data.details || ''}` : 'Failed to create share link');
+  }
+  return data;
 }
 
 export async function getShareLinks(depticId: string): Promise<{ shares: any[] }> {
@@ -833,6 +836,77 @@ export async function listWebhookEvents(id: string): Promise<WebhookEvent[]> {
   return res.json();
 }
 
+export interface OnboardingStatus {
+  is_new_user: boolean;
+  onboarding_completed: boolean;
+  onboarding_skipped: boolean;
+  user_created_at: string;
+  job_role?: string | null;
+  company_name?: string | null;
+  use_case?: string | null;
+  heard_about_from?: string | null;
+}
+
+export interface UserProfile {
+  full_name: string;
+  job_role?: string | null;
+  company_name?: string | null;
+  use_case?: string | null;
+  heard_about_from?: string | null;
+}
+
+export async function getOnboardingStatus(): Promise<OnboardingStatus> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/onboarding/status`, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error('Failed to load onboarding status');
+  return res.json();
+}
+
+export async function completeOnboarding(data: {
+  full_name?: string;
+  job_role?: string;
+  company_name?: string;
+  heard_about_from?: string;
+  use_case?: string;
+  skipped: boolean;
+}): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/onboarding/complete`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to complete onboarding');
+  }
+}
+
+export async function getUserProfile(): Promise<UserProfile> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/users/profile`, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error('Failed to load profile');
+  return res.json();
+}
+
+export async function updateUserProfile(data: {
+  full_name?: string;
+  job_role?: string;
+  company_name?: string;
+  bio?: string;
+}): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/users/profile`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to update profile');
+  }
+}
+
 export async function deleteAccount(): Promise<void> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_URL}/account`, {
@@ -843,4 +917,43 @@ export async function deleteAccount(): Promise<void> {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || 'Failed to delete account');
   }
+}
+
+// ── Generic authenticated API fetch ───────────────────────────────
+export async function apiFetch(path: string, options: RequestInit = {}): Promise<any> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: { ...headers, ...options.headers },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || `Request failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+// ── Payment / Plan Status ─────────────────────────────────────────
+export interface UsageStatus {
+  plan: string;
+  expires_at: string | null;
+  usage: {
+    scans_today: number;
+    scans_limit: number;
+    scans_remaining: number;
+    api_keys_today: number;
+    api_keys_limit: number;
+    api_keys_remaining: number;
+    webhooks_active: number;
+    webhooks_limit: number;
+    webhooks_remaining: number;
+    workspaces_joined: number;
+    workspaces_limit: number;
+    workspaces_remaining: number;
+    webhook_gap_mins: number;
+  };
+}
+
+export async function getPaymentStatus(): Promise<UsageStatus> {
+  return apiFetch('/payment/status');
 }

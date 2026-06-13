@@ -37,8 +37,8 @@ export function ToastContainer({ toasts }: { toasts: ToastMessage[] }) {
         <div key={t.id} className={cn(
           "flex items-center gap-2.5 px-4 py-3 rounded-lg border shadow-xl text-xs font-semibold pointer-events-auto animate-in slide-in-from-bottom-2 fade-in duration-300",
           t.type === 'success'
-            ? "bg-[#0d1f15] border-[#ffffff]/30 text-[#ffffff]"
-            : "bg-[#1f0d0d] border-red-500/30 text-red-400"
+            ? "bg-[var(--green)]/10 border-[var(--green)]/30 text-[var(--green)]"
+            : "bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400"
         )}>
           {t.type === 'success' ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> : <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
           {t.message}
@@ -58,7 +58,7 @@ export function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: 
       onClick={() => onChange(!checked)}
       className={cn(
         "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ffffff]/50",
-        checked ? "bg-[var(--green)]" : "bg-zinc-700"
+        checked ? "bg-[var(--green)]" : "bg-muted-foreground/30"
       )}
     >
       <span className={cn(
@@ -84,7 +84,7 @@ export function Modal({ open, onClose, title, children }: {
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
+      <div className="absolute inset-0 bg-[var(--lp-bg)]/70" onClick={onClose} />
       <div className="relative z-10 w-full max-w-md rounded-xl border border-border bg-card">
         <div className="flex items-center justify-between p-5 border-b border-border">
           <h3 className="text-sm font-bold text-foreground">{title}</h3>

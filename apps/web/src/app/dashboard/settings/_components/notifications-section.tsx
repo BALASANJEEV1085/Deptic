@@ -216,7 +216,7 @@ export function NotificationsSection({ user, loading }: { user: User | null; loa
               <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-3">Active Devices</p>
               <div className="space-y-2">
                 {pushStatus.devices.map((d, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-black/20 border border-border/50">
+                  <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-[var(--lp-bg)]/20 border border-border/50">
                     <div className="flex items-center gap-3">
                       <MonitorSmartphone className="h-4 w-4 text-zinc-500" />
                       <div>

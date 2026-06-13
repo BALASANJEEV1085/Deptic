@@ -73,27 +73,27 @@ function CreateWorkspaceDialog({ onClose, onCreated }: CreateWorkspaceDialogProp
       style={{
         position: 'fixed', inset: 0, zIndex: 9999,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+        background: 'var(--overlay)', backdropFilter: 'blur(4px)',
       }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div style={{
-        background: '#0e1015', border: '1px solid #1e2230', borderRadius: 12,
+        background: 'var(--card)', border: '1px solid var(--border-hover)', borderRadius: 12,
         padding: 24, width: 400, maxWidth: '90vw',
         boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
       }}>
         <div style={{ marginBottom: 20 }}>
-          <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 16, fontWeight: 600, color: '#e8ecf4', margin: 0 }}>
+          <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
             Create Workspace
           </h2>
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
             Collaborate with your team on DEPTIC analysis
           </p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 11, fontWeight: 500, color: '#9ca3af', display: 'block', marginBottom: 6 }}>
+            <label style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 11, fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
               Workspace Name
             </label>
             <input
@@ -102,22 +102,22 @@ function CreateWorkspaceDialog({ onClose, onCreated }: CreateWorkspaceDialogProp
               placeholder="Acme Corp"
               style={{
                 width: '100%', boxSizing: 'border-box',
-                background: 'rgba(255,255,255,0.04)', border: '1px solid #1e2230',
-                borderRadius: 6, padding: '8px 12px', color: '#e8ecf4',
+                background: 'var(--input-bg)', border: '1px solid var(--border-hover)',
+                borderRadius: 6, padding: '8px 12px', color: 'var(--text-primary)',
                 fontFamily: 'DM Sans, sans-serif', fontSize: 13, outline: 'none',
               }}
             />
           </div>
           <div>
-            <label style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 11, fontWeight: 500, color: '#9ca3af', display: 'block', marginBottom: 6 }}>
+            <label style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 11, fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
               Slug (URL identifier)
             </label>
             <div style={{
               display: 'flex', alignItems: 'center',
-              background: 'rgba(255,255,255,0.04)', border: '1px solid #1e2230',
+              background: 'var(--input-bg)', border: '1px solid var(--border-hover)',
               borderRadius: 6, overflow: 'hidden',
             }}>
-              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#4a5068', padding: '8px 0 8px 12px' }}>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: 'var(--text-tertiary)', padding: '8px 0 8px 12px' }}>
                 deptic.io/
               </span>
               <input
@@ -126,14 +126,14 @@ function CreateWorkspaceDialog({ onClose, onCreated }: CreateWorkspaceDialogProp
                 placeholder="acme-corp"
                 style={{
                   flex: 1, background: 'transparent', border: 'none',
-                  padding: '8px 12px 8px 4px', color: '#e8ecf4',
+                  padding: '8px 12px 8px 4px', color: 'var(--text-primary)',
                   fontFamily: 'DM Mono, monospace', fontSize: 12, outline: 'none',
                 }}
               />
             </div>
           </div>
           <div>
-            <label style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 11, fontWeight: 500, color: '#9ca3af', display: 'block', marginBottom: 6 }}>
+            <label style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 11, fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
               Description (optional)
             </label>
             <textarea
@@ -143,8 +143,8 @@ function CreateWorkspaceDialog({ onClose, onCreated }: CreateWorkspaceDialogProp
               rows={2}
               style={{
                 width: '100%', boxSizing: 'border-box', resize: 'none',
-                background: 'rgba(255,255,255,0.04)', border: '1px solid #1e2230',
-                borderRadius: 6, padding: '8px 12px', color: '#e8ecf4',
+                background: 'var(--input-bg)', border: '1px solid var(--border-hover)',
+                borderRadius: 6, padding: '8px 12px', color: 'var(--text-primary)',
                 fontFamily: 'DM Sans, sans-serif', fontSize: 13, outline: 'none',
               }}
             />
@@ -158,8 +158,8 @@ function CreateWorkspaceDialog({ onClose, onCreated }: CreateWorkspaceDialogProp
             <button
               type="button" onClick={onClose}
               style={{
-                background: 'transparent', border: '1px solid #1e2230',
-                borderRadius: 6, padding: '7px 16px', color: '#9ca3af',
+                background: 'transparent', border: '1px solid var(--border-hover)',
+                borderRadius: 6, padding: '7px 16px', color: 'var(--text-secondary)',
                 fontFamily: 'DM Sans, sans-serif', fontSize: 13, cursor: 'pointer',
               }}
             >
@@ -168,7 +168,7 @@ function CreateWorkspaceDialog({ onClose, onCreated }: CreateWorkspaceDialogProp
             <button
               type="submit" disabled={loading || !name.trim() || !slug.trim()}
               style={{
-                background: '#ffffff', border: 'none', borderRadius: 6,
+                background: 'var(--green)', border: 'none', borderRadius: 6,
                 padding: '7px 16px', color: '#000', fontFamily: 'DM Sans, sans-serif',
                 fontSize: 13, fontWeight: 600, cursor: 'pointer',
                 opacity: loading || !name.trim() || !slug.trim() ? 0.6 : 1,
@@ -202,8 +202,8 @@ export function WorkspaceSwitcher() {
   if (isLoading) {
     return (
       <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 6 }}>
-        <CustomLoader size={12} style={{ color: '#4a5068' }} />
-        <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 11, color: '#4a5068' }}>Loading...</span>
+        <CustomLoader size={12} style={{ color: 'var(--text-tertiary)' }} />
+        <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 11, color: 'var(--text-tertiary)' }}>Loading...</span>
       </div>
     )
   }
@@ -217,14 +217,14 @@ export function WorkspaceSwitcher() {
           id="workspace-switcher-btn"
           onClick={() => setOpen(o => !o)}
           style={{
-            width: '100%', background: open ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
-            border: '1px solid #1a1f2e', borderRadius: 7,
+            width: '100%', background: open ? 'var(--cta-bg)' : 'var(--input-bg)',
+            border: '1px solid var(--border-hover)', borderRadius: 7,
             padding: '6px 8px', cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 8,
             transition: 'all 0.15s ease',
           }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
-          onMouseLeave={e => (e.currentTarget.style.background = open ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)')}
+          onMouseEnter={e => (e.currentTarget.style.background = 'var(--cta-bg)')}
+          onMouseLeave={e => (e.currentTarget.style.background = open ? 'var(--cta-bg)' : 'var(--input-bg)')}
         >
           {activeWorkspace ? (
             <WorkspaceAvatar ws={activeWorkspace} size={20} />
@@ -234,19 +234,19 @@ export function WorkspaceSwitcher() {
               border: '1px solid rgba(255, 255, 255,0.2)', display: 'flex',
               alignItems: 'center', justifyContent: 'center', flexShrink: 0,
             }}>
-              <User size={10} color="#ffffff" />
+              <User size={10} color="var(--text-active)" />
             </div>
           )}
           <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
             <p style={{
               fontFamily: 'DM Sans, sans-serif', fontSize: 12, fontWeight: 500,
-              color: '#e8ecf4', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis',
+              color: 'var(--text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
             }}>
               {activeWorkspace?.name || 'Personal Workspace'}
             </p>
             <p style={{
-              fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#4a5068',
+              fontFamily: 'DM Mono, monospace', fontSize: 9, color: 'var(--text-tertiary)',
               margin: 0, marginTop: 1,
             }}>
               {isPersonal ? 'Personal' : `${activeWorkspace?.member_count ?? 1} member${(activeWorkspace?.member_count ?? 1) > 1 ? 's' : ''}`}
@@ -254,14 +254,14 @@ export function WorkspaceSwitcher() {
           </div>
           <ChevronDown
             size={12}
-            style={{ color: '#4a5068', flexShrink: 0, transition: 'transform 0.15s', transform: open ? 'rotate(180deg)' : 'none' }}
+            style={{ color: 'var(--text-tertiary)', flexShrink: 0, transition: 'transform 0.15s', transform: open ? 'rotate(180deg)' : 'none' }}
           />
         </button>
 
         {open && (
           <div style={{
             position: 'absolute', top: 'calc(100% + 4px)', left: 8, right: 8,
-            background: '#0e1015', border: '1px solid #1a1f2e', borderRadius: 8,
+            background: 'var(--card)', border: '1px solid var(--border-hover)', borderRadius: 8,
             zIndex: 200, overflow: 'hidden',
             boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
           }}>
@@ -269,7 +269,7 @@ export function WorkspaceSwitcher() {
             <div style={{ padding: '8px 10px 4px' }}>
               <p style={{
                 fontFamily: 'DM Sans, sans-serif', fontSize: 9, fontWeight: 600,
-                textTransform: 'uppercase', letterSpacing: '0.1em', color: '#374151', margin: 0,
+                textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-label)', margin: 0,
               }}>
                 Workspaces
               </p>
@@ -284,38 +284,38 @@ export function WorkspaceSwitcher() {
                     key={ws.id}
                     onClick={() => { setActiveWorkspace(ws); setOpen(false) }}
                     style={{
-                      width: '100%', background: isActive ? 'rgba(255, 255, 255,0.08)' : 'transparent',
+                      width: '100%', background: isActive ? 'var(--cta-bg)' : 'transparent',
                       border: 'none', padding: '7px 10px', cursor: 'pointer',
                       display: 'flex', alignItems: 'center', gap: 8,
                       transition: 'background 0.1s',
                     }}
-                    onMouseEnter={e => !isActive && (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
+                    onMouseEnter={e => !isActive && (e.currentTarget.style.background = 'var(--input-bg)')}
                     onMouseLeave={e => !isActive && (e.currentTarget.style.background = 'transparent')}
                   >
                     <WorkspaceAvatar ws={ws} size={18} />
                     <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
                       <p style={{
                         fontFamily: 'DM Sans, sans-serif', fontSize: 12, fontWeight: 500,
-                        color: isActive ? '#ffffff' : '#c9d1e0', margin: 0,
+                        color: isActive ? 'var(--text-active)' : 'var(--table-cell)', margin: 0,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>
                         {ws.name}
                       </p>
                       <p style={{
-                        fontFamily: 'DM Mono, monospace', fontSize: 9, color: '#4a5068',
+                        fontFamily: 'DM Mono, monospace', fontSize: 9, color: 'var(--text-tertiary)',
                         margin: 0, marginTop: 1, textTransform: 'capitalize',
                       }}>
                         {ws.is_personal ? 'Personal' : (ws.role || 'member')}
                       </p>
                     </div>
-                    {isActive && <Check size={11} color="#ffffff" />}
+                    {isActive && <Check size={11} color="var(--text-active)" />}
                   </button>
                 )
               })}
             </div>
 
             {/* Create new */}
-            <div style={{ borderTop: '1px solid #1a1f2e', padding: 6 }}>
+            <div style={{ borderTop: '1px solid var(--border-hover)', padding: 6 }}>
               <button
                 id="create-workspace-btn"
                 onClick={() => { setOpen(false); setShowCreate(true) }}
@@ -325,7 +325,7 @@ export function WorkspaceSwitcher() {
                   display: 'flex', alignItems: 'center', gap: 7, borderRadius: 5,
                   transition: 'background 0.1s',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--input-bg)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
                 <div style={{
@@ -334,9 +334,9 @@ export function WorkspaceSwitcher() {
                   border: '1px dashed #374151',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <Plus size={10} color="#6b7280" />
+                  <Plus size={10} color="var(--text-secondary)" />
                 </div>
-                <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 12, color: '#6b7280', fontWeight: 500 }}>
+                <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
                   Create workspace
                 </span>
               </button>

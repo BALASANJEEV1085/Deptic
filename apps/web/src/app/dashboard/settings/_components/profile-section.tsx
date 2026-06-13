@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { Camera, Mail, Save, ChevronDown } from 'lucide-react'
@@ -10,12 +10,26 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { Modal, SectionSkeleton, showToast } from './shared'
 import { useTheme } from 'next-themes'
+import { getUserProfile, updateUserProfile } from '@/lib/api'
+
+const ROLE_OPTIONS = [
+  'Security Engineer',
+  'DevOps / Platform Engineer',
+  'Software Developer',
+  'Engineering Manager',
+  'Compliance Officer',
+  'Student / Researcher',
+  'Other',
+]
 
 interface Props { user: User | null; loading: boolean }
 
 export function ProfileSection({ user, loading }: Props) {
   const supabase = createClient()
-  const { theme, setTheme } = useTheme()
+  const { theme, resolvedTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => setMounted(true), [])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [fullName, setFullName] = useState(user?.user_metadata?.full_name || '')
@@ -27,6 +41,18 @@ export function ProfileSection({ user, loading }: Props) {
   const [newEmail, setNewEmail] = useState('')
   const [sendingEmail, setSendingEmail] = useState(false)
   const [themeOpen, setThemeOpen] = useState(false)
+  const [jobRole, setJobRole] = useState('')
+  const [companyName, setCompanyName] = useState('')
+
+  useEffect(() => {
+    getUserProfile()
+      .then(p => {
+        if (p.full_name) setFullName(p.full_name)
+        if (p.job_role) setJobRole(p.job_role)
+        if (p.company_name) setCompanyName(p.company_name)
+      })
+      .catch(() => {})
+  }, [])
 
   const handleAvatarUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -51,8 +77,12 @@ export function ProfileSection({ user, loading }: Props) {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const { error } = await supabase.auth.updateUser({ data: { full_name: fullName, bio } })
-      if (error) throw error
+      await updateUserProfile({
+        full_name: fullName,
+        bio,
+        job_role: jobRole,
+        company_name: companyName,
+      })
       showToast('Profile saved!')
     } catch {
       showToast('Failed to save profile', 'error')
@@ -93,7 +123,7 @@ export function ProfileSection({ user, loading }: Props) {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full cursor-pointer"
+            className="absolute inset-0 bg-[var(--lp-bg)]/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full cursor-pointer"
           >
             <Camera className="h-4 w-4 text-foreground" />
           </button>
@@ -142,6 +172,31 @@ export function ProfileSection({ user, loading }: Props) {
           </div>
         </div>
 
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Role</label>
+            <select
+              value={jobRole}
+              onChange={e => setJobRole(e.target.value)}
+              className="w-full h-9 bg-muted/30 border border-border rounded-lg px-3 text-sm text-foreground focus:border-[var(--green)]/50 focus:outline-none"
+            >
+              <option value="">Select your role</option>
+              {ROLE_OPTIONS.map(r => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Company</label>
+            <Input
+              value={companyName}
+              onChange={e => setCompanyName(e.target.value)}
+              placeholder="Acme Corp"
+              className="bg-muted/30 border-border h-9 text-sm"
+            />
+          </div>
+        </div>
+
         <div className="space-y-1.5">
           <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Bio</label>
           <textarea
@@ -163,7 +218,7 @@ export function ProfileSection({ user, loading }: Props) {
                 onClick={() => setThemeOpen(!themeOpen)}
                 className="w-full h-9 bg-muted/30 border border-border rounded-lg px-3 pr-8 text-sm text-foreground text-left cursor-pointer focus:outline-none focus:border-[var(--green)]/50 transition-colors"
               >
-                {theme === 'light' ? 'Light' : theme === 'dark' ? 'Dark' : 'System'}
+                {!mounted ? 'Appearance' : theme === 'system' ? 'System' : resolvedTheme === 'light' ? 'Light' : 'Dark'}
               </button>
               <ChevronDown className={cn("absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none transition-transform", themeOpen && "rotate-180")} />
               {themeOpen && (

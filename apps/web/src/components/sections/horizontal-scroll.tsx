@@ -37,8 +37,8 @@ const PANELS = [
 function PanelVisual({ kind }: { kind: string }) {
   if (kind === 'connect') {
     return (
-      <div className="flex h-14 w-full max-w-md items-center rounded-full border border-[#2a2a2a] bg-[#1a1a1a] pl-6 pr-1.5">
-        <span className="flex-1 truncate font-mono text-sm text-white">
+      <div className="flex h-14 w-full max-w-md items-center rounded-full border border-[var(--lp-border-2)] bg-[var(--lp-surface-2)] pl-6 pr-1.5">
+        <span className="flex-1 truncate font-mono text-sm text-[var(--lp-text)]">
           https://github.com/company/backend<span className="animate-caret">|</span>
         </span>
         <span className="rounded-full bg-white px-6 py-2.5 text-sm font-semibold text-black">
@@ -49,12 +49,12 @@ function PanelVisual({ kind }: { kind: string }) {
   }
   if (kind === 'detect') {
     return (
-      <div className="w-full max-w-sm rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-4 font-mono text-[13px]">
-        <p className="text-[#666666]">backend/</p>
-        <p className="pl-4 text-white">├─ package.json ✓</p>
-        <p className="pl-4 text-[#888888]">├─ src/</p>
-        <p className="pl-4 text-white">├─ pom.xml ✓</p>
-        <p className="pl-4 text-white">└─ go.mod ✓</p>
+      <div className="w-full max-w-sm rounded-xl border border-[var(--lp-border)] bg-[var(--lp-surface)] p-4 font-mono text-[13px]">
+        <p className="text-[var(--lp-text-muted)]">backend/</p>
+        <p className="pl-4 text-[var(--lp-text)]">├─ package.json ✓</p>
+        <p className="pl-4 text-[var(--lp-text-muted)]">├─ src/</p>
+        <p className="pl-4 text-[var(--lp-text)]">├─ pom.xml ✓</p>
+        <p className="pl-4 text-[var(--lp-text)]">└─ go.mod ✓</p>
       </div>
     )
   }
@@ -92,7 +92,7 @@ function PanelVisual({ kind }: { kind: string }) {
             <circle key={i} cx={cx} cy={cy} r={r} fill={c as string} />
           ))}
         </svg>
-        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 font-heading text-lg font-bold text-white">
+        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 font-heading text-lg font-bold text-[var(--lp-text)]">
           1,247 deps
         </div>
       </div>
@@ -101,19 +101,19 @@ function PanelVisual({ kind }: { kind: string }) {
   // report
   return (
     <div className="grid w-full max-w-sm grid-cols-2 gap-3">
-      <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-4">
-        <p className="font-heading text-2xl font-bold text-white">100</p>
-        <p className="text-xs text-[#888888]">compliance score</p>
+      <div className="rounded-xl border border-[var(--lp-border)] bg-[var(--lp-surface)] p-4">
+        <p className="font-heading text-2xl font-bold text-[var(--lp-text)]">100</p>
+        <p className="text-xs text-[var(--lp-text-muted)]">compliance score</p>
       </div>
-      <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-4">
-        <p className="font-heading text-2xl font-bold text-white">3</p>
-        <p className="text-xs text-[#888888]">CVEs patched</p>
+      <div className="rounded-xl border border-[var(--lp-border)] bg-[var(--lp-surface)] p-4">
+        <p className="font-heading text-2xl font-bold text-[var(--lp-text)]">3</p>
+        <p className="text-xs text-[var(--lp-text-muted)]">CVEs patched</p>
       </div>
       <div className="col-span-2 flex gap-2">
         <span className="flex-1 rounded-lg bg-white py-2 text-center text-xs font-semibold text-black">
           Export PDF
         </span>
-        <span className="flex-1 rounded-lg border border-[#2a2a2a] py-2 text-center text-xs text-white">
+        <span className="flex-1 rounded-lg border border-[var(--lp-border-2)] py-2 text-center text-xs text-[var(--lp-text)]">
           CycloneDX
         </span>
       </div>
@@ -126,14 +126,14 @@ function Panel({ panel }: { panel: (typeof PANELS)[number] }) {
     <div className="flex w-screen shrink-0 items-center justify-center px-6 md:px-20">
       <div className="grid w-full max-w-6xl grid-cols-1 items-center gap-10 md:grid-cols-2">
         <div>
-          <span className="font-mono text-sm text-[#666666]">{panel.num}</span>
-          <p className="mt-2 text-sm uppercase tracking-widest text-[#888888]">
+          <span className="font-mono text-sm text-[var(--lp-text-muted)]">{panel.num}</span>
+          <p className="mt-2 text-sm uppercase tracking-widest text-[var(--lp-text-muted)]">
             {panel.kicker}
           </p>
-          <h3 className="mt-4 font-heading text-3xl font-bold tracking-[-0.02em] text-white md:text-5xl">
+          <h3 className="mt-4 font-heading text-3xl font-bold tracking-[-0.02em] text-[var(--lp-text)] md:text-5xl">
             {panel.title}
           </h3>
-          <p className="mt-4 max-w-md text-base text-[#888888]">{panel.body}</p>
+          <p className="mt-4 max-w-md text-base text-[var(--lp-text-muted)]">{panel.body}</p>
         </div>
         <div className="flex items-center justify-center">
           <PanelVisual kind={panel.visual} />
@@ -149,9 +149,9 @@ export function HorizontalScroll() {
 
   if (isMobile) {
     return (
-      <section className="bg-black">
+      <section className="bg-[var(--lp-bg)]">
         {PANELS.map((p) => (
-          <div key={p.num} className="flex min-h-[80vh] items-center border-b border-[#1a1a1a]">
+          <div key={p.num} className="flex min-h-[80vh] items-center border-b border-[var(--lp-border)]">
             <Panel panel={p} />
           </div>
         ))}
@@ -160,10 +160,10 @@ export function HorizontalScroll() {
   }
 
   return (
-    <section ref={ref} className="relative bg-black" style={{ height: '400vh' }}>
+    <section ref={ref} className="relative bg-[var(--lp-bg)]" style={{ height: '400vh' }}>
       <div className="sticky top-0 flex h-screen flex-col overflow-hidden">
         {/* progress bar */}
-        <div className="absolute left-0 top-0 z-10 h-[2px] w-full bg-[#1a1a1a]">
+        <div className="absolute left-0 top-0 z-10 h-[2px] w-full bg-[var(--lp-surface-2)]">
           <div className="h-full bg-white" style={{ width: `${progress * 100}%` }} />
         </div>
         <div
@@ -174,7 +174,7 @@ export function HorizontalScroll() {
             <Panel key={p.num} panel={p} />
           ))}
         </div>
-        <div className="absolute bottom-8 right-8 flex items-center gap-2 text-[#666666]">
+        <div className="absolute bottom-8 right-8 flex items-center gap-2 text-[var(--lp-text-muted)]">
           <span className="text-xs">scroll</span>
           <ArrowRight className="size-4" />
         </div>

@@ -18,7 +18,7 @@ function severityColor(sev: string): string {
     case "CRITICAL": return "#ef4444";
     case "HIGH":     return "#f97316";
     case "MEDIUM":   return "#f59e0b";
-    default:         return "#6b7280";
+    default:         return "var(--text-secondary)";
   }
 }
 
@@ -30,7 +30,7 @@ function SkeletonRow() {
         <td key={i} style={{ padding: "0 16px", height: 44 }}>
           <div
             className="skeleton"
-            style={{ height: 10, width: w, background: "#16191f", borderRadius: 4 }}
+            style={{ height: 10, width: w, background: "var(--border)", borderRadius: 4 }}
           />
         </td>
       ))}
@@ -106,7 +106,7 @@ export default function VulnerabilitiesPage() {
             fontSize: 24,
             fontWeight: 700,
             letterSpacing: "-0.5px",
-            color: "#e8ecf4",
+            color: "var(--text-primary)",
             margin: "0 0 4px",
           }}
         >
@@ -118,25 +118,25 @@ export default function VulnerabilitiesPage() {
             style={{
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13,
-              color: "#6b7280",
+              color: "var(--text-secondary)",
               margin: 0,
             }}
           >
             {summary.total} vulnerabilities across {repos} repositories{" "}
-            <span style={{ color: "#374151", margin: "0 4px" }}>·</span>
-            <span style={{ color: summary.critical > 0 ? "#ef4444" : "#374151" }}>
+            <span style={{ color: "var(--text-label)", margin: "0 4px" }}>·</span>
+            <span style={{ color: summary.critical > 0 ? "#ef4444" : "var(--text-label)" }}>
               {summary.critical} Critical
             </span>{" "}
-            <span style={{ color: "#374151", margin: "0 4px" }}>·</span>
-            <span style={{ color: summary.high > 0 ? "#f97316" : "#374151" }}>
+            <span style={{ color: "var(--text-label)", margin: "0 4px" }}>·</span>
+            <span style={{ color: summary.high > 0 ? "#f97316" : "var(--text-label)" }}>
               {summary.high} High
             </span>{" "}
-            <span style={{ color: "#374151", margin: "0 4px" }}>·</span>
-            <span style={{ color: summary.medium > 0 ? "#f59e0b" : "#374151" }}>
+            <span style={{ color: "var(--text-label)", margin: "0 4px" }}>·</span>
+            <span style={{ color: summary.medium > 0 ? "#f59e0b" : "var(--text-label)" }}>
               {summary.medium} Medium
             </span>{" "}
-            <span style={{ color: "#374151", margin: "0 4px" }}>·</span>
-            <span style={{ color: "#374151" }}>{summary.low} Low</span>
+            <span style={{ color: "var(--text-label)", margin: "0 4px" }}>·</span>
+            <span style={{ color: "var(--text-label)" }}>{summary.low} Low</span>
           </p>
         )}
       </div>
@@ -152,12 +152,12 @@ export default function VulnerabilitiesPage() {
                 gap: 6,
                 padding: "0 12px",
                 height: 34,
-                background: "#0e1015",
-                border: "1px solid #16191f",
+                background: "var(--card)",
+                border: "1px solid var(--border)",
                 borderRadius: 6,
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 13,
-                color: "#6b7280",
+                color: "var(--text-secondary)",
                 cursor: "pointer",
                 minWidth: 150,
                 justifyContent: "space-between",
@@ -170,8 +170,8 @@ export default function VulnerabilitiesPage() {
             <DropdownMenuContent
               align="end"
               style={{
-                background: "#0e1015",
-                border: "1px solid #16191f",
+                background: "var(--card)",
+                border: "1px solid var(--border)",
                 padding: 4,
                 minWidth: 150,
               }}
@@ -183,7 +183,7 @@ export default function VulnerabilitiesPage() {
                   style={{
                     fontFamily: "DM Sans, sans-serif",
                     fontSize: 13,
-                    color: severityFilter === s ? "#ffffff" : "#c9d1e0",
+                    color: severityFilter === s ? "#ffffff" : "var(--table-cell)",
                     padding: "6px 10px",
                     cursor: "pointer",
                     borderRadius: 4,
@@ -206,16 +206,16 @@ export default function VulnerabilitiesPage() {
             alignItems: "center",
             justifyContent: "center",
             padding: "80px 20px",
-            border: "1px solid #16191f",
+            border: "1px solid var(--border)",
             borderRadius: 8,
             gap: 12,
           }}
         >
           <ShieldCheck size={40} color="#ffffff" style={{ opacity: 0.3 }} />
-          <p style={{ fontFamily: "DM Sans, sans-serif", fontSize: 15, color: "#e8ecf4", margin: 0 }}>
+          <p style={{ fontFamily: "DM Sans, sans-serif", fontSize: 15, color: "var(--text-primary)", margin: 0 }}>
             No vulnerabilities detected
           </p>
-          <p style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, color: "#6b7280", margin: 0 }}>
+          <p style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
             Zero CVEs across your supply chain.
           </p>
         </div>
@@ -225,8 +225,8 @@ export default function VulnerabilitiesPage() {
       {(loading || (vulns && vulns.length > 0)) && (
         <div
           style={{
-            background: "#0e1015",
-            border: "1px solid #16191f",
+            background: "var(--card)",
+            border: "1px solid var(--border)",
             borderRadius: 8,
             overflow: "hidden",
           }}
@@ -256,7 +256,7 @@ export default function VulnerabilitiesPage() {
                         padding: "48px 16px",
                         fontFamily: "DM Sans, sans-serif",
                         fontSize: 13,
-                        color: "#374151",
+                        color: "var(--text-label)",
                       }}
                     >
                       No results for severity &ldquo;{severityFilter}&rdquo;
@@ -273,7 +273,7 @@ export default function VulnerabilitiesPage() {
                               fontFamily: "DM Sans, sans-serif",
                               fontSize: 13,
                               fontWeight: 500,
-                              color: "#e8ecf4",
+                              color: "var(--text-primary)",
                               margin: "0 0 2px",
                               overflow: "hidden",
                               textOverflow: "ellipsis",
@@ -288,7 +288,7 @@ export default function VulnerabilitiesPage() {
                               style={{
                                 fontFamily: "DM Mono, monospace",
                                 fontSize: 10,
-                                color: "#374151",
+                                color: "var(--text-label)",
                               }}
                             >
                               #{shortId(v.scan_id)}
@@ -303,7 +303,7 @@ export default function VulnerabilitiesPage() {
                           style={{
                             fontFamily: "DM Mono, monospace",
                             fontSize: 13,
-                            color: "#c9d1e0",
+                            color: "var(--table-cell)",
                           }}
                         >
                           {v.component_name}
@@ -316,7 +316,7 @@ export default function VulnerabilitiesPage() {
                           style={{
                             fontFamily: "DM Mono, monospace",
                             fontSize: 12,
-                            color: "#6b7280",
+                            color: "var(--text-secondary)",
                           }}
                         >
                           {v.component_version}
@@ -378,7 +378,7 @@ export default function VulnerabilitiesPage() {
                             style={{
                               fontFamily: "DM Mono, monospace",
                               fontSize: 12,
-                              color: "#ffffff",
+                              color: "var(--text-active)",
                             }}
                           >
                             → v{v.fixed_version}
@@ -388,7 +388,7 @@ export default function VulnerabilitiesPage() {
                             style={{
                               fontFamily: "DM Mono, monospace",
                               fontSize: 12,
-                              color: "#374151",
+                              color: "var(--text-label)",
                             }}
                           >
                             —
@@ -405,7 +405,7 @@ export default function VulnerabilitiesPage() {
                               fontFamily: "DM Sans, sans-serif",
                               fontSize: 13,
                               fontWeight: 500,
-                              color: "#ffffff",
+                              color: "var(--text-active)",
                               textDecoration: "none",
                             }}
                           >

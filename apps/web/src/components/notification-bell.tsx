@@ -78,7 +78,7 @@ export function NotificationBell() {
         onClick={() => setIsOpen(!isOpen)}
         style={{
           background: 'transparent', border: 'none', cursor: 'pointer',
-          color: '#e8ecf4', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36,
+          color: 'var(--text-primary)', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36,
           borderRadius: '50%',
         }}
       >
@@ -99,7 +99,7 @@ export function NotificationBell() {
           display: 'flex', flexDirection: 'column'
         }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid #1a1f2e', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontWeight: 600, color: '#f0f4ff' }}>Notifications</span>
+            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Notifications</span>
             {unreadCount > 0 && (
               <button onClick={markAllRead} style={{ background: 'transparent', border: 'none', color: '#60a5fa', fontSize: 12, cursor: 'pointer' }}>
                 Mark all read
@@ -109,7 +109,7 @@ export function NotificationBell() {
 
           <div style={{ flex: 1, overflowY: 'auto', padding: 0 }}>
             {notifications.length === 0 ? (
-              <div style={{ padding: 40, textAlign: 'center', color: '#8b91a8' }}>
+              <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-secondary)' }}>
                 <Bell size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
                 <div style={{ fontSize: 14 }}>No notifications yet</div>
               </div>
@@ -131,8 +131,8 @@ export function NotificationBell() {
                   }}>
                     <div style={{ fontSize: 20 }}>{icon}</div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 500, fontSize: 14, color: '#e8ecf4', marginBottom: 4 }}>{n.title}</div>
-                      <div style={{ fontSize: 13, color: '#8b91a8', lineHeight: 1.5 }}>{n.body}</div>
+                      <div style={{ fontWeight: 500, fontSize: 14, color: 'var(--text-primary)', marginBottom: 4 }}>{n.title}</div>
+                      <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{n.body}</div>
                     </div>
                   </div>
                 );
@@ -141,7 +141,7 @@ export function NotificationBell() {
           </div>
 
           <div style={{ padding: '12px 20px', borderTop: '1px solid #1a1f2e', textAlign: 'center' }}>
-            <button onClick={() => { setIsOpen(false); router.push('/dashboard/settings'); }} style={{ background: 'transparent', border: 'none', color: '#8b91a8', fontSize: 13, cursor: 'pointer' }}>
+            <button onClick={() => { setIsOpen(false); router.push('/dashboard/settings'); }} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer' }}>
               Notification settings
             </button>
           </div>

@@ -14,13 +14,15 @@ import { ApiAccessSection } from './_components/api-section'
 import { IntegrationsSection } from './_components/integrations-section'
 import { WebhooksSection } from './_components/webhook-section'
 import { WorkspaceSettingsSection } from './_components/workspace-section'
+import { PlanSection } from './_components/plan-section'
 import { useWorkspace } from '@/lib/contexts/workspace-context'
 
-type SectionId = 'profile' | 'workspace' | 'notifications' | 'security' | 'api' | 'integrations' | 'webhooks'
+type SectionId = 'profile' | 'workspace' | 'plan' | 'notifications' | 'security' | 'api' | 'integrations' | 'webhooks'
 
 const TABS: { id: SectionId; label: string; icon: React.ElementType }[] = [
   { id: 'profile',       label: 'Profile',         icon: UserIcon   },
   { id: 'workspace',     label: 'Workspace',       icon: Users      },
+  { id: 'plan',          label: 'Plan & Usage',    icon: Zap        },
   { id: 'notifications', label: 'Notifications',   icon: Bell       },
   { id: 'security',      label: 'Security & Auth',  icon: ShieldCheck },
   { id: 'api',           label: 'API Access',       icon: Key        },
@@ -31,6 +33,7 @@ const TABS: { id: SectionId; label: string; icon: React.ElementType }[] = [
 const SECTION_TITLES: Record<SectionId, { title: string; desc: string }> = {
   profile:       { title: 'Profile',         desc: 'Manage your personal information and appearance.' },
   workspace:     { title: 'Workspace Settings', desc: 'Collaborators, team permissions, and workspace configuration.' },
+  plan:          { title: 'Plan & Usage',    desc: 'View your current plan, limits, and usage.' },
   notifications: { title: 'Notifications',   desc: 'Control which alerts land in your inbox.' },
   security:      { title: 'Security & Auth', desc: 'Passwords, connected providers, and active sessions.' },
   api:           { title: 'API Access',      desc: 'Generate and manage API keys for programmatic access.' },
@@ -92,8 +95,8 @@ export default function SettingsPage() {
               className={cn(
                 "flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all shrink-0",
                 active === id
-                  ? "bg-[#ffffff]/10 text-[#ffffff] border border-[#ffffff]/20"
-                  : "text-zinc-500 hover:text-foreground hover:bg-muted/40 border border-transparent"
+                  ? "bg-[var(--green)]/10 text-[var(--green)] border border-[var(--green)]/30"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/40 border border-transparent"
               )}
             >
               <Icon className="h-3.5 w-3.5" />
@@ -115,13 +118,13 @@ export default function SettingsPage() {
                   className={cn(
                     "group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left",
                     active === id
-                      ? "bg-[#ffffff]/[0.08] text-foreground"
-                      : "text-zinc-500 hover:text-foreground hover:bg-muted/40"
+                      ? "bg-[var(--green)]/10 text-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
                   )}
                 >
                   <Icon className={cn(
                     "h-4 w-4 transition-colors ml-1",
-                    active === id ? "text-[#ffffff]" : "text-zinc-600 group-hover:text-muted-foreground"
+                    active === id ? "text-[var(--green)]" : "text-muted-foreground group-hover:text-foreground"
                   )} />
                   <span>{label}</span>
                 </button>
@@ -142,6 +145,7 @@ export default function SettingsPage() {
             {/* Section content */}
             {active === 'profile'       && <ProfileSection       user={user} loading={loading} />}
             {active === 'workspace'     && <WorkspaceSettingsSection />}
+            {active === 'plan'          && <PlanSection />}
             {active === 'notifications' && <NotificationsSection user={user} loading={loading} />}
             {active === 'security'      && <SecuritySection      user={user} loading={loading} />}
             {active === 'api'           && <ApiAccessSection     user={user} loading={loading} />}

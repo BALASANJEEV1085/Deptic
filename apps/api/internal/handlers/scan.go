@@ -20,6 +20,7 @@ import (
 	"github.com/deptic-io/api/internal/db"
 	"github.com/deptic-io/api/internal/github"
 	"github.com/deptic-io/api/internal/notify"
+	"github.com/deptic-io/api/internal/plans"
 	"github.com/deptic-io/api/internal/scanner"
 	"github.com/deptic-io/api/internal/vuln"
 	"github.com/deptic-io/api/internal/workspace"
@@ -150,6 +151,7 @@ func RegisterRoutes(api fiber.Router, database *sql.DB, redisClient *redis.Clien
 	wh := NewWorkspaceHandler(database)
 	webh := NewWebhookHandler(database, redisClient, h)
 	pushh := NewPushHandler(database)
+	obh := NewOnboardingHandler(database)
 
 	// Public routes (no auth)
 	api.Post("/webhooks/github", webh.HandleGitHubWebhook)
@@ -158,6 +160,8 @@ func RegisterRoutes(api fiber.Router, database *sql.DB, redisClient *redis.Clien
 	api.Get("/notifications/unread", pushh.GetUnreadOffline)
 	api.Post("/notifications/:id/clicked", pushh.MarkClicked)
 	api.Post("/donate", HandleDonate)
+	api.Post("/payment/webhook", h.RazorpayWebhook)
+	api.Post("/cookies/consent", h.SaveCookieConsent)
 
 	// CLI scan — authenticated by X-API-Key header only, NO JWT
 	api.Post("/scan-local", h.ScanLocal)
@@ -190,6 +194,12 @@ func RegisterRoutes(api fiber.Router, database *sql.DB, redisClient *redis.Clien
 	api.Delete("/keys/:keyID", h.HandleDeleteKey)
 
 	ih.RegisterRoutes(api)
+	obh.RegisterRoutes(api)
+
+	// Payment routes
+	api.Post("/payment/create-order", h.CreatePaymentOrder)
+	api.Post("/payment/verify", h.VerifyPayment)
+	api.Get("/payment/status", h.GetPaymentStatus)
 
 	api.Post("/scans", h.HandleCreateScan)
 	api.Get("/scans", h.HandleListAllScans)
@@ -213,6 +223,7 @@ func RegisterRoutes(api fiber.Router, database *sql.DB, redisClient *redis.Clien
 	api.Get("/scans/:scanID/compliance", h.GetCompliance)
 	api.Get("/scans/:scanID/report/pdf", h.DownloadPDFReport)
 	api.Delete("/deptics/:depticID/shares/:token", h.HandleRevokeShareLink)
+	api.Get("/share/:token/download", h.HandleDownloadShareLink)
 
 	// Account deletion
 	api.Delete("/account", h.HandleDeleteAccount)
@@ -241,6 +252,17 @@ type createScanRequest struct {
 // HandleCreateScan handles POST /api/scans
 func (h *ScanHandler) HandleCreateScan(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
+
+	exceeded, _, limit, _ := plans.CheckDailyScanLimit(c.Context(), h.db, userID)
+	if exceeded {
+		return c.Status(429).JSON(fiber.Map{
+			"error":       "Daily scan limit reached",
+			"limit":       limit,
+			"remaining":   0,
+			"plan":        plans.GetUserPlan(c.Context(), h.db, userID),
+			"upgrade_url": "/pricing",
+		})
+	}
 
 	var req createScanRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -301,6 +323,8 @@ func (h *ScanHandler) HandleCreateScan(c *fiber.Ctx) error {
 
 	// Launch scan in background
 	go h.RunFullScan(scanID, userID, githubToken, owner, repo, req.GithubURL)
+
+	plans.IncrementScanCount(c.Context(), h.db, userID)
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"scan_id": scanID,

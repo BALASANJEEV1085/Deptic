@@ -212,7 +212,7 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Slack Integration */}
-        <Card className="bg-background border-border shadow-xl overflow-hidden group hover:border-[#ffffff]/30 transition-colors">
+        <Card className="bg-background border-border shadow-xl overflow-hidden group hover:border-[var(--green)]/30 transition-colors">
           <CardHeader className="border-b border-border bg-muted/20">
             <div className="flex items-start justify-between">
               <div>
@@ -270,7 +270,7 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
                   <Input 
                     id="slackUrl" 
                     placeholder="https://hooks.slack.com/services/..." 
-                    className="bg-[#0a0c10] border-border text-sm h-10"
+                    className="bg-muted/50 border-border text-foreground text-sm h-10"
                     value={slackUrl}
                     onChange={(e) => setSlackUrl(e.target.value)}
                     required
@@ -281,17 +281,17 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
                   <Input 
                     id="slackChannel" 
                     placeholder="#security-alerts" 
-                    className="bg-[#0a0c10] border-border text-sm h-10 font-mono"
+                    className="bg-muted/50 border-border text-foreground text-sm h-10 font-mono"
                     value={slackChannel}
                     onChange={(e) => setSlackChannel(e.target.value)}
                     required
                   />
                 </div>
                 <div className="pt-2">
-                  <Button type="submit" disabled={saving || !canManage} className="w-full bg-white text-black hover:bg-zinc-200 font-bold h-10 shadow-[0_0_20px_rgba(255,255,255,0.1)] disabled:opacity-50">
+                  <Button type="submit" disabled={saving || !canManage} className="w-full bg-[var(--green)] text-black hover:bg-[var(--green)]/90 font-bold h-10 disabled:opacity-50">
                     {saving ? 'Connecting...' : 'Connect Slack'}
                   </Button>
-                  <a href="https://api.slack.com/messaging/webhooks" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 mt-4 text-[11px] text-zinc-500 hover:text-[#ffffff] transition-colors">
+                  <a href="https://api.slack.com/messaging/webhooks" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 mt-4 text-[11px] text-muted-foreground hover:text-[var(--green)] transition-colors">
                     How to create a Slack webhook <ExternalLink className="h-3 w-3" />
                   </a>
                 </div>
@@ -359,7 +359,7 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
                   <Input 
                     id="jiraUrl" 
                     placeholder="https://company.atlassian.net" 
-                    className="bg-[#0a0c10] border-border text-sm h-10"
+                    className="bg-muted/50 border-border text-foreground text-sm h-10"
                     value={jiraUrl}
                     onChange={(e) => setJiraUrl(e.target.value)}
                     required
@@ -371,7 +371,7 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
                     id="jiraEmail" 
                     type="email"
                     placeholder="admin@company.com" 
-                    className="bg-[#0a0c10] border-border text-sm h-10"
+                    className="bg-muted/50 border-border text-foreground text-sm h-10"
                     value={jiraEmail}
                     onChange={(e) => setJiraEmail(e.target.value)}
                     required
@@ -383,7 +383,7 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
                     id="jiraToken" 
                     type="password"
                     placeholder="••••••••••••••••" 
-                    className="bg-[#0a0c10] border-border text-sm h-10"
+                    className="bg-muted/50 border-border text-foreground text-sm h-10"
                     value={jiraToken}
                     onChange={(e) => setJiraToken(e.target.value)}
                     required
@@ -394,7 +394,7 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
                   <Input 
                     id="jiraProject" 
                     placeholder="SEC" 
-                    className="bg-[#0a0c10] border-border text-sm h-10 font-mono uppercase"
+                    className="bg-muted/50 border-border text-foreground text-sm h-10 font-mono uppercase"
                     value={jiraProject}
                     onChange={(e) => setJiraProject(e.target.value.toUpperCase())}
                     required

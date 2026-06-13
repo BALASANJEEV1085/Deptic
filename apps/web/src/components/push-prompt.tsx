@@ -7,7 +7,6 @@ export function PushPrompt() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Show after 3 seconds on first dashboard visit
     const dismissed = localStorage.getItem('deptic-push-dismissed');
     if (dismissed) return;
 
@@ -26,7 +25,6 @@ export function PushPrompt() {
     setLoading(false);
     setShow(false);
     if (sub) {
-      // Show a test notification immediately
       new Notification('Deptic notifications enabled ✓', {
         body: 'You will now receive alerts for scans and vulnerabilities.',
         icon: '/icon-192.png',
@@ -42,33 +40,39 @@ export function PushPrompt() {
   if (!show) return null;
 
   return (
-    <div style={{
-      position: 'fixed', bottom: 24, right: 24, zIndex: 999,
-      background: '#0f1117', border: '1px solid #1a1f2e',
-      borderRadius: 12, padding: '20px 24px', maxWidth: 340,
-      boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
-      animation: 'slideUp 0.3s ease',
-    }}>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(255, 255, 255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 18 }}>🔔</div>
+    <div
+      className="fixed bottom-6 right-6 z-[999] rounded-xl p-5 max-w-[340px] shadow-2xl"
+      style={{
+        background: 'var(--card)',
+        border: '1px solid var(--border-hover)',
+        boxShadow: `0 20px 40px var(--shadow-color)`,
+        animation: 'slideUp 0.3s ease',
+      }}
+    >
+      <div className="flex gap-3 items-start">
+        <div
+          className="flex items-center justify-center w-9 h-9 rounded-lg shrink-0 text-lg"
+          style={{ background: 'var(--avatar-bg)' }}
+        >
+          🔔
+        </div>
         <div>
-          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4, color: '#f0f4ff' }}>Enable security alerts</div>
-          <div style={{ fontSize: 12, color: '#8b91a8', lineHeight: 1.6, marginBottom: 14 }}>
+          <div className="font-semibold text-sm mb-1 text-[var(--text-primary)]">Enable security alerts</div>
+          <div className="text-xs leading-relaxed mb-3.5 text-[var(--text-secondary)]">
             Get instant browser notifications for critical CVEs, scan results, and Fix PRs.
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={enable} disabled={loading} style={{
-              background: '#ffffff', color: '#000', border: 'none',
-              borderRadius: 7, padding: '8px 16px', fontSize: 12,
-              fontWeight: 600, cursor: 'pointer',
-            }}>
+          <div className="flex gap-2">
+            <button
+              onClick={enable}
+              disabled={loading}
+              className="rounded-md px-4 py-2 text-xs font-semibold cursor-pointer border-none bg-[var(--green)] text-black"
+            >
               {loading ? 'Enabling...' : 'Enable notifications'}
             </button>
-            <button onClick={dismiss} style={{
-              background: 'transparent', color: '#4a5068',
-              border: '1px solid #1a1f2e', borderRadius: 7,
-              padding: '8px 12px', fontSize: 12, cursor: 'pointer',
-            }}>
+            <button
+              onClick={dismiss}
+              className="rounded-md px-3 py-2 text-xs cursor-pointer bg-transparent text-[var(--text-tertiary)] border border-[var(--border-hover)]"
+            >
               Not now
             </button>
           </div>

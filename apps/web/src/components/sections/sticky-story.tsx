@@ -23,13 +23,13 @@ const STAGES = [
 
 function StageVisual({ stage }: { stage: number }) {
   return (
-    <div className="relative h-[420px] w-full overflow-hidden rounded-xl border border-[#1a1a1a] bg-[#0a0a0a]">
+    <div className="relative h-[420px] w-full overflow-hidden rounded-xl border border-[var(--lp-border)] bg-[var(--lp-surface)]">
       {/* window chrome */}
-      <div className="flex items-center gap-1.5 border-b border-[#1a1a1a] px-4 py-3">
+      <div className="flex items-center gap-1.5 border-b border-[var(--lp-border)] px-4 py-3">
         <span className="size-2.5 rounded-full bg-[#2a2a2a]" />
         <span className="size-2.5 rounded-full bg-[#2a2a2a]" />
         <span className="size-2.5 rounded-full bg-[#2a2a2a]" />
-        <span className="ml-3 font-mono text-xs text-[#666666]">
+        <span className="ml-3 font-mono text-xs text-[var(--lp-text-muted)]">
           {stage === 0 ? 'deptic — terminal' : 'deptic — dashboard'}
         </span>
       </div>
@@ -40,12 +40,12 @@ function StageVisual({ stage }: { stage: number }) {
           className="absolute inset-0 p-5 font-mono text-[13px] leading-6 transition-opacity duration-500"
           style={{ opacity: stage === 0 ? 1 : 0 }}
         >
-          <p className="text-white">$ deptic-scan</p>
-          <p className="text-[#888888]">› Fetching file tree... 2,847 files indexed</p>
-          <p className="text-[#888888]">› Found package.json</p>
-          <p className="text-[#888888]">› Found pom.xml</p>
-          <p className="text-[#888888]">› Found go.mod</p>
-          <p className="text-white">
+          <p className="text-[var(--lp-text)]">$ deptic-scan</p>
+          <p className="text-[var(--lp-text-muted)]">› Fetching file tree... 2,847 files indexed</p>
+          <p className="text-[var(--lp-text-muted)]">› Found package.json</p>
+          <p className="text-[var(--lp-text-muted)]">› Found pom.xml</p>
+          <p className="text-[var(--lp-text-muted)]">› Found go.mod</p>
+          <p className="text-[var(--lp-text)]">
             › Indexing<span className="animate-caret">_</span>
           </p>
         </div>
@@ -55,13 +55,13 @@ function StageVisual({ stage }: { stage: number }) {
           className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-5 transition-opacity duration-500"
           style={{ opacity: stage === 1 ? 1 : 0 }}
         >
-          <p className="font-heading text-5xl font-bold text-white">1,247</p>
-          <p className="text-sm text-[#888888]">components resolved</p>
+          <p className="font-heading text-5xl font-bold text-[var(--lp-text)]">1,247</p>
+          <p className="text-sm text-[var(--lp-text-muted)]">components resolved</p>
           <div className="grid grid-cols-6 gap-2">
             {Array.from({ length: 18 }).map((_, i) => (
               <span
                 key={i}
-                className="size-3 rounded-full border border-[#2a2a2a] bg-[#1a1a1a]"
+                className="size-3 rounded-full border border-[var(--lp-border-2)] bg-[var(--lp-surface-2)]"
               />
             ))}
           </div>
@@ -83,16 +83,16 @@ function StageVisual({ stage }: { stage: number }) {
               className={`flex items-center justify-between rounded-md border px-3 py-2.5 ${
                 row.crit
                   ? 'border-[#ff4444]/40 bg-[#ff4444]/5 animate-glow-pulse'
-                  : 'border-[#1a1a1a] bg-[#111111]'
+                  : 'border-[var(--lp-border)] bg-[var(--lp-surface-2)]'
               }`}
             >
-              <span className="font-mono text-[13px] text-white">{row.n}</span>
-              <span className="font-mono text-xs text-[#666666]">{row.v}</span>
+              <span className="font-mono text-[13px] text-[var(--lp-text)]">{row.n}</span>
+              <span className="font-mono text-xs text-[var(--lp-text-muted)]">{row.v}</span>
               <span
                 className={`rounded px-2 py-0.5 text-[10px] font-bold ${
                   row.crit
                     ? 'bg-[#ff4444] text-black'
-                    : 'border border-[#2a2a2a] text-[#888888]'
+                    : 'border border-[var(--lp-border-2)] text-[var(--lp-text-muted)]'
                 }`}
               >
                 {row.sev}
@@ -123,15 +123,15 @@ function StageVisual({ stage }: { stage: number }) {
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="font-heading text-3xl font-bold text-white">100</span>
-              <span className="text-[10px] text-[#888888]">/ 100</span>
+              <span className="font-heading text-3xl font-bold text-[var(--lp-text)]">100</span>
+              <span className="text-[10px] text-[var(--lp-text-muted)]">/ 100</span>
             </div>
           </div>
           <div className="flex gap-3">
-            <span className="rounded-md border border-[#1a1a1a] bg-[#111111] px-3 py-1.5 text-xs text-white">
+            <span className="rounded-md border border-[var(--lp-border)] bg-[var(--lp-surface-2)] px-3 py-1.5 text-xs text-[var(--lp-text)]">
               CycloneDX 1.5
             </span>
-            <span className="rounded-md border border-[#1a1a1a] bg-[#111111] px-3 py-1.5 text-xs text-white">
+            <span className="rounded-md border border-[var(--lp-border)] bg-[var(--lp-surface-2)] px-3 py-1.5 text-xs text-[var(--lp-text)]">
               SPDX 2.3
             </span>
           </div>
@@ -146,10 +146,10 @@ export function StickyStory() {
   const stage = Math.min(3, Math.floor(progress * 3.999))
 
   return (
-    <section ref={ref} className="relative bg-black" style={{ height: '500vh' }}>
+    <section ref={ref} className="relative bg-[var(--lp-bg)]" style={{ height: '500vh' }}>
       <div className="sticky top-0 flex h-screen items-center overflow-hidden">
         {/* progress line */}
-        <div className="absolute right-0 top-0 h-full w-[2px] bg-[#1a1a1a]">
+        <div className="absolute right-0 top-0 h-full w-[2px] bg-[var(--lp-surface-2)]">
           <div
             className="w-full bg-white"
             style={{ height: `${progress * 100}%` }}
@@ -173,16 +173,16 @@ export function StickyStory() {
                         : 'translateY(20px)',
                 }}
               >
-                <p className="text-3xl font-bold text-white md:text-4xl">
+                <p className="text-3xl font-bold text-[var(--lp-text)] md:text-4xl">
                   {s.title}
                 </p>
-                <p className="mt-4 max-w-md text-base text-[#888888]">{s.sub}</p>
+                <p className="mt-4 max-w-md text-base text-[var(--lp-text-muted)]">{s.sub}</p>
                 <div className="mt-6 flex gap-2">
                   {STAGES.map((_, j) => (
                     <span
                       key={j}
                       className={`h-1 w-8 rounded-full transition-colors ${
-                        j === stage ? 'bg-white' : 'bg-[#1a1a1a]'
+                        j === stage ? 'bg-white' : 'bg-[var(--lp-surface-2)]'
                       }`}
                     />
                   ))}

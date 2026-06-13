@@ -57,7 +57,7 @@ export function DependencyGraph() {
   const { nodes, edges } = useMemo(buildGraph, [])
 
   return (
-    <section className="relative flex min-h-screen items-center justify-center overflow-hidden bg-black px-5">
+    <section className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--lp-bg)] px-5">
       <div
         ref={ref}
         className="relative w-full max-w-4xl"
@@ -112,7 +112,7 @@ export function DependencyGraph() {
           </svg>
         </div>
 
-        <p className="mt-8 text-center font-heading text-2xl font-bold text-white md:text-3xl">
+        <p className="mt-8 text-center font-heading text-2xl font-bold text-[var(--lp-text)] md:text-3xl">
           Visualize your entire software supply chain
         </p>
       </div>

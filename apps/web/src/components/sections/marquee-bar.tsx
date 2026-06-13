@@ -33,8 +33,8 @@ function Row({
         {doubled.map((item, i) => (
           <span
             key={`${item}-${i}`}
-            className={`whitespace-nowrap rounded-full border border-[#1a1a1a] bg-[#111111] px-4 py-1.5 font-mono text-[13px] ${
-              muted ? 'text-[#666666]' : 'text-white'
+            className={`whitespace-nowrap rounded-full border border-[var(--lp-border)] bg-[var(--lp-surface-2)] px-4 py-1.5 font-mono text-[13px] ${
+              muted ? 'text-[var(--lp-text-muted)]' : 'text-[var(--lp-text)]'
             }`}
           >
             {item}
@@ -47,10 +47,10 @@ function Row({
 
 export function MarqueeBar() {
   return (
-    <section className="border-y border-[#1a1a1a] bg-black py-5">
+    <section className="border-y border-[var(--lp-border)] bg-[var(--lp-bg)] py-5">
       <div className="flex flex-col gap-4">
         <Row items={ECOSYSTEMS} direction="left" duration={28} />
-        <p className="text-center text-[13px] text-white">
+        <p className="text-center text-[13px] text-[var(--lp-text)]">
           Scanning dependencies in real-time across every ecosystem
         </p>
         <Row items={CVES} direction="right" duration={34} muted />

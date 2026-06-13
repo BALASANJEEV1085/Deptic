@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
-import { getPublicShare } from "@/lib/api";
+import { getPublicShare, API_URL } from "@/lib/api";
 import { ShieldCheck, ShieldAlert, CheckCircle2, XCircle, FileJson, Package, Layers, Globe, Clock, Hash, AlertTriangle, ExternalLink, Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -164,13 +164,13 @@ export default function PublicSharePage() {
                 <span className="text-zinc-500 font-medium">{formattedDate}</span>
              </div>
              <div className="flex items-center justify-end pt-2">
-                <a 
-                  href={`/api/share/${token}/download`}
+                <Link 
+                  href={`/dashboard/scans/${data.scan_id}?tab=compliance`}
                   className="inline-flex items-center gap-2 px-4 py-2 border border-[#ffffff]/30 rounded-xl text-[11px] font-bold text-[#ffffff] hover:bg-[#ffffff]/5 transition-all"
                 >
-                  <Download className="h-3.5 w-3.5" />
-                  ↓ Download CycloneDX
-                </a>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  View in DEPTIC
+                </Link>
              </div>
           </div>
         </div>

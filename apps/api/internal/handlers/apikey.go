@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/deptic-io/api/internal/plans"
 	"github.com/deptic-io/api/internal/workspace"
 )
 
@@ -49,6 +50,16 @@ func (h *ScanHandler) HandleCreateKey(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": err.Error()})
 	}
 
+	exceeded, _, limit, _ := plans.CheckDailyAPIKeyLimit(c.Context(), h.db, userID)
+	if exceeded {
+		return c.Status(429).JSON(fiber.Map{
+			"error":       "Daily API key limit reached",
+			"limit":       limit,
+			"remaining":   0,
+			"upgrade_url": "/pricing",
+		})
+	}
+
 	var req createKeyRequest
 	if err := c.BodyParser(&req); err != nil || strings.TrimSpace(req.Name) == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name is required"})
@@ -81,6 +92,8 @@ func (h *ScanHandler) HandleCreateKey(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to store key: " + err.Error()})
 	}
+
+	plans.IncrementAPIKeyCount(c.Context(), h.db, userID)
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"key":    rawKey,

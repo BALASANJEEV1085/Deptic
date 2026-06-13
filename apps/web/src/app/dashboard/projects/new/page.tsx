@@ -62,9 +62,9 @@ function StepIndicators({ scanStep }: { scanStep: number }) {
                     ? "rgba(255, 255, 255,0.15)"
                     : isActive
                     ? "rgba(255, 255, 255,0.08)"
-                    : "#0e1015",
+                    : "var(--card)",
                   border: `2px solid ${
-                    isDone || isActive ? "#ffffff" : "#16191f"
+                    isDone || isActive ? "#ffffff" : "var(--border)"
                   }`,
                   transition: "all 0.3s ease",
                 }}
@@ -74,7 +74,7 @@ function StepIndicators({ scanStep }: { scanStep: number }) {
                 ) : (
                   <step.Icon
                     size={12}
-                    color={isActive ? "#ffffff" : "#374151"}
+                    color={isActive ? "#ffffff" : "var(--text-label)"}
                   />
                 )}
               </div>
@@ -85,10 +85,10 @@ function StepIndicators({ scanStep }: { scanStep: number }) {
                   fontSize: 11,
                   fontWeight: 500,
                   color: isDone
-                    ? "#6b7280"
+                    ? "var(--text-secondary)"
                     : isActive
                     ? "#ffffff"
-                    : "#374151",
+                    : "var(--text-label)",
                   transition: "color 0.3s ease",
                 }}
               >
@@ -102,7 +102,7 @@ function StepIndicators({ scanStep }: { scanStep: number }) {
                 style={{
                   width: 40,
                   height: 2,
-                  background: isDone ? "#ffffff" : "#16191f",
+                  background: isDone ? "#ffffff" : "var(--border)",
                   marginBottom: 18,
                   transition: "background 0.3s ease",
                 }}
@@ -242,7 +242,7 @@ function NewProjectContent() {
             fontFamily: "DM Sans, sans-serif",
             fontSize: 13,
             fontWeight: 500,
-            color: "#6b7280",
+            color: "var(--text-secondary)",
             textDecoration: "none",
             marginBottom: 32,
             transition: "color 0.15s ease",
@@ -258,7 +258,7 @@ function NewProjectContent() {
             fontSize: 24,
             fontWeight: 700,
             letterSpacing: "-0.5px",
-            color: "#e8ecf4",
+            color: "var(--text-primary)",
             margin: "0 0 8px",
           }}
         >
@@ -268,7 +268,7 @@ function NewProjectContent() {
           style={{
             fontFamily: "DM Sans, sans-serif",
             fontSize: 14,
-            color: "#6b7280",
+            color: "var(--text-secondary)",
             margin: "0 0 32px",
           }}
         >
@@ -286,7 +286,7 @@ function NewProjectContent() {
                 left: 14,
                 top: "50%",
                 transform: "translateY(-50%)",
-                color: isValidUrl ? "#ffffff" : "#374151",
+                color: isValidUrl ? "#ffffff" : "var(--text-label)",
                 transition: "color 0.15s ease",
                 pointerEvents: "none",
               }}
@@ -316,18 +316,18 @@ function NewProjectContent() {
                 height: 48,
                 paddingLeft: 44,
                 paddingRight: 44,
-                background: "#090b0f",
+                background: "var(--bg)",
                 border: `1px solid ${
                   isValidUrl === false
                     ? "#ef4444"
                     : isValidUrl === true
                     ? "#ffffff"
-                    : "#16191f"
+                    : "var(--border)"
                 }`,
                 borderRadius: 6,
                 fontFamily: "DM Mono, monospace",
                 fontSize: 14,
-                color: "#e8ecf4",
+                color: "var(--text-primary)",
                 outline: "none",
                 transition: "border-color 0.15s ease",
                 opacity: loading ? 0.5 : 1,
@@ -384,11 +384,11 @@ function NewProjectContent() {
               height: 48,
               background:
                 loading || !githubUrl || isValidUrl === false
-                  ? "#16191f"
+                  ? "var(--border)"
                   : "#ffffff",
               color:
                 loading || !githubUrl || isValidUrl === false
-                  ? "#374151"
+                  ? "var(--text-label)"
                   : "#000",
               border: "none",
               borderRadius: 6,
@@ -408,7 +408,7 @@ function NewProjectContent() {
           >
             {loading ? (
               <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div className="h-4 w-4 border-2 border-[#374151] border-t-white rounded-full animate-spin"></div>
+                <div className="h-4 w-4 border-2 border-[var(--text-label)] border-t-[var(--text-active)] rounded-full animate-spin"></div>
                 {scanStep <= 0 ? "Detecting" : scanStep === 1 ? "Scanning" : scanStep === 2 ? "Analyzing" : "Reporting"}... ({elapsedTime}s)
               </span>
             ) : "Analyze Supply Chain →"}
@@ -430,7 +430,7 @@ function NewProjectContent() {
                 fontWeight: 600,
                 textTransform: "uppercase",
                 letterSpacing: "0.08em",
-                color: "#4a5068",
+                color: "var(--text-tertiary)",
                 marginBottom: 10,
               }}
             >
@@ -443,12 +443,12 @@ function NewProjectContent() {
                   onClick={() => setGithubUrl(url)}
                   style={{
                     padding: "4px 10px",
-                    background: "#0e1015",
-                    border: "1px solid #16191f",
+                    background: "var(--card)",
+                    border: "1px solid var(--border)",
                     borderRadius: 4,
                     fontFamily: "DM Mono, monospace",
                     fontSize: 11,
-                    color: "#6b7280",
+                    color: "var(--text-secondary)",
                     cursor: "pointer",
                     transition: "all 0.15s ease",
                     maxWidth: 200,
@@ -471,7 +471,7 @@ function NewProjectContent() {
 
 export default function NewProjectPage() {
   return (
-    <React.Suspense fallback={<div style={{ display: "flex", minHeight: "70vh", alignItems: "center", justifyContent: "center", color: "#6b7280" }}>Loading...</div>}>
+    <React.Suspense fallback={<div style={{ display: "flex", minHeight: "70vh", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)" }}>Loading...</div>}>
       <NewProjectContent />
     </React.Suspense>
   );

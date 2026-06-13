@@ -136,7 +136,7 @@ function RepoRow({ repo, webhook, onToggleWebhook, onScan }: { repo: GitHubRepo;
             </button>
             <span className={cn(
               "text-[10px] font-semibold uppercase tracking-wider",
-              webhook?.enabled ? "text-[#ffffff]" : "text-zinc-500"
+              webhook?.enabled ? "text-[var(--green)]" : "text-muted-foreground"
             )}>
               {webhook?.enabled ? 'Active' : 'Off'}
             </span>
@@ -182,7 +182,7 @@ function RepoRow({ repo, webhook, onToggleWebhook, onScan }: { repo: GitHubRepo;
       <td className="px-5 py-3.5 text-right">
         <button
           onClick={() => onScan(repo.html_url)}
-          className="inline-flex items-center gap-1.5 bg-[#ffffff]/10 hover:bg-[#ffffff]/20 border border-[#ffffff]/20 hover:border-[#ffffff]/40 text-[#ffffff] text-[9px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all whitespace-nowrap group-hover:border-[#ffffff]/40"
+          className="inline-flex items-center gap-1.5 bg-[var(--green)] hover:bg-[var(--green)]/90 text-black text-[9px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all whitespace-nowrap shadow-sm"
         >
           Scan <ChevronRight className="h-2.5 w-2.5" />
         </button>
@@ -455,7 +455,7 @@ export default function ProjectsPage() {
                   {t.label}
                   <span className={cn(
                     'text-[8px] font-bold px-1 rounded',
-                    tab === t.key ? 'bg-[#ffffff]/20 text-[#ffffff]' : 'bg-muted text-zinc-600'
+                    tab === t.key ? 'bg-[var(--green)]/20 text-[var(--green)]' : 'bg-muted text-muted-foreground'
                   )}>{t.count}</span>
                 </button>
               ))}

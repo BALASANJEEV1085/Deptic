@@ -10,13 +10,13 @@ export function FinalCta() {
   return (
     <section
       id="cta"
-      className="relative flex min-h-screen items-center justify-center overflow-hidden bg-black px-5"
+      className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--lp-bg)] px-5"
     >
       {/* mesh gradient aurora */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-        <div className="absolute left-[15%] top-[20%] size-[400px] rounded-full bg-[#111111] opacity-60 blur-[120px] animate-aurora" />
+        <div className="absolute left-[15%] top-[20%] size-[400px] rounded-full bg-[var(--lp-surface-2)] opacity-60 blur-[120px] animate-aurora" />
         <div
-          className="absolute right-[10%] top-[40%] size-[360px] rounded-full bg-[#1a1a1a] opacity-50 blur-[120px] animate-aurora"
+          className="absolute right-[10%] top-[40%] size-[360px] rounded-full bg-[var(--lp-surface-2)] opacity-50 blur-[120px] animate-aurora"
           style={{ animationDelay: '-7s' }}
         />
         <div
@@ -35,10 +35,10 @@ export function FinalCta() {
         className="relative z-10 flex max-w-3xl flex-col items-center text-center transition-transform duration-1000 ease-out"
         style={{ transform: inView ? 'scale(1)' : 'scale(1.08)' }}
       >
-        <h2 className="font-heading text-[40px] font-bold leading-[1.05] tracking-[-0.03em] text-white md:text-[72px]">
+        <h2 className="font-heading text-[40px] font-bold leading-[1.05] tracking-[-0.03em] text-[var(--lp-text)] md:text-[72px]">
           Know exactly what&apos;s inside your software
         </h2>
-        <p className="mt-5 text-lg text-[#888888]">
+        <p className="mt-5 text-lg text-[var(--lp-text-muted)]">
           Free to start. No credit card required.
         </p>
         <Magnetic strength={10} className="mt-9" as="a" href="/login">
@@ -46,7 +46,7 @@ export function FinalCta() {
             Start scanning — deptic.in
           </span>
         </Magnetic>
-        <p className="mt-8 font-mono text-sm text-[#666666]">
+        <p className="mt-8 font-mono text-sm text-[var(--lp-text-muted)]">
           npm · pip · Maven · Go
         </p>
       </div>

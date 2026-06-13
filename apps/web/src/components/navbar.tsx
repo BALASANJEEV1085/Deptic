@@ -32,12 +32,12 @@ export function Navbar() {
     <header
       className={`fixed inset-x-0 top-0 z-50 h-14 transition-colors duration-300 ${
         scrolled
-          ? 'border-b border-[#1a1a1a] bg-black/90 backdrop-blur-xl'
+          ? 'border-b border-[var(--lp-border)] bg-[var(--lp-bg)]/90 backdrop-blur-xl'
           : 'border-b border-transparent bg-transparent'
       }`}
     >
       <nav className="mx-auto flex h-14 max-w-7xl items-center justify-between px-5 md:px-8">
-        <a href="/" className="text-[17px] font-bold tracking-tight text-white">
+        <a href="/" className="text-[17px] font-bold tracking-tight text-[var(--lp-text)]">
           Deptic
         </a>
 
@@ -46,7 +46,7 @@ export function Navbar() {
             <li key={l.label}>
               <a
                 href={l.href}
-                className="text-sm text-[#888888] transition-colors hover:text-white"
+                className="text-sm text-[var(--lp-text-muted)] transition-colors hover:text-[var(--lp-text)]"
               >
                 {l.label}
               </a>
@@ -57,7 +57,7 @@ export function Navbar() {
         <div className="hidden items-center gap-5 md:flex">
           <a
             href="/login"
-            className="rounded-full bg-white px-5 py-2 text-sm font-medium text-black transition-transform hover:scale-[1.03]"
+            className="rounded-full bg-[var(--green)] px-5 py-2 text-sm font-medium text-black transition-transform hover:scale-[1.03]"
           >
             Get started
           </a>
@@ -66,7 +66,7 @@ export function Navbar() {
         <button
           aria-label={open ? 'Close menu' : 'Open menu'}
           onClick={() => setOpen((v) => !v)}
-          className="text-white md:hidden"
+          className="text-[var(--lp-text)] md:hidden"
         >
           {open ? <Menu className="size-6 opacity-0" /> : <Menu className="size-6" />}
         </button>
@@ -74,18 +74,18 @@ export function Navbar() {
 
       {/* mobile overlay */}
       <div
-        className={`fixed inset-0 z-40 flex flex-col bg-black transition-opacity duration-300 md:hidden ${
+        className={`fixed inset-0 z-40 flex flex-col bg-[var(--lp-bg)] transition-opacity duration-300 md:hidden ${
           open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
         }`}
       >
         <div className="flex h-14 items-center justify-between px-5">
-          <span className="text-[17px] font-bold tracking-tight text-white">
+          <span className="text-[17px] font-bold tracking-tight text-[var(--lp-text)]">
             Deptic
           </span>
           <button
             aria-label="Close menu"
             onClick={() => setOpen(false)}
-            className="text-white"
+            className="text-[var(--lp-text)]"
           >
             <X className="size-6" />
           </button>
@@ -96,7 +96,7 @@ export function Navbar() {
               <a
                 href={l.href}
                 onClick={() => setOpen(false)}
-                className="block py-3 text-2xl font-semibold text-white"
+                className="block py-3 text-2xl font-semibold text-[var(--lp-text)]"
               >
                 {l.label}
               </a>
@@ -106,7 +106,7 @@ export function Navbar() {
             <a
               href="/login"
               onClick={() => setOpen(false)}
-              className="rounded-full bg-white px-5 py-3 text-center text-base font-medium text-black"
+              className="rounded-full bg-[var(--green)] px-5 py-3 text-center text-base font-medium text-black"
             >
               Get started
             </a>

@@ -200,7 +200,7 @@ export function WorkspaceSettingsSection() {
 
   if (!activeWorkspace) {
     return (
-      <div className="p-6 rounded-xl border border-border bg-[#0e1015] text-center">
+      <div className="p-6 rounded-xl border border-border bg-[var(--card)] text-center">
         <Users className="h-10 w-10 text-zinc-500 mx-auto mb-3" />
         <h3 className="text-sm font-semibold text-foreground">No Workspace Selected</h3>
         <p className="text-xs text-zinc-500 max-w-sm mx-auto mt-2 leading-relaxed">
@@ -212,7 +212,7 @@ export function WorkspaceSettingsSection() {
 
   if (isPersonal) {
     return (
-      <div className="p-6 rounded-xl border border-border bg-[#0e1015] text-center">
+      <div className="p-6 rounded-xl border border-border bg-[var(--card)] text-center">
         <Users className="h-10 w-10 text-zinc-500 mx-auto mb-3" />
         <h3 className="text-sm font-semibold text-foreground">Personal Workspace</h3>
         <p className="text-xs text-zinc-500 max-w-sm mx-auto mt-2 leading-relaxed">
@@ -233,9 +233,9 @@ export function WorkspaceSettingsSection() {
   return (
     <div className="space-y-8">
       {/* General Settings */}
-      <section className="p-6 rounded-xl border border-border bg-[#0e1015]">
+      <section className="p-6 rounded-xl border border-border bg-[var(--card)]">
         <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-          <Settings className="h-4 w-4 text-[#ffffff]" />
+          <Settings className="h-4 w-4 text-[var(--green)]" />
           Workspace Details
         </h3>
         <form onSubmit={handleUpdateDetails} className="space-y-4">
@@ -262,7 +262,7 @@ export function WorkspaceSettingsSection() {
             <Button
               type="submit"
               disabled={updatingDetails || !name.trim()}
-              className="h-8 text-xs bg-[#ffffff] hover:bg-[#ffffff]/90 text-black font-semibold"
+              className="h-8 text-xs bg-[var(--green)] hover:bg-[var(--green)]/90 text-black font-semibold"
             >
               {updatingDetails && <CustomLoader size={12} className="mr-1.5" />}
               Save Details
@@ -272,12 +272,12 @@ export function WorkspaceSettingsSection() {
       </section>
 
       {/* Team Members */}
-      <section className="p-6 rounded-xl border border-border bg-[#0e1015] space-y-6">
+      <section className="p-6 rounded-xl border border-border bg-[var(--card)] space-y-6">
         <div>
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Users className="h-4 w-4 text-[#ffffff]" />
+            <Users className="h-4 w-4 text-[var(--green)]" />
             Team Members
-            <span className="ml-1 text-[10px] font-bold bg-[#ffffff]/10 text-[#ffffff] border border-[#ffffff]/20 px-1.5 py-0.5 rounded">
+            <span className="ml-1 text-[10px] font-bold bg-[var(--green)]/10 text-[var(--green)] border border-[var(--green)]/20 px-1.5 py-0.5 rounded">
               {members.length}
             </span>
           </h3>
@@ -299,7 +299,7 @@ export function WorkspaceSettingsSection() {
               return (
                 <div key={member.user_id} className="flex items-center justify-between p-3.5 bg-background/30">
                   <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-xs text-[#ffffff]">
+                    <div className="h-8 w-8 rounded-full bg-muted border border-border flex items-center justify-center font-bold text-xs text-foreground">
                       {displayName.charAt(0).toUpperCase()}
                     </div>
                     <div>
@@ -309,10 +309,10 @@ export function WorkspaceSettingsSection() {
                           <span className="text-[9px] bg-zinc-800 text-muted-foreground border border-zinc-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">You</span>
                         )}
                         {memberIsOwner && (
-                          <span className="text-[9px] bg-[#ffffff]/10 text-[#ffffff] border border-[#ffffff]/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Owner</span>
+                          <span className="text-[9px] bg-[var(--green)]/10 text-[var(--green)] border border-[var(--green)]/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Owner</span>
                         )}
                       </h4>
-                      <p className="text-[10px] text-zinc-500 mt-0.5">{member.email}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{member.email}</p>
                     </div>
                   </div>
 
@@ -379,7 +379,7 @@ export function WorkspaceSettingsSection() {
                 <Button
                   type="submit"
                   disabled={inviting || !inviteEmail.trim()}
-                  className="bg-[#ffffff] hover:bg-[#ffffff]/90 text-black font-semibold text-xs h-9 px-4 shrink-0"
+                  className="bg-[var(--green)] hover:bg-[var(--green)]/90 text-black font-semibold text-xs h-9 px-4 shrink-0"
                 >
                   {inviting && <CustomLoader size={12} className="mr-1.5" />}
                   Send Invite
@@ -392,7 +392,7 @@ export function WorkspaceSettingsSection() {
 
       {/* Pending Invitations */}
       {invitations.length > 0 && (
-        <section className="p-6 rounded-xl border border-border bg-[#0e1015] space-y-4">
+        <section className="p-6 rounded-xl border border-border bg-[var(--card)] space-y-4">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Pending Invitations</h3>
             <p className="text-[11px] text-zinc-500 mt-1">Invited members who haven&apos;t accepted yet.</p>

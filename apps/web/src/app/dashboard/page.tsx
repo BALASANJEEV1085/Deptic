@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import { useWorkspace } from "@/lib/contexts/workspace-context";
 import {
   getDashboardStats,
+  getOnboardingStatus,
   DashboardStats,
+  OnboardingStatus,
   ecosystemLabel,
   relativeTime,
 } from "@/lib/api";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, BookOpen, GitBranch, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { CustomLoader } from "@/components/custom-loader";
 
@@ -22,7 +24,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
         fontWeight: 600,
         textTransform: "uppercase" as const,
         letterSpacing: "0.08em",
-        color: "#4a5068",
+        color: "var(--text-tertiary)",
         margin: 0,
       }}
     >
@@ -36,8 +38,8 @@ function EcoBadge({ eco, status }: { eco: string; status?: string }) {
   return (
     <span
       style={{
-        background: "#16191f",
-        color: "#6b7280",
+        background: "var(--border)",
+        color: "var(--text-secondary)",
         fontFamily: "DM Sans, sans-serif",
         fontSize: 11,
         fontWeight: 500,
@@ -45,7 +47,7 @@ function EcoBadge({ eco, status }: { eco: string; status?: string }) {
         borderRadius: 4,
         display: "inline-flex",
         alignItems: "center",
-        border: "1px solid #1e2230",
+        border: "1px solid var(--border-hover)",
       }}
     >
       {label}
@@ -58,7 +60,7 @@ function StatCard({
   label,
   value,
   delta,
-  deltaColor = "#ffffff",
+  deltaColor = "var(--green)",
 }: {
   label: string;
   value: string | number;
@@ -68,8 +70,8 @@ function StatCard({
   return (
     <div
       style={{
-        background: "#0e1015",
-        border: "1px solid #16191f",
+        background: "var(--card)",
+        border: "1px solid var(--border)",
         borderRadius: 8,
         padding: 20,
         display: "flex",
@@ -84,7 +86,7 @@ function StatCard({
           fontFamily: "var(--font-syne, Syne, sans-serif)",
           fontSize: 32,
           fontWeight: 700,
-          color: "#e8ecf4",
+          color: "var(--text-primary)",
           letterSpacing: "-0.5px",
           margin: 0,
           lineHeight: 1.1,
@@ -112,13 +114,18 @@ function StatCard({
 export default function DashboardPage() {
   const { activeWorkspace } = useWorkspace();
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [prefs, setPrefs] = useState<OnboardingStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    getDashboardStats()
-      .then((data) => {
+    Promise.all([
+      getDashboardStats(),
+      getOnboardingStatus().catch(() => null),
+    ])
+      .then(([data, onboarding]) => {
         setStats(data);
+        setPrefs(onboarding);
         setLoading(false);
       })
       .catch((err) => {
@@ -126,6 +133,11 @@ export default function DashboardPage() {
         setLoading(false);
       });
   }, [activeWorkspace?.id]);
+
+  const useCases = (prefs?.use_case || "").split(",").filter(Boolean);
+  const showComplianceFirst = useCases.includes("compliance");
+  const showRepoCta = useCases.includes("ci_cd");
+  const showGettingStarted = stats?.total_scans === 0;
 
   if (loading) {
     return (
@@ -146,7 +158,7 @@ export default function DashboardPage() {
 
   if (!stats) {
     return (
-      <div style={{ padding: 32, color: "#6b7280", textAlign: "center" }}>
+      <div style={{ padding: 32, color: "var(--text-secondary)", textAlign: "center" }}>
         Failed to load dashboard statistics.
       </div>
     );
@@ -170,7 +182,7 @@ export default function DashboardPage() {
     { label: "Critical", value: stats.critical_cves, color: "#ef4444" },
     { label: "High",     value: stats.high_cves,     color: "#f97316" },
     { label: "Medium",   value: stats.medium_cves,   color: "#f59e0b" },
-    { label: "Low",      value: stats.low_cves,       color: "#6b7280" },
+    { label: "Low",      value: stats.low_cves,       color: "var(--text-secondary)" },
   ];
 
   return (
@@ -185,6 +197,39 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* ── Personalized CTAs ── */}
+      {(showGettingStarted || showRepoCta) && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {showGettingStarted && (
+            <div className="rounded-xl border border-[var(--green)]/30 bg-[var(--green)]/5 p-5 flex items-start gap-4">
+              <BookOpen className="h-5 w-5 text-[var(--green)] shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-foreground mb-1">Getting started with Deptic</p>
+                <p className="text-xs text-muted-foreground mb-3">New to SBOM scanning? Start with a public repo or try our quick-start guide.</p>
+                <Link href="/docs/quick-start" className="text-xs font-bold text-[var(--green)] hover:underline">
+                  Read the quick-start guide →
+                </Link>
+              </div>
+            </div>
+          )}
+          {showRepoCta && (
+            <div className="rounded-xl border border-border bg-card p-5 flex items-start gap-4">
+              <GitBranch className="h-5 w-5 text-[var(--green)] shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-bold text-foreground mb-1">Connect your first repo</p>
+                <p className="text-xs text-muted-foreground mb-3">Enable auto-scan on push to catch vulnerabilities in CI/CD.</p>
+                <Link
+                  href="/dashboard/projects"
+                  className="inline-flex items-center gap-1.5 bg-[var(--green)] hover:bg-[var(--green)]/90 text-black text-xs font-bold px-4 py-2 rounded-lg transition-colors"
+                >
+                  Go to Projects <ArrowRight size={12} />
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Stat cards ── */}
       <div
         style={{
@@ -197,7 +242,7 @@ export default function DashboardPage() {
           label="Total Components"
           value={stats.total_components.toLocaleString()}
           delta={`Across ${totalScans} scans`}
-          deltaColor="#6b7280"
+          deltaColor="var(--text-secondary)"
         />
         <StatCard
           label="Critical CVEs"
@@ -219,6 +264,36 @@ export default function DashboardPage() {
         />
       </div>
 
+      {/* ── Compliance overview (prioritized for compliance use case) ── */}
+      {showComplianceFirst && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-[var(--green)]" />
+            <SectionLabel>Compliance Overview</SectionLabel>
+          </div>
+          <div
+            style={{
+              background: "var(--card)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              padding: 20,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
+              <p style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
+                {stats.ntia_compliant_scans} of {totalScans} scans NTIA compliant
+              </p>
+              <span style={{ fontFamily: "var(--font-syne, Syne, sans-serif)", fontSize: 24, fontWeight: 700, color: compliancePct === 100 ? "var(--green)" : compliancePct >= 75 ? "#f59e0b" : "#ef4444" }}>
+                {compliancePct}%
+              </span>
+            </div>
+            <div style={{ height: 6, background: "var(--border)", borderRadius: 3, overflow: "hidden" }}>
+              <div style={{ height: "100%", borderRadius: 3, background: compliancePct === 100 ? "var(--green)" : compliancePct >= 75 ? "#f59e0b" : "#ef4444", width: `${compliancePct}%`, transition: "width 0.6s ease" }} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Two-col ── */}
       <div
         style={{
@@ -238,7 +313,7 @@ export default function DashboardPage() {
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 12,
                 fontWeight: 500,
-                color: "#ffffff",
+                color: "var(--text-active)",
                 textDecoration: "none",
                 display: "flex",
                 alignItems: "center",
@@ -250,13 +325,13 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          <div className="ds-table-wrap border border-[#16191f] bg-[#0e1015] rounded-xl overflow-hidden" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+          <div className="ds-table-wrap border border-[var(--border)] bg-[var(--card)] rounded-xl overflow-hidden" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
             {(stats.recent_scans?.length ?? 0) === 0 ? (
               <div
                 style={{
                   padding: "40px 20px",
                   textAlign: "center",
-                  color: "#374151",
+                  color: "var(--text-label)",
                   fontFamily: "DM Sans, sans-serif",
                   fontSize: 13,
                 }}
@@ -306,7 +381,7 @@ export default function DashboardPage() {
                               fontFamily: "DM Sans, sans-serif",
                               fontSize: 13,
                               fontWeight: 500,
-                              color: "#e8ecf4",
+                              color: "var(--text-primary)",
                               overflow: "hidden",
                               textOverflow: "ellipsis",
                               whiteSpace: "nowrap",
@@ -326,7 +401,7 @@ export default function DashboardPage() {
                             fontFamily: "DM Sans, sans-serif",
                             fontSize: 13,
                             color:
-                              scan.critical_cves > 0 ? "#ef4444" : "#6b7280",
+                              scan.critical_cves > 0 ? "#ef4444" : "var(--text-secondary)",
                           }}
                         >
                           {scan.critical_cves > 0
@@ -339,7 +414,7 @@ export default function DashboardPage() {
                           style={{
                             fontFamily: "DM Mono, monospace",
                             fontSize: 12,
-                            color: "#6b7280",
+                            color: "var(--text-secondary)",
                           }}
                         >
                           {relativeTime(scan.created_at)}
@@ -365,7 +440,7 @@ export default function DashboardPage() {
                   fontFamily: "DM Sans, sans-serif",
                   fontSize: 12,
                   fontWeight: 500,
-                  color: "#ffffff",
+                  color: "var(--text-active)",
                   textDecoration: "none",
                   display: "flex",
                   alignItems: "center",
@@ -377,8 +452,8 @@ export default function DashboardPage() {
             </div>
             <div
               style={{
-                background: "#0e1015",
-                border: "1px solid #16191f",
+                background: "var(--card)",
+                border: "1px solid var(--border)",
                 borderRadius: 8,
                 padding: 20,
                 display: "flex",
@@ -402,7 +477,7 @@ export default function DashboardPage() {
                         fontWeight: 600,
                         textTransform: "uppercase",
                         letterSpacing: "0.06em",
-                        color: "#4a5068",
+                        color: "var(--text-tertiary)",
                       }}
                     >
                       {b.label}
@@ -411,7 +486,7 @@ export default function DashboardPage() {
                       style={{
                         fontFamily: "DM Mono, monospace",
                         fontSize: 12,
-                        color: b.value > 0 ? b.color : "#374151",
+                        color: b.value > 0 ? b.color : "var(--text-label)",
                       }}
                     >
                       {b.value}
@@ -420,7 +495,7 @@ export default function DashboardPage() {
                   <div
                     style={{
                       height: 4,
-                      background: "#16191f",
+                      background: "var(--border)",
                       borderRadius: 2,
                       overflow: "hidden",
                     }}
@@ -429,7 +504,7 @@ export default function DashboardPage() {
                       style={{
                         height: "100%",
                         borderRadius: 2,
-                        background: b.value > 0 ? b.color : "#1e2230",
+                        background: b.value > 0 ? b.color : "var(--border-hover)",
                         width: b.value === 0 ? "2%" : `${Math.max((b.value / maxCve) * 100, 4)}%`,
                         transition: "width 0.6s ease",
                       }}
@@ -445,8 +520,8 @@ export default function DashboardPage() {
             <SectionLabel>NTIA Compliance</SectionLabel>
             <div
               style={{
-                background: "#0e1015",
-                border: "1px solid #16191f",
+                background: "var(--card)",
+                border: "1px solid var(--border)",
                 borderRadius: 8,
                 padding: 20,
               }}
@@ -463,7 +538,7 @@ export default function DashboardPage() {
                   style={{
                     fontFamily: "DM Sans, sans-serif",
                     fontSize: 13,
-                    color: "#6b7280",
+                    color: "var(--text-secondary)",
                     margin: 0,
                   }}
                 >
@@ -489,7 +564,7 @@ export default function DashboardPage() {
               <div
                 style={{
                   height: 6,
-                  background: "#16191f",
+                  background: "var(--border)",
                   borderRadius: 3,
                   overflow: "hidden",
                   marginBottom: 16,
@@ -533,8 +608,8 @@ export default function DashboardPage() {
                           alignItems: "center",
                           padding: "8px 12px",
                           borderRadius: 6,
-                          background: "#090b0f",
-                          border: "1px solid #16191f",
+                          background: "var(--bg)",
+                          border: "1px solid var(--border)",
                           textDecoration: "none",
                           transition: "border-color 0.15s ease",
                         }}
@@ -543,7 +618,7 @@ export default function DashboardPage() {
                           style={{
                             fontFamily: "DM Sans, sans-serif",
                             fontSize: 13,
-                            color: "#c9d1e0",
+                            color: "var(--table-cell)",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
                             whiteSpace: "nowrap",

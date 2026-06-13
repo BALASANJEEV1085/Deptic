@@ -59,7 +59,7 @@ function ComparisonSlider() {
         // @ts-expect-error - Mutating ref.current for callback ref
         ref.current = el
       }}
-      className="relative h-[360px] w-full select-none overflow-hidden rounded-2xl border border-[#1a1a1a] md:h-[440px] cursor-ew-resize"
+      className="relative h-[360px] w-full select-none overflow-hidden rounded-2xl border border-[var(--lp-border)] md:h-[440px] cursor-ew-resize"
       onMouseDown={(e) => {
         dragging.current = true
         updateFromClientX(e.clientX)
@@ -70,18 +70,18 @@ function ComparisonSlider() {
       }}
     >
       {/* AFTER (full background) */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0a0a] p-6">
-        <span className="rounded-full border border-[#2a2a2a] bg-[#111111] px-3 py-1 text-xs text-white">
+      <div className="absolute inset-0 flex flex-col items-center justify-center bg-[var(--lp-surface)] p-6">
+        <span className="rounded-full border border-[var(--lp-border-2)] bg-[var(--lp-surface-2)] px-3 py-1 text-xs text-[var(--lp-text)]">
           AFTER
         </span>
         <div className="mt-6 space-y-3">
-          <div className="flex items-center justify-between rounded-lg border border-[#1a1a1a] bg-[#111111] px-4 py-3">
-            <span className="text-sm text-white">Compliance score</span>
-            <span className="font-heading text-lg font-bold text-white">100/100</span>
+          <div className="flex items-center justify-between rounded-lg border border-[var(--lp-border)] bg-[var(--lp-surface-2)] px-4 py-3">
+            <span className="text-sm text-[var(--lp-text)]">Compliance score</span>
+            <span className="font-heading text-lg font-bold text-[var(--lp-text)]">100/100</span>
           </div>
           {['log4j-core patched', 'lodash patched', 'axios patched'].map((t) => (
-            <div key={t} className="flex items-center gap-2 text-sm text-[#888888]">
-              <Check className="size-4 text-white" />
+            <div key={t} className="flex items-center gap-2 text-sm text-[var(--lp-text-muted)]">
+              <Check className="size-4 text-[var(--lp-text)]" />
               {t}
             </div>
           ))}
@@ -94,7 +94,7 @@ function ComparisonSlider() {
 
       {/* BEFORE (clipped) */}
       <div
-        className="absolute inset-0 flex flex-col items-center justify-center bg-[#050505] p-6"
+        className="absolute inset-0 flex flex-col items-center justify-center bg-[var(--lp-bg)] p-6"
         style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}
       >
         <span className="rounded-full border border-[#ff4444]/40 bg-[#ff4444]/10 px-3 py-1 text-xs text-[#ff6666]">
@@ -103,8 +103,8 @@ function ComparisonSlider() {
         <div className="mt-6 space-y-2 font-mono text-[13px]">
           <p className="text-[#ff4444]">⚠ CVE-2021-44228 unresolved</p>
           <p className="text-[#ff4444]">⚠ CVE-2024-22262 unresolved</p>
-          <p className="text-[#888888]">manual_tracking.xlsx — 4 days old</p>
-          <p className="text-[#888888]">visibility: 0%</p>
+          <p className="text-[var(--lp-text-muted)]">manual_tracking.xlsx — 4 days old</p>
+          <p className="text-[var(--lp-text-muted)]">visibility: 0%</p>
           <div className="mt-4 flex items-center gap-2 text-[#ff6666]">
             <AlertTriangle className="size-4" />
             <span>14 unknown dependencies</span>
@@ -118,7 +118,7 @@ function ComparisonSlider() {
         style={{ left: `${pos}%` }}
       >
         <div className="absolute left-1/2 top-0 h-full w-[2px] -translate-x-1/2 bg-white" />
-        <span className="absolute left-1/2 top-1/2 flex size-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-[#333333] bg-black text-white">
+        <span className="absolute left-1/2 top-1/2 flex size-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--lp-border-2)] bg-[var(--lp-bg)] text-[var(--lp-text)]">
           <span className="text-xs">↔</span>
         </span>
       </div>
@@ -130,17 +130,17 @@ const CARDS = [
   {
     title: 'Manual vulnerability tracking',
     body: 'Spreadsheets, stale data, and zero visibility into transitive dependencies.',
-    tone: 'bg-[#0a0a0a] text-[#888888]',
+    tone: 'bg-[var(--lp-surface)] text-[var(--lp-text-muted)]',
   },
   {
     title: 'Automated CVE detection',
     body: 'Every component continuously matched against NVD and OSV.dev.',
-    tone: 'bg-[#111111] text-white',
+    tone: 'bg-[var(--lp-surface-2)] text-[var(--lp-text)]',
   },
   {
     title: 'Zero CVEs shipped',
     body: 'Clean builds, signed SBOMs, and a 100/100 compliance score every release.',
-    tone: 'bg-[#1a1a1a] text-white',
+    tone: 'bg-[var(--lp-surface-2)] text-[var(--lp-text)]',
   },
 ]
 
@@ -148,9 +148,9 @@ export function BeforeAfter() {
   const [ref, inView] = useInView<HTMLDivElement>(0.2)
 
   return (
-    <section className="bg-black px-5 py-24 md:py-32">
+    <section className="bg-[var(--lp-bg)] px-5 py-24 md:py-32">
       <div className="mx-auto max-w-5xl">
-        <h2 className="text-center font-heading text-4xl font-bold tracking-[-0.02em] text-white md:text-5xl">
+        <h2 className="text-center font-heading text-4xl font-bold tracking-[-0.02em] text-[var(--lp-text)] md:text-5xl">
           Before Deptic. After Deptic.
         </h2>
 
@@ -166,7 +166,7 @@ export function BeforeAfter() {
           {CARDS.map((c, i) => (
             <div
               key={c.title}
-              className={`absolute inset-x-0 rounded-2xl border border-[#1a1a1a] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.6)] transition-all duration-700 ${c.tone}`}
+              className={`absolute inset-x-0 rounded-2xl border border-[var(--lp-border)] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.6)] transition-all duration-700 ${c.tone}`}
               style={{
                 top: inView ? `${i * 28}px` : `${i * 10}px`,
                 zIndex: CARDS.length - i,

@@ -48,7 +48,7 @@ function LoginContent() {
   );
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#0a0a0a] text-foreground p-4 selection:bg-[var(--green)] selection:text-black">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background text-foreground p-4 selection:bg-[var(--green)] selection:text-black">
       {/* Absolute Logo Top Left */}
       <div className="absolute top-8 left-8">
         <Link href="/" className="flex items-center gap-3 font-syne font-bold text-xl hover:opacity-80 transition-opacity">
@@ -63,8 +63,8 @@ function LoginContent() {
 
       <div className="w-full max-w-[400px] flex flex-col items-center">
         <div className="text-center mb-10 w-full">
-          <h1 className="text-3xl font-syne font-bold mb-3 tracking-tight text-white">Welcome back</h1>
-          <p className="text-zinc-400 text-sm">Sign in to your account to continue</p>
+          <h1 className="text-3xl font-syne font-bold mb-3 tracking-tight text-foreground">Welcome back</h1>
+          <p className="text-muted-foreground text-sm">Sign in to your account to continue</p>
         </div>
 
         {error && (
@@ -80,7 +80,7 @@ function LoginContent() {
             disabled={loading !== null}
             className={cn(
               "w-full h-12 flex items-center justify-center gap-3 rounded-lg text-sm font-medium transition-all",
-              "bg-white text-black hover:bg-zinc-200",
+              "bg-[var(--green)] text-black hover:bg-[var(--green)]/90",
               "disabled:opacity-50 disabled:cursor-not-allowed"
             )}
           >
@@ -97,7 +97,7 @@ function LoginContent() {
             disabled={loading !== null}
             className={cn(
               "w-full h-12 flex items-center justify-center gap-3 rounded-lg text-sm font-medium transition-all",
-              "bg-zinc-900 text-white hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700",
+              "bg-card text-foreground hover:bg-muted border border-border hover:border-border",
               "disabled:opacity-50 disabled:cursor-not-allowed"
             )}
           >
@@ -115,13 +115,13 @@ function LoginContent() {
           </button>
         </div>
 
-        <p className="mt-10 text-xs text-zinc-500 text-center max-w-[280px]">
+        <p className="mt-10 text-xs text-muted-foreground text-center max-w-[280px]">
           By continuing, you agree to DEPTIC's{' '}
-          <Link href="/terms" className="text-zinc-400 hover:text-white underline underline-offset-4 decoration-zinc-700 hover:decoration-zinc-400 transition-colors">
+          <Link href="/terms" className="text-muted-foreground hover:text-foreground underline underline-offset-4 decoration-border hover:decoration-muted-foreground transition-colors">
             Terms of Service
           </Link>{' '}
           and{' '}
-          <Link href="/privacy" className="text-zinc-400 hover:text-white underline underline-offset-4 decoration-zinc-700 hover:decoration-zinc-400 transition-colors">
+          <Link href="/privacy" className="text-muted-foreground hover:text-foreground underline underline-offset-4 decoration-border hover:decoration-muted-foreground transition-colors">
             Privacy Policy
           </Link>.
         </p>
@@ -132,7 +132,7 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen bg-[#0a0a0a] items-center justify-center"><div className="h-8 w-8 border-2 border-white/20 border-t-white rounded-full animate-spin"></div></div>}>
+    <Suspense fallback={<div className="flex min-h-screen bg-[var(--lp-surface)] items-center justify-center"><div className="h-8 w-8 border-2 border-white/20 border-t-white rounded-full animate-spin"></div></div>}>
       <LoginContent />
     </Suspense>
   );

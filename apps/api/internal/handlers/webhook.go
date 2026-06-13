@@ -17,6 +17,7 @@ import (
 
 	"github.com/deptic-io/api/internal/db"
 	"github.com/deptic-io/api/internal/github"
+	"github.com/deptic-io/api/internal/plans"
 )
 
 type WebhookHandler struct {
@@ -167,15 +168,19 @@ func (wh *WebhookHandler) HandleGitHubWebhook(c *fiber.Ctx) error {
 	}
 
 	// Rate Limiting
-	recentCount, err := db.CountRecentWebhookScans(c.Context(), wh.db, reg.UserID)
-	if err == nil && recentCount >= 10 {
+	// Check daily scan limit
+	exceeded, _, _, _ := plans.CheckDailyScanLimit(c.Context(), wh.db, reg.UserID)
+	if exceeded {
 		fmt.Printf("Skipping webhook scan for %s: daily limit reached\n", repoFullName)
 		db.UpdateWebhookEvent(c.Context(), wh.db, eventID, "", "skipped: daily limit reached")
 		return c.SendStatus(fiber.StatusOK)
 	}
-	if reg.LastTriggeredAt != nil && time.Since(*reg.LastTriggeredAt) < 5*time.Minute {
-		fmt.Printf("Skipping webhook scan for %s: 5 minute cooldown\n", repoFullName)
-		db.UpdateWebhookEvent(c.Context(), wh.db, eventID, "", "skipped: 5 minute cooldown")
+
+	// Check webhook gap
+	tooSoon, _ := plans.CheckWebhookScanGap(c.Context(), wh.db, reg.ID)
+	if tooSoon {
+		fmt.Printf("Skipping webhook scan for %s: cooldown active\n", repoFullName)
+		db.UpdateWebhookEvent(c.Context(), wh.db, eventID, "", "skipped: cooldown active")
 		return c.SendStatus(fiber.StatusOK)
 	}
 
@@ -243,6 +248,16 @@ func (wh *WebhookHandler) HandleRegisterWebhook(c *fiber.Ctx) error {
 	var req registerWebhookRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	exceeded, _, limit, _ := plans.CheckWebhookLimit(c.Context(), wh.db, userID)
+	if exceeded {
+		return c.Status(429).JSON(fiber.Map{
+			"error":       fmt.Sprintf("Webhook limit reached. Your plan allows %d active webhooks.", limit),
+			"limit":       limit,
+			"remaining":   0,
+			"upgrade_url": "/pricing",
+		})
 	}
 
 	// Fetch GitHub OAuth token

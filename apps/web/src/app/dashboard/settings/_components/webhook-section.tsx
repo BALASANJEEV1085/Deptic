@@ -20,7 +20,7 @@ export function WebhooksSection() {
     try {
       setLoading(true)
       const data = await listWebhooks()
-      setWebhooks(data)
+      setWebhooks(data.filter(w => w.enabled))
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to load webhooks')
     } finally {
@@ -58,7 +58,13 @@ export function WebhooksSection() {
   const handleToggle = async (id: string, current: boolean) => {
     try {
       await toggleWebhook(id, !current)
-      setWebhooks(prev => prev.map(w => w.id === id ? { ...w, enabled: !current } : w))
+      if (current) {
+        // Disabled — remove from active webhooks list (matches Projects auto-scan off)
+        setWebhooks(prev => prev.filter(w => w.id !== id))
+        if (expandedId === id) setExpandedId(null)
+      } else {
+        setWebhooks(prev => prev.map(w => w.id === id ? { ...w, enabled: true } : w))
+      }
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : String(e))
     }

@@ -70,7 +70,7 @@ function CopyButton({ text, label = 'Copied!' }: { text: string; label?: string 
 // ─── Code Snippet with Copy ────────────────────────────────────────────────────
 function CodeSnippet({ code, lang }: { code: string; lang: string }) {
   return (
-    <div className="relative rounded-lg bg-black/50 border border-zinc-800 overflow-hidden">
+    <div className="relative rounded-lg bg-[var(--lp-bg)]/50 border border-zinc-800 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 bg-zinc-900/50">
         <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">{lang}</span>
         <CopyButton text={code} label="Command copied!" />
@@ -135,7 +135,7 @@ deptic-scan`
                 className={cn(
                   "px-3 py-1.5 rounded-md text-[10px] font-bold transition-all",
                   platform === 'windows'
-                    ? "bg-zinc-700 text-white shadow-sm"
+                    ? "bg-muted text-foreground shadow-sm"
                     : "text-zinc-500 hover:text-zinc-300"
                 )}
               >
@@ -146,7 +146,7 @@ deptic-scan`
                 className={cn(
                   "px-3 py-1.5 rounded-md text-[10px] font-bold transition-all",
                   platform === 'mac'
-                    ? "bg-zinc-700 text-white shadow-sm"
+                    ? "bg-muted text-foreground shadow-sm"
                     : "text-zinc-500 hover:text-zinc-300"
                 )}
               >
@@ -426,7 +426,7 @@ export function ApiAccessSection({ user, loading }: { user: User | null; loading
               </div>
 
               {/* Key display */}
-              <div className="rounded-lg bg-black/40 border border-zinc-800 overflow-hidden">
+              <div className="rounded-lg bg-[var(--lp-bg)]/40 border border-zinc-800 overflow-hidden">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800/60">
                   <span className="text-[10px] text-zinc-600 font-mono">API Key</span>
                   <CopyButton text={newKey} label="Key copied!" />

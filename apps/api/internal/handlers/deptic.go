@@ -141,12 +141,12 @@ func (h *ScanHandler) HandleGenerateDEPTIC(c *fiber.Ctx) error {
 	fileKey := fmt.Sprintf("deptics/%s/%s-%s.%s", scanID, req.Format, time.Now().UTC().Format("20060102150405"), ext)
 
 	_, dbErr := h.db.ExecContext(c.Context(), `
-		INSERT INTO deptics (id, scan_id, format, spec_version, file_key, sha256_hash, component_count)
+		INSERT INTO sboms (id, scan_id, format, spec_version, file_key, sha256_hash, component_count)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
 		depticID, scanID, req.Format, specVersion, fileKey, sha256Hash, len(components))
 
 	if dbErr != nil {
-		fmt.Printf("Failed to insert deptic into db: %v\n", dbErr)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to save DEPTIC metadata", "details": dbErr.Error()})
 	}
 
 	// 4. Return file directly as download
@@ -164,7 +164,7 @@ func (h *ScanHandler) HandleDownloadDEPTIC(c *fiber.Ctx) error {
 	depticID := c.Params("depticID")
 
 	var fileKey string
-	err := h.db.QueryRowContext(c.Context(), "SELECT file_key FROM deptics WHERE id = $1", depticID).Scan(&fileKey)
+	err := h.db.QueryRowContext(c.Context(), "SELECT file_key FROM sboms WHERE id = $1", depticID).Scan(&fileKey)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "DEPTIC not found"})
 	}

@@ -16,7 +16,7 @@ import { Footer } from '@/components/footer'
 
 export default function Page() {
   return (
-    <main className="relative bg-black">
+    <main className="dark relative bg-[var(--lp-bg)] text-[var(--lp-text)]">
       <Navbar />
       <Hero />
 

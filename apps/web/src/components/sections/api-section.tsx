@@ -31,7 +31,7 @@ function Typewriter({ text, start }: { text: string; start: boolean }) {
   }, [start, text])
   const done = out.length >= text.length
   return (
-    <pre className="whitespace-pre-wrap break-all font-mono text-[13px] leading-6 text-white">
+    <pre className="whitespace-pre-wrap break-all font-mono text-[13px] leading-6 text-[var(--lp-text)]">
       {out}
       {!done && <span className="animate-caret">|</span>}
     </pre>
@@ -72,20 +72,20 @@ export function ApiSection() {
     <section
       id="api"
       ref={revealRef}
-      className="bg-black px-5 py-24 md:px-8 md:py-32"
+      className="bg-[var(--lp-bg)] px-5 py-24 md:px-8 md:py-32"
     >
       <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-14 md:grid-cols-2">
         <div ref={ref}>
-          <h2 className="reveal font-heading text-4xl font-bold tracking-[-0.02em] text-white md:text-5xl">
+          <h2 className="reveal font-heading text-4xl font-bold tracking-[-0.02em] text-[var(--lp-text)] md:text-5xl">
             Built for developers
           </h2>
-          <p className="reveal mt-4 max-w-md text-base text-[#888888]">
+          <p className="reveal mt-4 max-w-md text-base text-[var(--lp-text-muted)]">
             One API call. Full SBOM analysis. Download reports programmatically.
           </p>
 
           {/* timeline */}
           <div className="relative mt-10 pl-8">
-            <div className="absolute left-[7px] top-1 h-full w-[2px] bg-[#1a1a1a]">
+            <div className="absolute left-[7px] top-1 h-full w-[2px] bg-[var(--lp-surface-2)]">
               <div
                 className="w-full bg-white transition-[height] duration-1000 ease-out"
                 style={{ height: inView ? '100%' : '0%' }}
@@ -104,14 +104,14 @@ export function ApiSection() {
                       transitionDelay: `${0.3 + i * 0.25}s`,
                     }}
                   >
-                    <span className="absolute -left-[33px] top-0.5 flex size-4 items-center justify-center rounded-full border border-[#333333] bg-black">
+                    <span className="absolute -left-[33px] top-0.5 flex size-4 items-center justify-center rounded-full border border-[var(--lp-border-2)] bg-[var(--lp-bg)]">
                       <span className="size-1.5 rounded-full bg-white" />
                     </span>
                     <div className="flex items-center gap-2">
-                      <Icon className="size-4 text-white" />
-                      <p className="font-medium text-white">{p.title}</p>
+                      <Icon className="size-4 text-[var(--lp-text)]" />
+                      <p className="font-medium text-[var(--lp-text)]">{p.title}</p>
                     </div>
-                    <p className="mt-1 text-sm text-[#888888]">{p.body}</p>
+                    <p className="mt-1 text-sm text-[var(--lp-text-muted)]">{p.body}</p>
                   </li>
                 )
               })}
@@ -120,21 +120,21 @@ export function ApiSection() {
         </div>
 
         {/* terminal */}
-        <div className="scanline relative overflow-hidden rounded-xl border border-[#1a1a1a] bg-[#0a0a0a]">
-          <div className="flex items-center gap-1.5 border-b border-[#1a1a1a] px-4 py-3">
+        <div className="scanline relative overflow-hidden rounded-xl border border-[var(--lp-border)] bg-[var(--lp-surface)]">
+          <div className="flex items-center gap-1.5 border-b border-[var(--lp-border)] px-4 py-3">
             <span className="size-2.5 rounded-full bg-[#2a2a2a]" />
             <span className="size-2.5 rounded-full bg-[#2a2a2a]" />
             <span className="size-2.5 rounded-full bg-[#2a2a2a]" />
-            <span className="ml-3 font-mono text-xs text-[#666666]">bash</span>
+            <span className="ml-3 font-mono text-xs text-[var(--lp-text-muted)]">bash</span>
           </div>
           <div className="space-y-3 p-5">
             <Typewriter text={CURL} start={inView} />
             {showResult && (
-              <div className="border-t border-[#1a1a1a] pt-3">
+              <div className="border-t border-[var(--lp-border)] pt-3">
                 {RESULT.map((line, i) => (
                   <p
                     key={i}
-                    className="font-mono text-[13px] leading-6 text-[#888888]"
+                    className="font-mono text-[13px] leading-6 text-[var(--lp-text-muted)]"
                     style={{
                       animation: `fade-in 0.3s ease-out ${i * 0.1}s both`,
                     }}

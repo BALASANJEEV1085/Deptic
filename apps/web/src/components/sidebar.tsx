@@ -35,20 +35,19 @@ const CONFIG_NAV = [
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
 
-/* ── Shield SVG logo icon ──────────────────────────────────────────────── */
 function ShieldIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
       <path
         d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.25C16.5 22.15 20 17.25 20 12V6L12 2z"
-        fill="rgba(255, 255, 255,0.15)"
-        stroke="#ffffff"
+        fill="var(--avatar-bg)"
+        stroke="var(--logo-icon)"
         strokeWidth="1.5"
         strokeLinejoin="round"
       />
       <path
         d="M9 12l2 2 4-4"
-        stroke="#ffffff"
+        stroke="var(--logo-icon)"
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -102,20 +101,19 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
       className="flex h-full flex-col"
       style={{
         width: 220,
-        background: '#090b0f',
-        borderRight: '1px solid #16191f',
+        background: 'var(--bg)',
+        borderRight: '1px solid var(--border)',
       }}
     >
-      {/* ── Logo ─────────────────────────────────────────────────────── */}
       <div
         className="hidden md:flex items-center gap-2.5 px-4"
-        style={{ height: 56, borderBottom: '1px solid #16191f' }}
+        style={{ height: 56, borderBottom: '1px solid var(--border)' }}
       >
         <div
           style={{
             width: 24,
             height: 24,
-            background: '#ffffff',
+            background: 'var(--logo-bg)',
             borderRadius: 4,
             display: 'flex',
             alignItems: 'center',
@@ -130,7 +128,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
             fontFamily: 'var(--font-syne, Syne, sans-serif)',
             fontSize: 16,
             fontWeight: 700,
-            color: '#e8ecf4',
+            color: 'var(--text-primary)',
             letterSpacing: '-0.3px',
           }}
         >
@@ -138,14 +136,12 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
         </span>
       </div>
 
-      {/* ── Workspace Switcher ────────────────────────────────────────── */}
       <div style={{ padding: '8px 4px 0' }}>
         <WorkspaceSwitcher />
       </div>
 
-      <div style={{ height: 1, background: '#16191f', margin: '0 12px' }} />
+      <div style={{ height: 1, background: 'var(--border)', margin: '0 12px' }} />
 
-      {/* ── Initiate Scan shortcut ────────────────────────────────────── */}
       <div style={{ padding: '8px 12px 4px' }}>
         <Link
           href="/dashboard/projects/new"
@@ -157,12 +153,12 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
             height: 32,
             padding: '0 10px',
             borderRadius: 6,
-            background: 'rgba(255, 255, 255,0.08)',
-            border: '1px solid rgba(255, 255, 255,0.15)',
+            background: 'var(--cta-bg)',
+            border: '1px solid var(--cta-border)',
             fontFamily: 'DM Sans, sans-serif',
             fontSize: 12,
             fontWeight: 500,
-            color: '#ffffff',
+            color: 'var(--cta-text)',
             textDecoration: 'none',
             transition: 'all 0.15s ease',
           }}
@@ -172,9 +168,8 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
         </Link>
       </div>
 
-      {/* ── Search by Audit ID ─────────────────────────────────────── */}
       <div style={{ padding: '4px 12px' }}>
-        <form 
+        <form
           onSubmit={async (e) => {
             e.preventDefault()
             if (!searchAuditId.trim()) return
@@ -198,30 +193,30 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            background: 'rgba(255, 255, 255, 0.03)',
-            border: searchError ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)',
+            background: 'var(--input-bg)',
+            border: searchError ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--input-border)',
             borderRadius: 6,
             height: 30,
             padding: '0 8px',
             gap: 6,
           }}>
-            <Search size={12} color="#6b7280" />
-            <input 
-              type="text" 
-              placeholder="Search Audit ID..." 
+            <Search size={12} color="var(--text-secondary)" />
+            <input
+              type="text"
+              placeholder="Search Audit ID..."
               value={searchAuditId}
               onChange={(e) => setSearchAuditId(e.target.value)}
               style={{
                 background: 'transparent',
                 border: 'none',
                 outline: 'none',
-                color: '#e8ecf4',
+                color: 'var(--text-primary)',
                 fontSize: 11,
                 fontFamily: 'DM Mono, monospace',
                 width: '100%',
               }}
             />
-            {isSearching && <CustomLoader size={12} className="text-zinc-500" />}
+            {isSearching && <CustomLoader size={12} className="text-muted-foreground" />}
           </div>
           {searchError && (
             <div style={{
@@ -245,9 +240,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
         </form>
       </div>
 
-      {/* ── Navigation ───────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto no-scrollbar" style={{ padding: '8px 12px' }}>
-        {/* MAIN */}
         <p
           style={{
             fontFamily: 'DM Sans, sans-serif',
@@ -255,7 +248,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
             fontWeight: 600,
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
-            color: '#374151',
+            color: 'var(--text-label)',
             margin: '16px 0 6px 4px',
           }}
         >
@@ -275,7 +268,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
               >
                 <Icon
                   size={14}
-                  style={{ color: active ? '#ffffff' : '#6b7280', flexShrink: 0 }}
+                  style={{ color: active ? 'var(--nav-icon-active)' : 'var(--nav-icon)', flexShrink: 0 }}
                 />
                 <span style={{ flex: 1 }}>{item.name}</span>
                 {item.name === 'Vulnerabilities' && hasCritical && (
@@ -294,7 +287,6 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
           })}
         </nav>
 
-        {/* CONFIGURATION */}
         <p
           style={{
             fontFamily: 'DM Sans, sans-serif',
@@ -302,7 +294,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
             fontWeight: 600,
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
-            color: '#374151',
+            color: 'var(--text-label)',
             margin: '20px 0 6px 4px',
           }}
         >
@@ -322,7 +314,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
               >
                 <Icon
                   size={14}
-                  style={{ color: active ? '#ffffff' : '#6b7280', flexShrink: 0 }}
+                  style={{ color: active ? 'var(--nav-icon-active)' : 'var(--nav-icon)', flexShrink: 0 }}
                 />
                 <span>{item.name}</span>
               </Link>
@@ -331,8 +323,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
         </nav>
       </div>
 
-      {/* ── User card ─────────────────────────────────────────────────── */}
-      <div style={{ padding: 12, borderTop: '1px solid #16191f' }}>
+      <div style={{ padding: 12, borderTop: '1px solid var(--border)' }}>
         <DropdownMenu>
           <DropdownMenuTrigger
             className="flex w-full items-center gap-2.5 outline-none"
@@ -343,14 +334,13 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
               cursor: 'pointer',
             }}
           >
-            {/* Avatar */}
             <div
               style={{
                 width: 28,
                 height: 28,
                 borderRadius: '50%',
-                background: 'rgba(255, 255, 255,0.12)',
-                border: '1px solid rgba(255, 255, 255,0.2)',
+                background: 'var(--avatar-bg)',
+                border: '1px solid var(--avatar-border)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -358,7 +348,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                 fontFamily: 'DM Sans, sans-serif',
                 fontSize: 11,
                 fontWeight: 600,
-                color: '#ffffff',
+                color: 'var(--text-active)',
               }}
             >
               {initials}
@@ -369,7 +359,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 13,
                   fontWeight: 500,
-                  color: '#e8ecf4',
+                  color: 'var(--text-primary)',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
@@ -381,7 +371,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                 style={{
                   fontFamily: 'DM Mono, monospace',
                   fontSize: 11,
-                  color: '#4a5068',
+                  color: 'var(--text-tertiary)',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
@@ -394,8 +384,8 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
 
           <DropdownMenuContent
             style={{
-              background: '#0e1015',
-              border: '1px solid #16191f',
+              background: 'var(--dropdown-bg)',
+              border: '1px solid var(--border)',
               minWidth: 200,
               padding: 6,
             }}
@@ -411,7 +401,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                   fontWeight: 600,
                   textTransform: 'uppercase',
                   letterSpacing: '0.06em',
-                  color: '#4a5068',
+                  color: 'var(--text-tertiary)',
                   marginBottom: 4,
                 }}
               >
@@ -421,7 +411,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                 style={{
                   fontFamily: 'DM Mono, monospace',
                   fontSize: 11,
-                  color: '#c9d1e0',
+                  color: 'var(--table-cell)',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
@@ -430,7 +420,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                 {user?.email}
               </p>
             </div>
-            <DropdownMenuSeparator style={{ background: '#16191f', margin: '4px 0' }} />
+            <DropdownMenuSeparator style={{ background: 'var(--border)', margin: '4px 0' }} />
             <DropdownMenuItem
               onClick={handleLogout}
               style={{

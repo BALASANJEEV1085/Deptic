@@ -14,6 +14,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/deptic-io/api/internal/notify"
+	"github.com/deptic-io/api/internal/plans"
 	"github.com/deptic-io/api/internal/workspace"
 )
 
@@ -161,6 +162,16 @@ func (h *WorkspaceHandler) HandleCreateWorkspace(c *fiber.Ctx) error {
 	var req createWorkspaceReq
 	if err := c.BodyParser(&req); err != nil || strings.TrimSpace(req.Name) == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Workspace name is required"})
+	}
+
+	exceeded, _, limit, _ := plans.CheckWorkspaceLimit(c.Context(), h.db, userID)
+	if exceeded {
+		return c.Status(429).JSON(fiber.Map{
+			"error":       fmt.Sprintf("Workspace limit reached. Your plan allows %d workspaces.", limit),
+			"limit":       limit,
+			"remaining":   0,
+			"upgrade_url": "/pricing",
+		})
 	}
 
 	slug, err := h.generateUniqueSlug(c.Context(), req.Name)
@@ -784,6 +795,16 @@ func (h *WorkspaceHandler) HandleGetInvitationPublic(c *fiber.Ctx) error {
 func (h *WorkspaceHandler) HandleAcceptInvitation(c *fiber.Ctx) error {
 	token := c.Params("token")
 	userID := c.Locals("user_id").(string)
+
+	exceeded, _, limit, _ := plans.CheckWorkspaceLimit(c.Context(), h.db, userID)
+	if exceeded {
+		return c.Status(429).JSON(fiber.Map{
+			"error":       fmt.Sprintf("Workspace limit reached. Your plan allows %d workspaces.", limit),
+			"limit":       limit,
+			"remaining":   0,
+			"upgrade_url": "/pricing",
+		})
+	}
 
 	var wsID, role string
 	var expiresAt time.Time

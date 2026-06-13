@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 export function H1({ children, className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h1 
-      className={cn("font-heading text-4xl font-bold tracking-tight text-white border-b border-[#1a1a1a] pb-5 mb-8", className)} 
+      className={cn("font-heading text-4xl font-bold tracking-tight text-white border-b border-[var(--lp-border)] pb-5 mb-8", className)} 
       {...props}
     >
       {children}
@@ -43,7 +43,7 @@ export function H3({ children, id, className, ...props }: React.HTMLAttributes<H
 export function H4({ children, className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h4 
-      className={cn("text-sm font-semibold uppercase tracking-widest text-[#888888] mt-6 mb-2", className)} 
+      className={cn("text-sm font-semibold uppercase tracking-widest text-[var(--lp-text-muted)] mt-6 mb-2", className)} 
       {...props}
     >
       {children}
@@ -54,7 +54,7 @@ export function H4({ children, className, ...props }: React.HTMLAttributes<HTMLH
 export function P({ children, className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
   return (
     <p 
-      className={cn("text-base text-[#888888] leading-[1.8] mb-4", className)} 
+      className={cn("text-base text-[var(--lp-text-muted)] leading-[1.8] mb-4", className)} 
       {...props}
     >
       {children}
@@ -76,7 +76,7 @@ export function A({ children, className, ...props }: React.AnchorHTMLAttributes<
 export function Ul({ children, className, ...props }: React.HTMLAttributes<HTMLUListElement>) {
   return (
     <ul 
-      className={cn("list-disc list-outside pl-6 text-[#888888] mb-4 space-y-2", className)} 
+      className={cn("list-disc list-outside pl-6 text-[var(--lp-text-muted)] mb-4 space-y-2", className)} 
       {...props}
     >
       {children}
@@ -87,7 +87,7 @@ export function Ul({ children, className, ...props }: React.HTMLAttributes<HTMLU
 export function Ol({ children, className, ...props }: React.HTMLAttributes<HTMLOListElement>) {
   return (
     <ol 
-      className={cn("list-decimal list-outside pl-6 text-[#888888] mb-4 space-y-2", className)} 
+      className={cn("list-decimal list-outside pl-6 text-[var(--lp-text-muted)] mb-4 space-y-2", className)} 
       {...props}
     >
       {children}
@@ -106,7 +106,7 @@ export function Li({ children, className, ...props }: React.HTMLAttributes<HTMLL
 export function InlineCode({ children, className, ...props }: React.HTMLAttributes<HTMLElement>) {
   return (
     <code 
-      className={cn("font-mono text-xs bg-[#111111] border border-[#1a1a1a] rounded px-1.5 py-0.5 text-white", className)} 
+      className={cn("font-mono text-xs bg-[var(--lp-surface-2)] border border-[var(--lp-border)] rounded px-1.5 py-0.5 text-white", className)} 
       {...props}
     >
       {children}
@@ -124,15 +124,15 @@ export function CodeBlock({ children, language, className }: { children: string,
   }
 
   return (
-    <div className={cn("relative group mb-6 rounded-lg border border-[#1a1a1a] bg-[#0d0d0d] overflow-hidden", className)}>
+    <div className={cn("relative group mb-6 rounded-lg border border-[var(--lp-border)] bg-[#0d0d0d] overflow-hidden", className)}>
       {language && (
-        <div className="absolute top-0 right-0 px-3 py-1.5 text-[10px] uppercase font-mono text-[#666666]">
+        <div className="absolute top-0 right-0 px-3 py-1.5 text-[10px] uppercase font-mono text-[var(--lp-text-muted)]">
           {language}
         </div>
       )}
       <button 
         onClick={handleCopy}
-        className="absolute top-3 right-3 p-1.5 rounded-md bg-[#1a1a1a] text-[#888888] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute top-3 right-3 p-1.5 rounded-md bg-[var(--lp-surface-2)] text-[var(--lp-text-muted)] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
       >
         {copied ? <Check size={14} /> : <Copy size={14} />}
       </button>
@@ -151,7 +151,7 @@ export function Callout({ children, type = "info", className }: { children: Reac
   }
 
   return (
-    <div className={cn(`bg-[#0a0a0a] border-l-4 ${borderColors[type]} p-5 mb-6`, className)}>
+    <div className={cn(`bg-[var(--lp-surface)] border-l-4 ${borderColors[type]} p-5 mb-6`, className)}>
       {children}
     </div>
   )
@@ -160,7 +160,7 @@ export function Callout({ children, type = "info", className }: { children: Reac
 export function Table({ children, className, ...props }: React.HTMLAttributes<HTMLTableElement>) {
   return (
     <div className="w-full overflow-x-auto mb-6">
-      <table className={cn("w-full border-collapse border border-[#1a1a1a] text-left", className)} {...props}>
+      <table className={cn("w-full border-collapse border border-[var(--lp-border)] text-left", className)} {...props}>
         {children}
       </table>
     </div>
@@ -170,7 +170,7 @@ export function Table({ children, className, ...props }: React.HTMLAttributes<HT
 export function Th({ children, className, ...props }: React.HTMLAttributes<HTMLTableCellElement>) {
   return (
     <th 
-      className={cn("bg-[#111111] px-4 py-3 text-xs uppercase tracking-wider text-white border border-[#1a1a1a] font-semibold", className)} 
+      className={cn("bg-[var(--lp-surface-2)] px-4 py-3 text-xs uppercase tracking-wider text-white border border-[var(--lp-border)] font-semibold", className)} 
       {...props}
     >
       {children}
@@ -181,7 +181,7 @@ export function Th({ children, className, ...props }: React.HTMLAttributes<HTMLT
 export function Td({ children, className, ...props }: React.HTMLAttributes<HTMLTableCellElement>) {
   return (
     <td 
-      className={cn("px-4 py-3 text-sm text-[#888888] border border-[#1a1a1a]", className)} 
+      className={cn("px-4 py-3 text-sm text-[var(--lp-text-muted)] border border-[var(--lp-border)]", className)} 
       {...props}
     >
       {children}
@@ -192,7 +192,7 @@ export function Td({ children, className, ...props }: React.HTMLAttributes<HTMLT
 export function Tr({ children, className, ...props }: React.HTMLAttributes<HTMLTableRowElement>) {
   return (
     <tr 
-      className={cn("bg-[#000000] [&:nth-child(even)]:bg-[#0a0a0a]", className)} 
+      className={cn("bg-[#000000] [&:nth-child(even)]:bg-[var(--lp-surface)]", className)} 
       {...props}
     >
       {children}
@@ -203,7 +203,7 @@ export function Tr({ children, className, ...props }: React.HTMLAttributes<HTMLT
 export function StepIndicator({ step, children, className }: { step: number, children: React.ReactNode, className?: string }) {
   return (
     <div className={cn("flex gap-4 mt-8 mb-4 items-start", className)}>
-      <div className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-[#111111] border border-[#333333] text-xs font-semibold text-white">
+      <div className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-[var(--lp-surface-2)] border border-[var(--lp-border-2)] text-xs font-semibold text-white">
         {step}
       </div>
       <div className="flex-1">

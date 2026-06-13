@@ -27,14 +27,14 @@ function EcoBadge({ eco }: { eco: string }) {
   return (
     <span
       style={{
-        background: "#16191f",
-        color: "#6b7280",
+        background: "var(--border)",
+        color: "var(--text-secondary)",
         fontFamily: "DM Sans, sans-serif",
         fontSize: 11,
         fontWeight: 500,
         padding: "2px 8px",
         borderRadius: 4,
-        border: "1px solid #1e2230",
+        border: "1px solid var(--border-hover)",
         display: "inline-block",
       }}
     >
@@ -45,16 +45,16 @@ function EcoBadge({ eco }: { eco: string }) {
 
 function NtiaScore({ score, loading }: { score?: number; loading: boolean }) {
   if (loading)
-    return <CustomLoader size={14} color="#374151" />;
+    return <CustomLoader size={14} color="var(--text-label)" />;
   if (score === undefined)
     return (
-      <span style={{ fontFamily: "DM Mono, monospace", fontSize: 12, color: "#374151" }}>
+      <span style={{ fontFamily: "DM Mono, monospace", fontSize: 12, color: "var(--text-label)" }}>
         N/A
       </span>
     );
   const s = getComplianceStatus(score);
   const color =
-    s.color === "green" ? "#ffffff" : s.color === "amber" ? "#f59e0b" : "#ef4444";
+    s.color === "green" ? "var(--green)" : s.color === "amber" ? "#f59e0b" : "#ef4444";
   return (
     <span
       style={{
@@ -77,9 +77,9 @@ function StatusBadge({
   loading: boolean;
 }) {
   if (loading)
-    return <span style={{ fontFamily: "DM Mono, monospace", fontSize: 11, color: "#374151" }}>—</span>;
+    return <span style={{ fontFamily: "DM Mono, monospace", fontSize: 11, color: "var(--text-label)" }}>—</span>;
   if (score === undefined)
-    return <span style={{ fontFamily: "DM Mono, monospace", fontSize: 11, color: "#374151" }}>N/A</span>;
+    return <span style={{ fontFamily: "DM Mono, monospace", fontSize: 11, color: "var(--text-label)" }}>N/A</span>;
 
   if (score >= 95) {
     return (
@@ -90,7 +90,7 @@ function StatusBadge({
           fontWeight: 600,
           textTransform: "uppercase" as const,
           letterSpacing: "0.04em",
-          color: "#ffffff",
+          color: "var(--text-active)",
           display: "inline-flex",
           alignItems: "center",
           gap: 5,
@@ -155,7 +155,7 @@ function SkeletonRow() {
         <td key={i} style={{ padding: "0 16px", height: 44 }}>
           <div
             className="skeleton"
-            style={{ height: 10, width: w, background: "#16191f", borderRadius: 4 }}
+            style={{ height: 10, width: w, background: "var(--border)", borderRadius: 4 }}
           />
         </td>
       ))}
@@ -246,7 +246,7 @@ export default function ReportsPage() {
             fontSize: 24,
             fontWeight: 700,
             letterSpacing: "-0.5px",
-            color: "#e8ecf4",
+            color: "var(--text-primary)",
             margin: "0 0 4px",
           }}
         >
@@ -256,7 +256,7 @@ export default function ReportsPage() {
           style={{
             fontFamily: "DM Sans, sans-serif",
             fontSize: 14,
-            color: "#6b7280",
+            color: "var(--text-secondary)",
             margin: 0,
           }}
         >
@@ -282,7 +282,7 @@ export default function ReportsPage() {
               left: 10,
               top: "50%",
               transform: "translateY(-50%)",
-              color: "#374151",
+              color: "var(--text-label)",
               pointerEvents: "none",
             }}
           />
@@ -296,17 +296,17 @@ export default function ReportsPage() {
               height: 34,
               paddingLeft: 34,
               paddingRight: 12,
-              background: "#0e1015",
-              border: "1px solid #16191f",
+              background: "var(--card)",
+              border: "1px solid var(--border)",
               borderRadius: 6,
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13,
-              color: "#e8ecf4",
+              color: "var(--text-primary)",
               outline: "none",
               transition: "border-color 0.15s ease",
             }}
-            onFocus={(e) => (e.target.style.borderColor = "#ffffff")}
-            onBlur={(e) => (e.target.style.borderColor = "#16191f")}
+            onFocus={(e) => (e.target.style.borderColor = "var(--green)")}
+            onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
           />
         </div>
 
@@ -315,8 +315,8 @@ export default function ReportsPage() {
           style={{
             display: "flex",
             gap: 2,
-            background: "#0e1015",
-            border: "1px solid #16191f",
+            background: "var(--card)",
+            border: "1px solid var(--border)",
             borderRadius: 6,
             padding: 3,
           }}
@@ -331,8 +331,8 @@ export default function ReportsPage() {
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 12,
                 fontWeight: 500,
-                background: filter === t.key ? "#16191f" : "transparent",
-                color: filter === t.key ? "#e8ecf4" : "#6b7280",
+                background: filter === t.key ? "var(--border)" : "transparent",
+                color: filter === t.key ? "var(--text-primary)" : "var(--text-secondary)",
                 border: "none",
                 cursor: "pointer",
                 transition: "all 0.15s ease",
@@ -347,8 +347,8 @@ export default function ReportsPage() {
       {/* Table */}
       <div
         style={{
-          background: "#0e1015",
-          border: "1px solid #16191f",
+          background: "var(--card)",
+          border: "1px solid var(--border)",
           borderRadius: 8,
           overflow: "hidden",
         }}
@@ -376,11 +376,11 @@ export default function ReportsPage() {
                     style={{
                       textAlign: "center",
                       padding: "64px 16px",
-                      color: "#374151",
+                      color: "var(--text-label)",
                     }}
                   >
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-                      <FileBarChart2 size={32} color="#1e2230" />
+                      <FileBarChart2 size={32} color="var(--border-hover)" />
                       <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13 }}>
                         {searchQuery
                           ? `No reports matching "${searchQuery}"`
@@ -400,7 +400,7 @@ export default function ReportsPage() {
                             fontFamily: "DM Sans, sans-serif",
                             fontSize: 13,
                             fontWeight: 500,
-                            color: "#e8ecf4",
+                            color: "var(--text-primary)",
                             margin: "0 0 2px",
                           }}
                         >
@@ -410,7 +410,7 @@ export default function ReportsPage() {
                           style={{
                             fontFamily: "DM Mono, monospace",
                             fontSize: 10,
-                            color: "#374151",
+                            color: "var(--text-label)",
                           }}
                         >
                           #{shortId(report.id)}
@@ -422,7 +422,7 @@ export default function ReportsPage() {
                           style={{
                             fontFamily: "DM Mono, monospace",
                             fontSize: 12,
-                            color: "#6b7280",
+                            color: "var(--text-secondary)",
                           }}
                           title={new Date(report.created_at).toLocaleString()}
                         >
@@ -439,7 +439,7 @@ export default function ReportsPage() {
                           style={{
                             fontFamily: "DM Mono, monospace",
                             fontSize: 13,
-                            color: "#c9d1e0",
+                            color: "var(--table-cell)",
                           }}
                         >
                           {(report.component_count ?? 0).toLocaleString()}
@@ -469,7 +469,7 @@ export default function ReportsPage() {
                               fontFamily: "DM Sans, sans-serif",
                               fontSize: 13,
                               fontWeight: 500,
-                              color: "#ffffff",
+                              color: "var(--text-active)",
                               textDecoration: "none",
                             }}
                           >
@@ -481,7 +481,7 @@ export default function ReportsPage() {
                                 style={{
                                   fontFamily: "DM Mono, monospace",
                                   fontSize: 12,
-                                  color: "#374151",
+                                  color: "var(--text-label)",
                                 }}
                               >
                                 ·
@@ -493,7 +493,7 @@ export default function ReportsPage() {
                                   fontFamily: "DM Sans, sans-serif",
                                   fontSize: 13,
                                   fontWeight: 500,
-                                  color: pdfLoading[report.id] ? "#374151" : "#6b7280",
+                                  color: pdfLoading[report.id] ? "var(--text-label)" : "var(--text-secondary)",
                                   background: "none",
                                   border: "none",
                                   cursor: pdfLoading[report.id] ? "not-allowed" : "pointer",

@@ -17,11 +17,11 @@ function Metric({
   const n = useCountUp(value, trigger, 1500)
   return (
     <div className="flex flex-col items-center text-center">
-      <span className="font-heading text-6xl font-bold tracking-[-0.02em] text-white md:text-[96px]">
+      <span className="font-heading text-6xl font-bold tracking-[-0.02em] text-[var(--lp-text)] md:text-[96px]">
         {Math.round(n).toLocaleString()}
         {suffix}
       </span>
-      <span className="mt-2 text-base text-[#888888]">{label}</span>
+      <span className="mt-2 text-base text-[var(--lp-text-muted)]">{label}</span>
     </div>
   )
 }
@@ -47,7 +47,7 @@ export function Metrics() {
   return (
     <section
       ref={sectionRef}
-      className="relative overflow-hidden bg-black px-5 py-28 md:py-32"
+      className="relative overflow-hidden bg-[var(--lp-bg)] px-5 py-28 md:py-32"
     >
       {/* parallax grid bg */}
       <div
