@@ -93,12 +93,6 @@ export const metadata: Metadata = {
 
   referrer: "origin-when-cross-origin",
 
-  icons: {
-    icon: "/icon.png",
-    shortcut: "/icon.png",
-    apple: "/icon.png",
-  },
-
   manifest: "/manifest.json",
 
   openGraph: {
@@ -310,8 +304,9 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <link rel="icon" href="/icon.png" type="image/png" />
-        <link rel="apple-touch-icon" href="/icon.png" />
+        <link rel="icon" href="/deptic-favicon.png" type="image/png" sizes="any" />
+        <link rel="shortcut icon" href="/deptic-favicon.png" />
+        <link rel="apple-touch-icon" href="/deptic-favicon.png" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

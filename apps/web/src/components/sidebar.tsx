@@ -109,31 +109,10 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
         className="hidden md:flex items-center gap-2.5 px-4"
         style={{ height: 56, borderBottom: '1px solid var(--border)' }}
       >
-        <div
-          style={{
-            width: 24,
-            height: 24,
-            background: 'var(--logo-bg)',
-            borderRadius: 4,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          <ShieldIcon />
-        </div>
-        <span
-          style={{
-            fontFamily: 'var(--font-syne, Syne, sans-serif)',
-            fontSize: 16,
-            fontWeight: 700,
-            color: 'var(--text-primary)',
-            letterSpacing: '-0.3px',
-          }}
-        >
-          DEPTIC
-        </span>
+        <Link href="/dashboard" className="flex items-center -ml-2">
+          <img src="/logo-light.png" alt="Deptic Logo" className="h-24 w-auto dark:hidden" />
+          <img src="/logo-dark.png" alt="Deptic Logo" className="h-24 w-auto hidden dark:block" />
+        </Link>
       </div>
 
       <div style={{ padding: '8px 4px 0' }}>
