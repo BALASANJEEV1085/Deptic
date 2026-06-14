@@ -18,7 +18,7 @@ const PLANS = [
 
   {
     name: 'Enterprise',
-    monthly: 2,
+    monthly: 999,
     annual: 9999,
     desc: 'For organizations at scale.',
     features: [
