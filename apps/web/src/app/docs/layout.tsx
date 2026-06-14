@@ -164,52 +164,54 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
     <div className="min-h-screen bg-[var(--lp-bg)] text-[var(--lp-text)] selection:bg-[var(--green)]/20 font-sans">
       
       {/* Top Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-[var(--lp-bg)]/95 backdrop-blur border-b border-[var(--lp-border)] flex items-center justify-between px-4 lg:px-6">
-        <div className="flex items-center gap-4">
-          <button 
-            className="lg:hidden p-1.5 -ml-1.5 text-[var(--lp-text-muted)] hover:text-[var(--lp-text)]"
-            onClick={() => setMobileMenuOpen(true)}
-          >
-            <Menu size={20} />
-          </button>
-          <Link href="/" className="flex items-center gap-2">
-            <img src="/logo.png" alt="Deptic Logo" className="w-6 h-6 rounded-md" />
-            <span className="font-heading font-bold text-[15px] tracking-tight">Deptic</span>
-          </Link>
-        </div>
+      <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-[var(--lp-bg)]/95 backdrop-blur border-b border-[var(--lp-border)]">
+        <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-5 md:px-8">
+          <div className="flex items-center gap-4">
+            <button 
+              className="lg:hidden p-1.5 -ml-1.5 text-[var(--lp-text-muted)] hover:text-[var(--lp-text)]"
+              onClick={() => setMobileMenuOpen(true)}
+            >
+              <Menu size={20} />
+            </button>
+            <Link href="/" className="flex items-center">
+              <img src="/logo-light.png" alt="Deptic Logo" className="h-24 w-auto dark:hidden" />
+              <img src="/logo-dark.png" alt="Deptic Logo" className="h-24 w-auto hidden dark:block" />
+            </Link>
+          </div>
 
-        {/* Global Search Bar (Desktop) */}
-        <div className="hidden md:flex flex-1 max-w-[480px] mx-8">
+          {/* Global Search Bar (Desktop) */}
+          <div className="hidden md:flex flex-1 max-w-[480px] mx-8">
+            <button 
+              onClick={() => setSearchOpen(true)}
+              className="flex w-full items-center gap-2 h-9 rounded-md border border-[var(--lp-border)] bg-[var(--lp-surface)] hover:bg-[var(--lp-surface-2)] px-3 text-sm text-[var(--lp-text-muted)] transition-colors shadow-sm"
+            >
+              <SearchIcon size={14} />
+              <span className="flex-1 text-left">Search documentation...</span>
+              <div className="flex items-center gap-1 font-mono text-[10px]">
+                <kbd className="rounded bg-[var(--lp-surface-2)] px-1.5 py-0.5 text-[var(--lp-text-muted)]">⌘</kbd>
+                <kbd className="rounded bg-[var(--lp-surface-2)] px-1.5 py-0.5 text-[var(--lp-text-muted)]">K</kbd>
+              </div>
+            </button>
+          </div>
+
+          {/* Search Icon (Mobile) */}
           <button 
+            className="md:hidden p-1.5 text-[var(--lp-text-muted)] hover:text-[var(--lp-text)]"
             onClick={() => setSearchOpen(true)}
-            className="flex w-full items-center gap-2 h-9 rounded-md border border-[var(--lp-border)] bg-[var(--lp-surface)] hover:bg-[var(--lp-surface-2)] px-3 text-sm text-[var(--lp-text-muted)] transition-colors shadow-sm"
           >
-            <SearchIcon size={14} />
-            <span className="flex-1 text-left">Search documentation...</span>
-            <div className="flex items-center gap-1 font-mono text-[10px]">
-              <kbd className="rounded bg-[var(--lp-surface-2)] px-1.5 py-0.5 text-[var(--lp-text-muted)]">⌘</kbd>
-              <kbd className="rounded bg-[var(--lp-surface-2)] px-1.5 py-0.5 text-[var(--lp-text-muted)]">K</kbd>
-            </div>
+            <SearchIcon size={18} />
           </button>
-        </div>
 
-        {/* Search Icon (Mobile) */}
-        <button 
-          className="md:hidden p-1.5 text-[var(--lp-text-muted)] hover:text-[var(--lp-text)]"
-          onClick={() => setSearchOpen(true)}
-        >
-          <SearchIcon size={18} />
-        </button>
+          <div className="flex items-center gap-4">
 
-        <div className="flex items-center gap-4">
-
-          <button
-            className="text-[var(--lp-text-muted)] hover:text-[var(--lp-text)] transition-colors"
-            onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-            aria-label="Toggle theme"
-          >
-            {themeMounted && resolvedTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
+            <button
+              className="text-[var(--lp-text-muted)] hover:text-[var(--lp-text)] transition-colors"
+              onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+              aria-label="Toggle theme"
+            >
+              {themeMounted && resolvedTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+          </div>
         </div>
       </header>
 

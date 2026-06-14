@@ -37,9 +37,9 @@ export function Navbar() {
       }`}
     >
       <nav className="mx-auto flex h-14 max-w-7xl items-center justify-between px-5 md:px-8">
-        <a href="/" className="flex items-center gap-2 text-[17px] font-bold tracking-tight text-[var(--lp-text)]">
-          <img src="/logo.png" alt="Deptic Logo" className="w-6 h-6 rounded-md" />
-          Deptic
+        <a href="/" className="flex items-center">
+          <img src="/logo-light.png" alt="Deptic Logo" className="h-24 w-auto dark:hidden" />
+          <img src="/logo-dark.png" alt="Deptic Logo" className="h-24 w-auto hidden dark:block" />
         </a>
 
         <ul className="hidden items-center gap-8 md:flex">

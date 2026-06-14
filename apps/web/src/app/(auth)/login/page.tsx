@@ -49,12 +49,13 @@ function LoginContent() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background text-foreground p-4 selection:bg-[var(--green)] selection:text-black">
-      {/* Absolute Logo Top Left */}
-      <div className="absolute top-8 left-8">
-        <Link href="/" className="flex items-center gap-3 font-syne font-bold text-xl hover:opacity-80 transition-opacity">
-          <img src="/logo.png" alt="Deptic Logo" className="w-8 h-8 rounded-lg" />
-          <span>DEPTIC</span>
-        </Link>
+      <div className="absolute top-0 left-0 right-0">
+        <div className="mx-auto flex h-14 max-w-7xl items-center px-5 md:px-8">
+          <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+            <img src="/logo-light.png" alt="Deptic Logo" className="h-24 w-auto dark:hidden" />
+            <img src="/logo-dark.png" alt="Deptic Logo" className="h-24 w-auto hidden dark:block" />
+          </Link>
+        </div>
       </div>
 
       <div className="w-full max-w-[400px] flex flex-col items-center">
