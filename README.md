@@ -1,4 +1,4 @@
-[![Deptic Security](https://api.deptic.in/badge/github/BALASANJEEV1085/Deptic)](https://deptic.in/dashboard)
+[![Deptic Security](https://deptic-api.onrender.com/badge/github/BALASANJEEV1085/Deptic)](https://deptic.netlify.app/dashboard)
 
 <p align="center">
   <a href="https://deptic.netlify.app">
