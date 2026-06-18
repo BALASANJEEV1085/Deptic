@@ -62,14 +62,12 @@ Get your first SBOM in under 60 seconds:
 
 ```bash
 # Install the Deptic CLI
-npm install -g deptic-cli
+npm install -g deptic-scan
 
 # Scan your project
-deptic-scan --path ./my-project --output cyclonedx
+deptic-scan 
 
-# Or scan a remote repo
-deptic-scan --repo https://github.com/user/repo
-```
+
 
 <br>
 
