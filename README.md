@@ -1,3 +1,5 @@
+[![Deptic Security](https://api.deptic.in/badge/github/BALASANJEEV1085/Deptic)](https://deptic.in/dashboard)
+
 <p align="center">
   <a href="https://deptic.netlify.app">
     <img src="https://deptic.netlify.app/logo-dark.png" width="320" alt="Deptic Logo">
