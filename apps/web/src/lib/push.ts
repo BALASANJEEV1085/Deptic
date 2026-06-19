@@ -20,7 +20,8 @@ export function isPushSupported() {
 
 export async function isPushSubscribed() {
   if (!isPushSupported()) return false;
-  const reg = await navigator.serviceWorker.ready;
+  const reg = await navigator.serviceWorker.register('/sw.js');
+  await navigator.serviceWorker.ready;
   const sub = await reg.pushManager.getSubscription();
   return !!sub;
 }
@@ -28,7 +29,8 @@ export async function isPushSubscribed() {
 export async function subscribeToPush() {
   if (!isPushSupported()) return false;
   try {
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.ready;
     const existing = await reg.pushManager.getSubscription();
     if (existing) return existing;
 

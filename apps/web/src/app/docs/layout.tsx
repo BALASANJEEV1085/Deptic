@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { Menu, X, Search as SearchIcon, Sun, Moon } from 'lucide-react'
 import { useTheme } from 'next-themes'
@@ -170,12 +171,13 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
             <button 
               className="lg:hidden p-1.5 -ml-1.5 text-[var(--lp-text-muted)] hover:text-[var(--lp-text)]"
               onClick={() => setMobileMenuOpen(true)}
+              aria-label="Open mobile menu"
             >
               <Menu size={20} />
             </button>
             <Link href="/" className="flex items-center">
-              <img src="/logo-light.png" alt="Deptic Logo" className="h-24 w-auto dark:hidden" />
-              <img src="/logo-dark.png" alt="Deptic Logo" className="h-24 w-auto hidden dark:block" />
+              <Image src="/logo-light.png" width={384} height={96} alt="Deptic Logo" className="h-24 w-auto dark:hidden" priority />
+              <Image src="/logo-dark.png" width={384} height={96} alt="Deptic Logo" className="h-24 w-auto hidden dark:block" priority />
             </Link>
           </div>
 
@@ -198,6 +200,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
           <button 
             className="md:hidden p-1.5 text-[var(--lp-text-muted)] hover:text-[var(--lp-text)]"
             onClick={() => setSearchOpen(true)}
+            aria-label="Open search"
           >
             <SearchIcon size={18} />
           </button>

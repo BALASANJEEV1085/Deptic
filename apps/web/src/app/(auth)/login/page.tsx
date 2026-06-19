@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
+import Image from 'next/image';
 import { AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -52,8 +53,8 @@ function LoginContent() {
       <div className="absolute top-0 left-0 right-0">
         <div className="mx-auto flex h-14 max-w-7xl items-center px-5 md:px-8">
           <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
-            <img src="/logo-light.png" alt="Deptic Logo" className="h-24 w-auto dark:hidden" />
-            <img src="/logo-dark.png" alt="Deptic Logo" className="h-24 w-auto hidden dark:block" />
+            <Image src="/logo-light.png" width={384} height={96} alt="Deptic Logo" className="h-24 w-auto dark:hidden" priority />
+            <Image src="/logo-dark.png" width={384} height={96} alt="Deptic Logo" className="h-24 w-auto hidden dark:block" priority />
           </Link>
         </div>
       </div>

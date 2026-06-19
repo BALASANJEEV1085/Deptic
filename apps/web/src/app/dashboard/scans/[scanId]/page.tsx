@@ -246,7 +246,7 @@ export default function ScanResultsPage() {
             <span className="text-zinc-500">Audit ID:</span>
             <div className="flex items-center gap-1.5 group/id">
               <span className="text-muted-foreground font-bold">{shortId(scanId)}</span>
-              <button onClick={copyIdToClipboard} className="text-zinc-600 hover:text-foreground transition-colors">
+              <button onClick={copyIdToClipboard} className="text-zinc-600 hover:text-foreground transition-colors" aria-label="Copy Audit ID">
                 {idCopied ? <CheckCircle2 className="h-2.5 w-2.5 text-[#ffffff]" /> : <Copy className="h-2.5 w-2.5" />}
               </button>
             </div>

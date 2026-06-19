@@ -289,10 +289,10 @@ async function main() {
     spinner2.fail('Scan failed')
     const msg = result.body?.error || 'Unknown error'
     if (result.status === 401) {
-      console.log(col('red', '\n  Invalid API key. Generate a new one at deptic.in/dashboard/settings\n'))
+      console.log(col('red', '\n  Invalid API key. Generate a new one at deptic.netlify.app/dashboard/settings\n'))
     } else if (result.status === 403) {
       console.log(col('red', '\n  This API key has already been used.'))
-      console.log(col('gray', '  Each key allows one scan. Generate a new key at deptic.in\n'))
+      console.log(col('gray', '  Each key allows one scan. Generate a new key at deptic.netlify.app\n'))
     } else {
       console.log(col('red', `\n  Error (${result.status}): ${msg}\n`))
     }
@@ -355,7 +355,7 @@ async function main() {
   }
 
   console.log('')
-  console.log(col('gray', '  View full report: ') + col('green', 'https://deptic.in/dashboard'))
+  console.log(col('gray', '  View full report: ') + col('green', 'https://deptic.netlify.app/dashboard'))
   console.log(col('gray', '  ─────────────────────────────────────'))
   console.log('')
 

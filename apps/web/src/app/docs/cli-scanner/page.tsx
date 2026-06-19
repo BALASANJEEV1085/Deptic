@@ -9,7 +9,7 @@ export default function Page() {
       <Ul>
         <Li>Node.js 18 or higher</Li>
         <Li>npm (comes with Node.js)</Li>
-        <Li>A Deptic API key (generate at deptic.in/dashboard/settings)</Li>
+        <Li>A Deptic API key (generate at deptic.netlify.app/dashboard/settings)</Li>
       </Ul>
 
       <H2 id="installation">Installation:</H2>
@@ -96,7 +96,7 @@ deptic-scan
   ✓ deptic-sbom-spring-petclinic.spdx
 
   Reports saved to current directory.
-  View full report: https://deptic.in/dashboard`}
+  View full report: https://deptic.netlify.app/dashboard`}
       </CodeBlock>
 
       <H2 id="flags">Flags:</H2>

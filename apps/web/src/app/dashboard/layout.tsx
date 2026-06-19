@@ -85,6 +85,7 @@ export default function DashboardLayout({
             <button
               onClick={() => setIsMobileMenuOpen(false)}
               className="flex items-center justify-center w-7 h-7 rounded text-[var(--text-secondary)] bg-[var(--card)] border border-[var(--border)] cursor-pointer"
+              aria-label="Close mobile menu"
             >
               <X size={14} />
             </button>
@@ -100,6 +101,7 @@ export default function DashboardLayout({
             <button
               onClick={() => setIsMobileMenuOpen(true)}
               className="flex items-center justify-center w-9 h-9 rounded-md text-[var(--text-secondary)] bg-[var(--card)] border border-[var(--border)] cursor-pointer"
+              aria-label="Open mobile menu"
             >
               <Menu size={16} />
             </button>

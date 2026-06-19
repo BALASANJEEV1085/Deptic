@@ -1,12 +1,14 @@
-/* ── Google Fonts: Syne + DM Sans + DM Mono ─────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&display=swap');
-
+/* ── Google Fonts removed in favor of next/font/google ─────────────────────────────── */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 @layer base {
   html {
     scroll-behavior: smooth;
+  }
+  img {
+    width: auto;
+    height: auto;
   }
 
   :root {

@@ -70,7 +70,7 @@ export function Hero() {
             style={{ scale: card1Scale, opacity: card1Opacity, y: card1Y }}
             className="flex flex-col items-center text-center px-6 max-w-5xl mx-auto"
           >
-            <h1 className="text-white text-5xl lg:text-6xl xl:text-7xl leading-[1.12] font-medium tracking-tight max-w-[900px] mx-auto mb-6">
+            <h1 className="text-white text-5xl lg:text-6xl xl:text-7xl leading-[1.12] font-medium tracking-tight max-w-[900px] mx-auto mb-6" style={{ contentVisibility: 'auto' }}>
               SBOM Intelligence for Modern Engineering Teams
             </h1>
             <p className="text-white/60 text-lg md:text-[21px] max-w-2xl mx-auto mb-10">

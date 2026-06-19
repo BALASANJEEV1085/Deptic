@@ -22,7 +22,7 @@ The scanner will:
 
 ## API Keys
 
-Get your free API key at https://deptic.in/dashboard/settings
+Get your free API key at https://deptic.netlify.app/dashboard/settings
 
 Each key is single-use. Generate a new key for each scan.
 The CLI saves your key locally for convenience.

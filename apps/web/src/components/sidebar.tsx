@@ -1,6 +1,7 @@
 "use client"
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useEffect, useState } from 'react'
@@ -110,8 +111,8 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
         style={{ height: 56, borderBottom: '1px solid var(--border)' }}
       >
         <Link href="/dashboard" className="flex items-center -ml-2">
-          <img src="/logo-light.png" alt="Deptic Logo" className="h-24 w-auto dark:hidden" />
-          <img src="/logo-dark.png" alt="Deptic Logo" className="h-24 w-auto hidden dark:block" />
+          <Image src="/logo-light.png" width={384} height={96} alt="Deptic Logo" className="h-24 w-auto dark:hidden" priority />
+          <Image src="/logo-dark.png" width={384} height={96} alt="Deptic Logo" className="h-24 w-auto hidden dark:block" priority />
         </Link>
       </div>
 

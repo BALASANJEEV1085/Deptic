@@ -4,16 +4,19 @@ import { useState, useRef, useEffect } from 'react'
 import { useWorkspace } from '@/lib/contexts/workspace-context'
 import type { Workspace } from '@/lib/api'
 import { Check, ChevronDown, Plus, Building2, User } from 'lucide-react'
+import Image from 'next/image'
 import { CustomLoader } from '@/components/custom-loader'
 import { cn } from '@/lib/utils'
 
 function WorkspaceAvatar({ ws, size = 22 }: { ws: Workspace; size?: number }) {
   if (ws.logo_url) {
     return (
-      <img
+      <Image
         src={ws.logo_url}
         alt={ws.name}
-        style={{ width: size, height: size, borderRadius: 4, objectFit: 'cover', flexShrink: 0 }}
+        width={size}
+        height={size}
+        style={{ borderRadius: 4, objectFit: 'cover', flexShrink: 0 }}
       />
     )
   }

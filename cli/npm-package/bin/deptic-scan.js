@@ -221,11 +221,11 @@ async function main() {
       scanSpinner.fail('Scan failed');
       console.log('');
       if (resp.status === 401) {
-        console.log(chalk.red('  ✗ Invalid API key. Generate a new key at deptic.in/dashboard/settings'));
+        console.log(chalk.red('  ✗ Invalid API key. Generate a new key at deptic.netlify.app/dashboard/settings'));
         config.delete('api_key');
       } else if (resp.status === 403) {
         console.log(chalk.red('  ✗ This API key has already been used.'));
-        console.log(chalk.gray('  Each API key allows one scan. Generate a new key at deptic.in'));
+        console.log(chalk.gray('  Each API key allows one scan. Generate a new key at deptic.netlify.app'));
         config.delete('api_key');
       } else {
         console.log(chalk.red('  ✗ Error: ' + (data.error || 'Unknown error')));
@@ -270,7 +270,7 @@ async function main() {
   }
 
   console.log('');
-  console.log(chalk.gray('  View full report: ') + chalk.green('https://deptic.in/dashboard'));
+  console.log(chalk.gray('  View full report: ') + chalk.green('https://deptic.netlify.app/dashboard'));
   console.log(chalk.gray('  ─────────────────────────────────────'));
   console.log('');
 

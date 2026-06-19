@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { ExternalLink, CheckCircle2, XCircle, Lock } from 'lucide-react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/contexts/workspace-context'
 
@@ -217,7 +218,7 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
             <div className="flex items-start justify-between">
               <div>
                 <CardTitle className="text-lg font-bold flex items-center gap-3 text-foreground">
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/d/d5/Slack_icon_2019.svg" alt="Slack" className="w-6 h-6" />
+                  <Image src="https://upload.wikimedia.org/wikipedia/commons/d/d5/Slack_icon_2019.svg" alt="Slack" width={24} height={24} className="w-6 h-6" loading="lazy" />
                   Slack
                 </CardTitle>
                 <CardDescription className="text-muted-foreground text-xs mt-1.5 leading-relaxed">
@@ -306,7 +307,7 @@ export function IntegrationsSection({ user, loading }: { user: User | null; load
             <div className="flex items-start justify-between">
               <div>
                 <CardTitle className="text-lg font-bold flex items-center gap-3 text-foreground">
-                  <img src="https://cdn.worldvectorlogo.com/logos/jira-3.svg" alt="Jira" className="w-6 h-6 rounded" />
+                  <Image src="https://cdn.worldvectorlogo.com/logos/jira-3.svg" alt="Jira" width={24} height={24} className="w-6 h-6 rounded" loading="lazy" />
                   Jira Software
                 </CardTitle>
                 <CardDescription className="text-muted-foreground text-xs mt-1.5 leading-relaxed">

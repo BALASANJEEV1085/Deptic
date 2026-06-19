@@ -1,6 +1,6 @@
 {
   "name": "deptic-scan",
-  "version": "1.0.5",
+  "version": "1.0.7",
   "description": "CLI scanner for DEPTIC.io — scan local projects for vulnerabilities and NTIA compliance",
   "main": "index.js",
   "bin": {

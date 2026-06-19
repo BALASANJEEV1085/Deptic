@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { Menu, X } from 'lucide-react'
 
 const LINKS = [
@@ -38,8 +39,8 @@ export function Navbar() {
     >
       <nav className="mx-auto flex h-14 max-w-7xl items-center justify-between px-5 md:px-8">
         <a href="/" className="flex items-center">
-          <img src="/logo-light.png" alt="Deptic Logo" className="h-24 w-auto dark:hidden" />
-          <img src="/logo-dark.png" alt="Deptic Logo" className="h-24 w-auto hidden dark:block" />
+          <Image src="/logo-light.png" width={384} height={96} alt="Deptic Logo" className="h-24 w-auto dark:hidden" priority />
+          <Image src="/logo-dark.png" width={384} height={96} alt="Deptic Logo" className="h-24 w-auto hidden dark:block" priority />
         </a>
 
         <ul className="hidden items-center gap-8 md:flex">

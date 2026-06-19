@@ -201,11 +201,11 @@ func (h *BadgeHandler) ServeBadgeEmbed(c *fiber.Ctx) error {
 		<div class="snippets">
 			<div class="snippet">
 				<div class="snippet-title">Markdown</div>
-				<div class="code">[![Deptic Security](https://api.deptic.in/badge/github/%s/%s)](https://deptic.in/dashboard)</div>
+				<div class="code">[![Deptic Security](https://deptic-api.onrender.com/badge/github/%s/%s)](https://deptic.netlify.app/dashboard)</div>
 			</div>
 			<div class="snippet">
 				<div class="snippet-title">HTML</div>
-				<div class="code">&lt;a href="https://deptic.in/dashboard"&gt;&lt;img src="https://api.deptic.in/badge/github/%s/%s" alt="Deptic Security" /&gt;&lt;/a&gt;</div>
+				<div class="code">&lt;a href="https://deptic.netlify.app/dashboard"&gt;&lt;img src="https://deptic-api.onrender.com/badge/github/%s/%s" alt="Deptic Security" /&gt;&lt;/a&gt;</div>
 			</div>
 		</div>
 		<div class="summary">
@@ -243,8 +243,8 @@ func (h *BadgeHandler) AddBadgeToReadme(c *fiber.Ctx) error {
 		return c.Status(401).JSON(fiber.Map{"error": "GitHub not connected"})
 	}
 
-	badgeURL := fmt.Sprintf("https://api.deptic.in/badge/github/%s/%s", owner, repo)
-	dashboardURL := "https://deptic.in/dashboard"
+	badgeURL := fmt.Sprintf("https://deptic-api.onrender.com/badge/github/%s/%s", owner, repo)
+	dashboardURL := "https://deptic.netlify.app/dashboard"
 	badgeMarkdown := fmt.Sprintf("[![Deptic Security](%s)](%s)", badgeURL, dashboardURL)
 
 	// Helper for GitHub requests
