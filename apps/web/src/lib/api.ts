@@ -1,0 +1,959 @@
+import { createClient } from './supabase/client';
+
+
+
+export interface Component {
+  id: string;
+  scan_id: string;
+  name: string;
+  version: string;
+  version_spec: string;
+  license: string;
+  ecosystem: string;
+  depth: number;
+  parent_name: string;
+  source_path: string;
+  created_at: string;
+}
+
+export interface Scan {
+  id: string;
+  project_id: string;
+  status: 'running' | 'done' | 'failed';
+  created_at: string;
+  repo_url?: string;
+  repo_name?: string;
+  ecosystem?: string;
+  trigger_type?: string;
+  commit_sha?: string;
+  branch?: string;
+  ntia_score?: number;
+  component_count?: number;
+  critical_cves?: number;
+  high_cves?: number;
+  medium_cves?: number;
+  low_cves?: number;
+}
+
+export interface Project {
+  latest_scan_id: string;
+  repo_url: string;
+  repo_name: string;
+  ecosystem: string;
+  status: 'running' | 'done' | 'failed';
+  created_at: string;
+  ntia_score: number;
+  component_count: number;
+  critical_cves: number;
+  high_cves: number;
+  medium_cves: number;
+  low_cves: number;
+}
+
+export interface GitHubRepository {
+  id: number;
+  name: string;
+  full_name: string;
+  html_url: string;
+  description: string;
+  private: boolean;
+}
+
+export interface DashboardStats {
+  total_projects: number;
+  total_scans: number;
+  total_components: number;
+  critical_cves: number;
+  high_cves: number;
+  medium_cves: number;
+  low_cves: number;
+  ntia_compliant_scans: number;
+  non_compliant_scans: number;
+  clean_projects: number;
+  recent_scans: {
+    id: string;
+    repo_name: string;
+    ecosystem: string;
+    status: 'running' | 'done' | 'failed';
+    component_count: number;
+    critical_cves: number;
+    ntia_score: number;
+    created_at: string;
+  }[];
+}
+
+export interface GetScanResponse {
+  scan: Scan;
+  components: Component[];
+  total: number;
+  ecosystems: string[];
+  ecosystem_breakdown: Record<string, { count: number; direct: number; transitive: number }>;
+  manifest_files: { path: string; ecosystem: string }[];
+  is_owner?: boolean;
+  /** True only when the current user's connected GitHub account has push access to this repo */
+  has_github_push_access?: boolean;
+}
+
+export interface StartScanResponse {
+  scan_id: string;
+  status: string;
+}
+
+// ── Workspace types ────────────────────────────────────────────────────────
+export interface Workspace {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  plan: string;
+  logo_url?: string;
+  created_at: string;
+  role?: string;        // current user's role in this workspace
+  member_count?: number;
+  is_personal?: boolean; // true for the user's default personal workspace
+}
+
+export interface WorkspaceMember {
+  user_id: string;
+  email: string;
+  full_name: string;    // mapped from "name" in backend response
+  name?: string;        // raw name field from backend
+  role: string;
+  joined_at: string;
+}
+
+export interface WorkspaceInvitation {
+  id: string;
+  email: string;
+  role: string;
+  invited_by: string;
+  expires_at: string;
+  created_at: string;
+  declined?: boolean;
+}
+
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://deptic-api.onrender.com/api';
+
+export async function getAuthHeaders() {
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (!session?.access_token) {
+    throw new Error('No authenticated session found');
+  }
+  
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${session.access_token}`
+  };
+
+  if (typeof window !== 'undefined') {
+    const wsID = localStorage.getItem('deptic_active_workspace_id');
+    if (wsID) {
+      headers['X-Workspace-ID'] = wsID;
+    }
+  }
+
+  if (typeof session?.provider_token === 'string' && session.provider_token.startsWith('gh')) {
+    headers['X-GitHub-Token'] = session.provider_token;
+  }
+
+  return headers;
+}
+
+export async function startScan(githubUrl: string, projectId: string): Promise<StartScanResponse> {
+  const headers = await getAuthHeaders();
+  
+  const response = await fetch(`${API_URL}/scans`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      github_url: githubUrl,
+      project_id: projectId
+    })
+  });
+  
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || 'Failed to start scan');
+  }
+  
+  return response.json();
+}
+
+export async function resolveAuditId(auditId: string): Promise<{ scan_id: string }> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/scans/audit/${auditId}`, { headers });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || 'Failed to resolve Audit ID');
+  }
+  return response.json();
+}
+
+export async function getScan(scanId: string): Promise<GetScanResponse> {
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  const headers = await getAuthHeaders();
+
+  // Pass the live GitHub OAuth token so the backend can verify push access
+  // using a fresh token rather than the potentially-stale one in the DB
+  if (typeof session?.provider_token === 'string' && session.provider_token.startsWith('gh')) {
+    headers['X-GitHub-Token'] = session.provider_token;
+  }
+
+  const response = await fetch(`${API_URL}/scans/${scanId}`, { headers });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || 'Failed to fetch scan results');
+  }
+
+  return response.json();
+}
+
+export async function listScans(): Promise<{ scans: Scan[], total: number }> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/scans`, { headers });
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch scans');
+  }
+  return response.json();
+}
+
+export async function listProjects(): Promise<{ projects: Project[], total: number }> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/projects`, { headers });
+  if (!response.ok) throw new Error('Failed to fetch projects');
+  return response.json();
+}
+
+// ── Shared UI Helpers ────────────────────────────────────────────────────────
+
+export function shortId(id: string): string {
+  return id.slice(0, 8);
+}
+
+export function relativeTime(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diff = Math.floor((now - then) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 86400 * 30) return `${Math.floor(diff / 86400)}d ago`;
+  return new Date(dateStr).toLocaleDateString();
+}
+
+export function ecosystemLabel(eco: string | undefined, status?: string): string {
+  if (!eco || eco === '' || eco.toLowerCase() === 'unknown') {
+    if (status === 'running') return 'Detecting...';
+    return 'Unknown';
+  }
+  return eco.toLowerCase();
+}
+
+export function ecosystemColorClass(eco: string | undefined): string {
+  switch ((eco || '').toLowerCase()) {
+    case 'npm':    return 'bg-blue-500/15 text-blue-400 border-blue-500/20';
+    case 'pip':    return 'bg-yellow-500/15 text-yellow-400 border-yellow-500/20';
+    case 'maven':  return 'bg-orange-500/15 text-orange-400 border-orange-500/20';
+    default:       return 'bg-zinc-800/60 text-zinc-500 border-zinc-700/40';
+  }
+}
+
+export function ntiaScoreColor(score: number): string {
+  if (score === 100) return 'text-emerald-400';
+  if (score >= 60)   return 'text-orange-400';
+  return 'text-red-400';
+}
+
+export async function getDashboardStats(): Promise<DashboardStats> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/dashboard/stats`, { headers });
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch dashboard stats');
+  }
+  return response.json();
+}
+
+export interface Vulnerability {
+  project_name?: string;
+  scan_id?: string;
+  component_name: string;
+  component_version: string;
+  cve_id: string;
+  severity: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+  summary: string;
+  fixed_version: string;
+}
+
+export interface VulnDetail {
+  id: string;
+  severity: string;
+  summary: string;
+}
+
+export interface GroupedVulnResponse {
+  component_name: string;
+  component_version: string;
+  ecosystem: string;
+  highest_severity: string;
+  cve_count: number;
+  cves: string[];
+  cves_detail: VulnDetail[];
+  clean_version: string;
+}
+
+export interface ScanVulnerabilitiesResponse {
+  summary: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+  vulnerabilities?: Vulnerability[];
+  grouped?: GroupedVulnResponse[];
+}
+
+export interface AllVulnerabilitiesResponse {
+  vulnerabilities: Vulnerability[];
+}
+
+export async function getScanVulnerabilities(scanId: string, grouped = false): Promise<ScanVulnerabilitiesResponse> {
+  const headers = await getAuthHeaders();
+  const url = grouped ? `${API_URL}/scans/${scanId}/vulnerabilities?grouped=true` : `${API_URL}/scans/${scanId}/vulnerabilities`;
+  const response = await fetch(url, { headers });
+  if (!response.ok) {
+    throw new Error('Failed to fetch scan vulnerabilities');
+  }
+  return response.json();
+}
+
+export async function getAllVulnerabilities(): Promise<AllVulnerabilitiesResponse> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/vulnerabilities`, { headers });
+  if (!response.ok) {
+    throw new Error('Failed to fetch vulnerabilities');
+  }
+  return response.json();
+}
+
+export async function generateDEPTIC(scanId: string, format: string): Promise<{ deptic_id: string; sha256: string; blob: Blob; filename: string; component_count: number }> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/scans/${scanId}/deptic`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ format })
+  });
+  if (!response.ok) throw new Error('Failed to generate DEPTIC');
+  const blob = await response.blob();
+  const cd = response.headers.get('Content-Disposition') || '';
+  const match = cd.match(/filename="([^"]+)"/);
+  const filename = match?.[1] ?? `${format}-${scanId.slice(0, 8)}.${format === 'spdx' ? 'spdx' : 'json'}`;
+  return {
+    deptic_id: response.headers.get('X-Deptic-ID') || '',
+    sha256: response.headers.get('X-Deptic-SHA256') || '',
+    blob,
+    filename,
+    component_count: parseInt(response.headers.get('X-Component-Count') || '0', 10),
+  };
+}
+
+export async function createShareLink(depticId: string, label: string, expiresInDays: number): Promise<{ share_url: string; expires_at: string; label: string }> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/deptics/${depticId}/share`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ label, expires_in_days: expiresInDays })
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.error ? `${data.error}: ${data.details || ''}` : 'Failed to create share link');
+  }
+  return data;
+}
+
+export async function getShareLinks(depticId: string): Promise<{ shares: any[] }> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/deptics/${depticId}/shares`, { headers });
+  if (!response.ok) throw new Error('Failed to list share links');
+  return response.json();
+}
+
+export async function revokeShareLink(depticId: string, token: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/deptics/${depticId}/shares/${token}`, {
+    method: 'DELETE',
+    headers
+  });
+  if (!response.ok) throw new Error('Failed to revoke share link');
+}
+
+export async function getPublicShare(token: string): Promise<any> {
+  const response = await fetch(`${API_URL}/share/${token}`);
+  if (!response.ok) {
+    if (response.status === 410) throw new Error('Expired');
+    throw new Error('Failed to fetch public share');
+  }
+  return response.json();
+}
+
+export async function getScanShareLinks(scanId: string): Promise<{ shares: any[] }> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/scans/${scanId}/shares`, { headers });
+  if (!response.ok) throw new Error('Failed to list scan share links');
+  return response.json();
+}
+
+// ── Compliance ──────────────────────────────────────────────────────────────
+
+export interface NTIAElement {
+  name: string;
+  description: string;
+  passed: boolean;
+  coverage: number;
+  detail: string;
+}
+
+export interface NTIAResult {
+  compliant: boolean;
+  score: number;
+  elements: NTIAElement[];
+  failed_components?: { name: string; version: string; missing: string[] }[];
+  recommendations: string[];
+}
+
+export interface ComplianceResponse {
+  ntia: NTIAResult;
+  eu_cra_compliant: boolean;
+  status: string;
+}
+
+export async function getCompliance(scanId: string): Promise<ComplianceResponse> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/scans/${scanId}/compliance`, { headers });
+  if (!response.ok) throw new Error('Failed to fetch compliance data');
+  return response.json();
+}
+
+/**
+ * Triggers a browser file download for the PDF compliance report.
+ * Returns the fetch Response so callers can check status before consuming.
+ */
+export async function downloadPDFReport(scanId: string): Promise<void> {
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('Not authenticated');
+
+  const response = await fetch(`${API_URL}/scans/${scanId}/report/pdf`, {
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || 'Failed to generate PDF report');
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  // pick filename from Content-Disposition header if present
+  const cd = response.headers.get('Content-Disposition') || '';
+  const match = cd.match(/filename="([^"]+)"/);
+  a.download = match?.[1] ?? `deptic-report-${scanId}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export async function listGitHubRepos(): Promise<{ repositories: GitHubRepository[] }> {
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+
+  const authHeaders = await getAuthHeaders();
+
+  // Pass the live provider_token (GitHub OAuth) so backend doesn't use the stale DB token
+  const headers: Record<string, string> = { ...authHeaders };
+  if (typeof session?.provider_token === 'string' && session.provider_token.startsWith('gh')) {
+    headers['X-GitHub-Token'] = session.provider_token;
+  }
+
+  const response = await fetch(`${API_URL}/github/repos`, { headers });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || 'Failed to fetch GitHub repositories');
+  }
+  return response.json();
+}
+
+export interface AddBadgeResponse {
+  status: string;
+  pr_url?: string;
+  pr_number?: number;
+  readme_created?: boolean;
+  badge_url?: string;
+  message?: string;
+}
+
+export async function addBadgeToReadme(repo_owner: string, repo_name: string): Promise<AddBadgeResponse> {
+  const authHeaders = await getAuthHeaders();
+  
+  // Need to pass OAuth token if available
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  const headers: Record<string, string> = { 
+    ...authHeaders,
+    'Content-Type': 'application/json' 
+  };
+  
+  if (typeof session?.provider_token === 'string' && session.provider_token.startsWith('gh')) {
+    headers['X-GitHub-Token'] = session.provider_token;
+  }
+
+  const response = await fetch(`${API_URL}/badge/add-to-readme`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ repo_owner, repo_name }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || 'Failed to add badge to README');
+  }
+
+  return response.json();
+}
+
+export interface FixPRRequest {
+  vulnerabilities: {
+    package_name: string;
+    current_version: string;
+    fixed_version: string;
+    cve_id: string;
+    ecosystem: string;
+  }[];
+}
+
+export interface FixPRResponse {
+  pr_url: string;
+  pr_number: number;
+  message: string;
+}
+
+export interface FixPRStatus {
+  stage: string;
+  progress: number;
+  message: string;
+  pr_url?: string;
+  pr_number?: number;
+  error?: string;
+  completed: boolean;
+}
+
+export interface FixPR {
+  id: string;
+  pr_url: string;
+  pr_number: number;
+  pr_title: string;
+  status: string;
+  created_at: string;
+  packages_fixed: number;
+  package_names?: string[];
+}
+
+export async function createFixPR(scanId: string, req: FixPRRequest): Promise<FixPRResponse> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/scans/${scanId}/fix-pr`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(req),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || 'Failed to create PR');
+  }
+  return response.json();
+}
+
+export async function getFixPRStatus(scanId: string): Promise<FixPRStatus> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/scans/${scanId}/fix-pr/status`, { headers });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || 'Failed to get PR status');
+  }
+  return response.json();
+}
+
+export async function getFixPRs(scanId: string): Promise<{ prs: FixPR[] }> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/scans/${scanId}/fix-prs`, {
+    headers,
+    cache: 'no-store'
+  });
+  
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || 'Failed to fetch PRs');
+  }
+  return response.json();
+}
+
+// ── Workspace API ──────────────────────────────────────────────────────────
+
+export async function listWorkspaces(): Promise<{ workspaces: Workspace[] }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces`, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error('Failed to list workspaces');
+  return res.json();
+}
+
+export async function createWorkspace(data: { name: string; slug: string; description?: string }): Promise<Workspace> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to create workspace');
+  }
+  return res.json();
+}
+
+export async function getWorkspace(id: string): Promise<Workspace> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces/${id}`, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error('Failed to fetch workspace');
+  return res.json();
+}
+
+export async function updateWorkspace(id: string, data: { name?: string; description?: string }): Promise<Workspace> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces/${id}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to update workspace');
+  }
+  return res.json();
+}
+
+export async function deleteWorkspace(id: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces/${id}`, { method: 'DELETE', headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to delete workspace');
+  }
+}
+
+export async function listWorkspaceMembers(workspaceId: string): Promise<{ members: WorkspaceMember[] }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces/${workspaceId}/members`, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error('Failed to list members');
+  return res.json();
+}
+
+export async function updateMemberRole(workspaceId: string, memberId: string, role: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces/${workspaceId}/members/${memberId}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ role }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to update member role');
+  }
+}
+
+export async function removeMember(workspaceId: string, memberId: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces/${workspaceId}/members/${memberId}`, {
+    method: 'DELETE',
+    headers,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to remove member');
+  }
+}
+
+export async function inviteMember(workspaceId: string, data: { email: string; role: string }): Promise<{ success: boolean; token: string }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces/${workspaceId}/invite`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to create invitation');
+  }
+  return res.json();
+}
+
+export async function listInvitations(workspaceId: string): Promise<{ invitations: WorkspaceInvitation[] }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces/${workspaceId}/invitations`, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error('Failed to list invitations');
+  return res.json();
+}
+
+export async function cancelInvitation(workspaceId: string, invitationId: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/workspaces/${workspaceId}/invitations/${invitationId}`, {
+    method: 'DELETE',
+    headers,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to cancel invitation');
+  }
+}
+
+export async function getInvitationPublic(token: string): Promise<{ workspace_name: string; email: string; invited_by_name: string; role: string }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/invite/${token}`, { headers, cache: 'no-store' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to fetch invitation details');
+  }
+  return res.json();
+}
+
+export async function acceptInvitation(token: string): Promise<{ workspace_id: string }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/invite/${token}/accept`, {
+    method: 'POST',
+    headers,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to accept invitation');
+  }
+  return res.json();
+}
+
+export async function declineInvitation(token: string): Promise<{ success: boolean }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/invite/${token}/decline`, {
+    method: 'POST',
+    headers,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to decline invitation');
+  }
+  return res.json();
+}
+
+// ── Webhooks API ───────────────────────────────────────────────────────────
+
+export interface WebhookRegistration {
+  id: string;
+  repo_owner: string;
+  repo_name: string;
+  github_hook_id: number;
+  enabled: boolean;
+  auto_scan_branch: string;
+  scan_on_all_branches: boolean;
+  last_triggered_at: string | null;
+  last_scan_id: string | null;
+  last_event_status?: string;
+  created_at: string;
+}
+
+export interface WebhookEvent {
+  id: string;
+  webhook_id: string;
+  event_type: string;
+  branch: string;
+  commit_sha: string;
+  pusher: string;
+  scan_id: string | null;
+  status: string;
+  received_at: string;
+}
+
+export async function registerWebhook(data: { repo_owner: string; repo_name: string; branch: string; scan_all_branches: boolean }): Promise<{ webhook_id: string; status: string; repo: string; branch: string }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/webhooks/register`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to register webhook');
+  }
+  return res.json();
+}
+
+export async function deleteWebhook(id: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/webhooks/${id}`, { method: 'DELETE', headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to delete webhook');
+  }
+}
+
+export async function toggleWebhook(id: string, active: boolean): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/webhooks/${id}/toggle`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ active }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to toggle webhook');
+  }
+}
+
+export async function listWebhooks(): Promise<WebhookRegistration[]> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/webhooks`, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error('Failed to list webhooks');
+  return res.json();
+}
+
+export async function listWebhookEvents(id: string): Promise<WebhookEvent[]> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/webhooks/${id}/events`, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error('Failed to list webhook events');
+  return res.json();
+}
+
+export interface OnboardingStatus {
+  is_new_user: boolean;
+  onboarding_completed: boolean;
+  onboarding_skipped: boolean;
+  user_created_at: string;
+  job_role?: string | null;
+  company_name?: string | null;
+  use_case?: string | null;
+  heard_about_from?: string | null;
+}
+
+export interface UserProfile {
+  full_name: string;
+  job_role?: string | null;
+  company_name?: string | null;
+  use_case?: string | null;
+  heard_about_from?: string | null;
+}
+
+export async function getOnboardingStatus(): Promise<OnboardingStatus> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/onboarding/status`, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error('Failed to load onboarding status');
+  return res.json();
+}
+
+export async function completeOnboarding(data: {
+  full_name?: string;
+  job_role?: string;
+  company_name?: string;
+  heard_about_from?: string;
+  use_case?: string;
+  skipped: boolean;
+}): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/onboarding/complete`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to complete onboarding');
+  }
+}
+
+export async function getUserProfile(): Promise<UserProfile> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/users/profile`, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error('Failed to load profile');
+  return res.json();
+}
+
+export async function updateUserProfile(data: {
+  full_name?: string;
+  job_role?: string;
+  company_name?: string;
+  bio?: string;
+}): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/users/profile`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to update profile');
+  }
+}
+
+export async function deleteAccount(): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/account`, {
+    method: 'DELETE',
+    headers,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to delete account');
+  }
+}
+
+// ── Generic authenticated API fetch ───────────────────────────────
+export async function apiFetch(path: string, options: RequestInit = {}): Promise<any> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: { ...headers, ...options.headers },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || `Request failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+// ── Payment / Plan Status ─────────────────────────────────────────
+export interface UsageStatus {
+  plan: string;
+  expires_at: string | null;
+  usage: {
+    scans_today: number;
+    scans_limit: number;
+    scans_remaining: number;
+    api_keys_today: number;
+    api_keys_limit: number;
+    api_keys_remaining: number;
+    webhooks_active: number;
+    webhooks_limit: number;
+    webhooks_remaining: number;
+    workspaces_joined: number;
+    workspaces_limit: number;
+    workspaces_remaining: number;
+    webhook_gap_mins: number;
+  };
+}
+
+export async function getPaymentStatus(): Promise<UsageStatus> {
+  return apiFetch('/payment/status');
+}

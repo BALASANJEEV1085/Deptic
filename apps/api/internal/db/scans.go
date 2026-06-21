@@ -1,0 +1,221 @@
+// go get github.com/jackc/pgx/v5
+package db
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"strings"
+	"time"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/deptic-io/api/internal/scanner"
+)
+
+// Scan represents a single DEPTIC scan operation
+type Scan struct {
+	ID              string    `json:"id"`
+	ProjectID       string    `json:"project_id"`
+	Status          string    `json:"status"`
+	RepoURL         string    `json:"repo_url"`
+	RepoName        string    `json:"repo_name"`
+	Ecosystem       string    `json:"ecosystem"`
+	ComplianceScore int       `json:"ntia_score"`
+	NTIACompliant   bool      `json:"ntia_compliant"`
+	EUCRACompliant  bool      `json:"eu_cra_compliant"`
+	TriggerType     string    `json:"trigger_type"`
+	CommitSHA       string    `json:"commit_sha"`
+	Branch          string    `json:"branch"`
+	CreatedAt       time.Time `json:"created_at"`
+
+	// Derived/Subquery fields
+	ComponentCount int `json:"component_count"`
+	CriticalCVEs   int `json:"critical_cves"`
+	HighCVEs       int `json:"high_cves"`
+	MediumCVEs     int `json:"medium_cves"`
+	LowCVEs        int `json:"low_cves"`
+}
+
+// Component represents a resolved dependency package inside a scan
+type Component struct {
+	ID          string    `json:"id"`
+	ScanID      string    `json:"scan_id"`
+	Name        string    `json:"name"`
+	Version     string    `json:"version"`
+	VersionSpec string    `json:"version_spec"`
+	License     string    `json:"license"`
+	Ecosystem   string    `json:"ecosystem"`
+	Depth       int       `json:"depth"`
+	ParentName  string    `json:"parent_name"`
+	SourcePath  string    `json:"source_path"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// CreateOrGetDefaultProject upserts a default project for the given user and returns its project UUID
+func CreateOrGetDefaultProject(ctx context.Context, db *sql.DB, userID string) (projectID string, err error) {
+	query := `
+		INSERT INTO projects (id, user_id, name, created_at)
+		VALUES (gen_random_uuid(), $1, 'Default Project', now())
+		ON CONFLICT (user_id) DO UPDATE SET name = EXCLUDED.name
+		RETURNING id`
+	err = db.QueryRowContext(ctx, query, userID).Scan(&projectID)
+	if err != nil {
+		// If projects table doesn't have user_id unique constraint, try SELECT
+		fmt.Printf("Upsert project error: %v — trying SELECT\n", err)
+		selErr := db.QueryRowContext(ctx, `SELECT id FROM projects WHERE user_id = $1 LIMIT 1`, userID).Scan(&projectID)
+		if selErr != nil {
+			// Last resort: insert without ON CONFLICT
+			insErr := db.QueryRowContext(ctx, `INSERT INTO projects (id, user_id, name, created_at) VALUES (gen_random_uuid(), $1, 'Default Project', now()) RETURNING id`, userID).Scan(&projectID)
+			if insErr != nil {
+				fmt.Printf("CreateProject error: %v\n", insErr)
+				return "", fmt.Errorf("creating project: %w", insErr)
+			}
+		}
+	}
+	return projectID, nil
+}
+
+type CreateScanParams struct {
+	ProjectID   string
+	RepoURL     string
+	TriggerType string
+	CommitSHA   string
+	Branch      string
+}
+
+// CreateScan inserts a new scan row with status="running" and returns its UUID
+func CreateScan(ctx context.Context, db *sql.DB, p *CreateScanParams) (scanID string, err error) {
+	triggerType := p.TriggerType
+	if triggerType == "" {
+		triggerType = "manual"
+	}
+	branch := p.Branch
+	if branch == "" {
+		branch = "main"
+	}
+	query := `INSERT INTO scans (id, project_id, status, repo_url, trigger_type, commit_sha, branch, created_at) VALUES (gen_random_uuid(), $1, 'running', $2, $3, $4, $5, now()) RETURNING id`
+	err = db.QueryRowContext(ctx, query, p.ProjectID, p.RepoURL, triggerType, p.CommitSHA, branch).Scan(&scanID)
+	if err != nil {
+		fmt.Printf("CreateScan DB error: %v\n", err)
+		return "", fmt.Errorf("creating scan: %w", err)
+	}
+	return scanID, nil
+}
+
+// UpdateScanStatus updates the scan status and optionally the ecosystem
+func UpdateScanStatus(ctx context.Context, db *sql.DB, scanID, status, ecosystem string) error {
+	query := `UPDATE scans SET status = $1, ecosystem = $2 WHERE id = $3`
+	_, err := db.ExecContext(ctx, query, status, ecosystem, scanID)
+	if err != nil {
+		return fmt.Errorf("updating scan status: %w", err)
+	}
+	return nil
+}
+
+// SaveComponents inserts all resolved packages into the components table in batches of 500
+func SaveComponents(ctx context.Context, db *sql.DB, scanID string, packages []scanner.Package) error {
+	if len(packages) == 0 {
+		return nil
+	}
+
+	batchSize := 500
+	for i := 0; i < len(packages); i += batchSize {
+		end := i + batchSize
+		if end > len(packages) {
+			end = len(packages)
+		}
+
+		batch := packages[i:end]
+		if err := insertComponentsBatch(ctx, db, scanID, batch); err != nil {
+			return fmt.Errorf("inserting batch starting at %d: %w", i, err)
+		}
+	}
+
+	return nil
+}
+
+// insertComponentsBatch handles the actual bulk insert SQL logic for a single batch
+func insertComponentsBatch(ctx context.Context, db *sql.DB, scanID string, batch []scanner.Package) error {
+	valueStrings := make([]string, 0, len(batch))
+	valueArgs := make([]interface{}, 0, len(batch)*8)
+
+	for i, pkg := range batch {
+		baseIdx := i * 9
+		// 9 fields per row: scan_id, name, version, version_spec, license, ecosystem, depth, parent_name, source_path
+		valueStrings = append(valueStrings, fmt.Sprintf("(gen_random_uuid(), $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, now())",
+			baseIdx+1, baseIdx+2, baseIdx+3, baseIdx+4, baseIdx+5, baseIdx+6, baseIdx+7, baseIdx+8, baseIdx+9))
+		
+		valueArgs = append(valueArgs, scanID, pkg.Name, pkg.Version, pkg.VersionSpec, pkg.License, pkg.Ecosystem, pkg.Depth, pkg.ParentName, pkg.SourcePath)
+	}
+
+	query := fmt.Sprintf(`
+		INSERT INTO components (id, scan_id, name, version, version_spec, license, ecosystem, depth, parent_name, source_path, created_at)
+		VALUES %s`, strings.Join(valueStrings, ","))
+
+	_, err := db.ExecContext(ctx, query, valueArgs...)
+	if err != nil {
+		return fmt.Errorf("bulk insert exec failed: %w", err)
+	}
+	return nil
+}
+
+// GetScanWithComponents fetches a scan and all its associated components
+func GetScanWithComponents(ctx context.Context, db *sql.DB, scanID string) (scan Scan, components []Component, err error) {
+	err = db.QueryRowContext(ctx, `
+		SELECT id, project_id, status, COALESCE(repo_url, ''), COALESCE(ecosystem, ''), 
+		       COALESCE(compliance_score, 0), ntia_compliant, eu_cra_compliant, COALESCE(trigger_type, 'manual'), COALESCE(commit_sha, ''), COALESCE(branch, 'main'), created_at 
+		FROM scans WHERE id::text LIKE $1 || '%' LIMIT 1`, scanID).
+		Scan(&scan.ID, &scan.ProjectID, &scan.Status, &scan.RepoURL, &scan.Ecosystem, 
+			&scan.ComplianceScore, &scan.NTIACompliant, &scan.EUCRACompliant, &scan.TriggerType, &scan.CommitSHA, &scan.Branch, &scan.CreatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return scan, nil, fmt.Errorf("scan not found")
+		}
+		return scan, nil, fmt.Errorf("fetching scan: %w", err)
+	}
+
+	rows, err := db.QueryContext(ctx, `
+		SELECT id, scan_id, name, version, version_spec, license, ecosystem, depth, parent_name, COALESCE(source_path, ''), created_at
+		FROM components
+		WHERE scan_id = $1
+		ORDER BY depth ASC, name ASC`, scan.ID)
+	if err != nil {
+		return scan, nil, fmt.Errorf("fetching components: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var c Component
+		if err := rows.Scan(&c.ID, &c.ScanID, &c.Name, &c.Version, &c.VersionSpec, &c.License, &c.Ecosystem, &c.Depth, &c.ParentName, &c.SourcePath, &c.CreatedAt); err != nil {
+			return scan, nil, fmt.Errorf("scanning component row: %w", err)
+		}
+		components = append(components, c)
+	}
+
+	if err := rows.Err(); err != nil {
+		return scan, nil, fmt.Errorf("iterating component rows: %w", err)
+	}
+
+	return scan, components, nil
+}
+
+func UpdateScanCompliance(ctx context.Context, db *sql.DB, scanID string, score int, ntiaCompliant, euCraCompliant bool, detailJson []byte, repoURL, ecosystem string) error {
+	res, err := db.ExecContext(ctx, `
+		UPDATE scans 
+		SET compliance_score = $2, 
+		    ntia_compliant = $3, 
+		    eu_cra_compliant = $4, 
+		    compliance_detail = $5::jsonb,
+		    repo_url = $6,
+		    ecosystem = $7
+		WHERE id = $1`, 
+		scanID, score, ntiaCompliant, euCraCompliant, string(detailJson), repoURL, ecosystem)
+	if err != nil {
+		return fmt.Errorf("UpdateScanCompliance Exec failed: %w", err)
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("UpdateScanCompliance: no rows updated for id %s", scanID)
+	}
+	return nil
+}
