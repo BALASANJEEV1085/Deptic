@@ -45,25 +45,15 @@ jobs:
           docker push "$FULL_IMAGE:latest"
           echo "image=$FULL_IMAGE:$GITHUB_SHA" >> $GITHUB_OUTPUT
 
-      - name: Download current ECS task definition
+      - name: Force new ECS deployment
         run: |
-          aws ecs describe-task-definition \
-            --task-definition $ECS_SERVICE \
-            --query taskDefinition > task-def.json
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --force-new-deployment
 
-      - name: Render updated task definition with new image
-        id: task-def
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: task-def.json
-          container-name: deptic
-          image: ${{ steps.build-image.outputs.image }}
-
-      - name: Deploy task definition to ECS
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-        with:
-          task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: ${{ env.ECS_SERVICE }}
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
-          wait-for-minutes: 10
+      - name: Wait for ECS service stability
+        run: |
+          aws ecs wait services-stable \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE
