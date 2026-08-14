@@ -1,8 +1,8 @@
-name: Deploy to AWS
+name: Deploy Deptic to AWS ECS
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
 
 env:
   AWS_REGION: ap-south-1
@@ -12,9 +12,10 @@ env:
 
 jobs:
   deploy:
+    name: Build and Deploy
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials
@@ -24,28 +25,45 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
-      - name: Login to ECR
+      - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, tag, and push image
+      - name: Build, tag, and push Docker image to ECR
+        id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA" >> $GITHUB_OUTPUT
+          set -e
+          FULL_IMAGE=$ECR_REGISTRY/$ECR_REPOSITORY
+          echo "Building: $FULL_IMAGE:$GITHUB_SHA"
+          docker build \
+            --tag "$FULL_IMAGE:$GITHUB_SHA" \
+            --tag "$FULL_IMAGE:latest" \
+            . 2>&1
+          docker push "$FULL_IMAGE:$GITHUB_SHA"
+          docker push "$FULL_IMAGE:latest"
+          echo "image=$FULL_IMAGE:$GITHUB_SHA" >> $GITHUB_OUTPUT
 
-      - name: Force new ECS deployment
+      - name: Download current ECS task definition
         run: |
-          aws ecs update-service \
-            --cluster $ECS_CLUSTER \
-            --service $ECS_SERVICE \
-            --force-new-deployment
+          aws ecs describe-task-definition \
+            --task-definition $ECS_SERVICE \
+            --query taskDefinition > task-def.json
 
-      - name: Wait for ECS service stability
-        run: |
-          aws ecs wait services-stable \
-            --cluster $ECS_CLUSTER \
-            --services $ECS_SERVICE
+      - name: Render updated task definition with new image
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-def.json
+          container-name: deptic
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: Deploy task definition to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+          wait-for-minutes: 10
