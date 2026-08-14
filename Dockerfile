@@ -6,7 +6,6 @@ RUN npm install --legacy-peer-deps
 COPY apps/web/ ./
 RUN sed -i "s/const nextConfig = {/const nextConfig = { output: 'standalone',/" next.config.mjs || true
 ENV NEXT_TELEMETRY_DISABLED=1
-# Dummy build-time environment variables for Next.js static prerendering
 ENV NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy
 ENV SUPABASE_SERVICE_ROLE_KEY=dummy
@@ -34,7 +33,6 @@ COPY --from=api-builder /app/api/server ./server
 # Next.js standalone output
 COPY --from=web-builder /app/web/.next/standalone ./web/
 COPY --from=web-builder /app/web/.next/static ./web/.next/static/
-COPY --from=web-builder /app/web/public ./web/public/ 2>/dev/null || true
 
 # nginx reverse proxy config
 RUN echo 'server {' > /etc/nginx/conf.d/default.conf && \
