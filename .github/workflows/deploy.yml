@@ -3,6 +3,7 @@ name: Build & Deploy to EC2 Docker
 on:
   push:
     branches: [main, master]
+  workflow_dispatch:
 
 env:
   AWS_REGION: ap-south-1
