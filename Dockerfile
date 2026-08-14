@@ -1,13 +1,25 @@
-FROM node:18-alpine AS frontend-builder
-WORKDIR /app/frontend
-COPY frontend/ ./
-RUN rm -rf node_modules && npm install --legacy-peer-deps && npm run build
+# Stage 1: Build Next.js frontend
+FROM node:20-alpine AS web-builder
+WORKDIR /app/web
+COPY apps/web/package*.json ./
+RUN npm install --legacy-peer-deps
+COPY apps/web/ ./
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm run build
 
-FROM node:18-alpine
+# Stage 2: Build Go API backend
+FROM golang:1.23-alpine AS api-builder
+WORKDIR /app/api
+COPY apps/api/go.mod apps/api/go.sum ./
+RUN go mod download
+COPY apps/api/ ./
+RUN CGO_ENABLED=0 GOOS=linux go build -o server ./cmd/server
+
+# Stage 3: Production runtime
+FROM alpine:3.19
+RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /app
-COPY backend/ ./
-RUN rm -rf node_modules && npm install --production --legacy-peer-deps
-COPY --from=frontend-builder /app/frontend/build ./public
-EXPOSE 80
-ENV PORT=80
-CMD ["node", "server.js"]
+COPY --from=api-builder /app/api/server ./server
+EXPOSE 8081
+ENV PORT=8081
+CMD ["./server"]
