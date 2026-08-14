@@ -1,0 +1,85 @@
+name: Build & Deploy to EC2 Docker
+
+on:
+  push:
+    branches: [main, master]
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: deptic
+  INSTANCE_ID: i-027ad079ad01e9c75
+
+jobs:
+  deploy:
+    name: Build, Push and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push Docker image to ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          set -e
+          FULL_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY"
+          echo "Building $FULL_IMAGE:latest"
+          docker build --tag "$FULL_IMAGE:$GITHUB_SHA" --tag "$FULL_IMAGE:latest" .
+          docker push "$FULL_IMAGE:$GITHUB_SHA"
+          docker push "$FULL_IMAGE:latest"
+          echo "full_image=$FULL_IMAGE" >> $GITHUB_OUTPUT
+
+      - name: Wait for SSM Agent & Deploy to EC2
+        if: ${{ env.INSTANCE_ID != '' }}
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          echo "==> Waiting for SSM agent to come online on $INSTANCE_ID..."
+          for i in $(seq 1 30); do
+            PING=$(aws ssm describe-instance-information                       --region "$AWS_REGION"                       --filters "Key=InstanceIds,Values=$INSTANCE_ID"                       --query 'InstanceInformationList[0].PingStatus'                       --output text 2>/dev/null || echo "NotReady")
+            echo "SSM ping: $PING ($i/30)"
+            [ "$PING" = "Online" ] && break
+            sleep 10
+          done
+
+          echo "==> Sending deployment command to EC2 instance $INSTANCE_ID..."
+          COMMAND_ID=$(aws ssm send-command                     --region "$AWS_REGION"                     --instance-ids "$INSTANCE_ID"                     --document-name "AWS-RunShellScript"                     --comment "Deploy $ECR_REPOSITORY:latest"                     --parameters 'commands=[
+              "until command -v docker > /dev/null 2>&1; do echo Waiting for docker...; sleep 5; done",
+              "aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 696434672023.dkr.ecr.ap-south-1.amazonaws.com",
+              "docker pull 696434672023.dkr.ecr.ap-south-1.amazonaws.com/deptic:latest",
+              "docker stop app 2>/dev/null || true",
+              "docker rm app 2>/dev/null || true",
+              "aws secretsmanager get-secret-value --region ap-south-1 --secret-id '''deptic/Deptic/secrets''' --query SecretString --output text | jq -r '''to_entries|map(\"\\(.key)=\\(.value)\")|.[]''' > /home/ubuntu/app.env || touch /home/ubuntu/app.env",
+              "docker run -d --restart always -p 80:80 --env-file /home/ubuntu/app.env --name app 696434672023.dkr.ecr.ap-south-1.amazonaws.com/deptic:latest"
+            ]'                     --output text --query 'Command.CommandId')
+          echo "SSM CommandId: $COMMAND_ID"
+
+          echo "==> Polling for completion..."
+          for i in $(seq 1 24); do
+            STATUS=$(aws ssm get-command-invocation                       --region "$AWS_REGION"                       --command-id "$COMMAND_ID"                       --instance-id "$INSTANCE_ID"                       --query 'Status' --output text 2>/dev/null || echo 'Pending')
+            echo "Status [$i/24]: $STATUS"
+            if [ "$STATUS" = "Success" ]; then
+              echo "Deployment succeeded! App is live."
+              exit 0
+            fi
+            if [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ]; then
+              echo "Deployment failed. Error output:"
+              aws ssm get-command-invocation                         --region "$AWS_REGION"                         --command-id "$COMMAND_ID"                         --instance-id "$INSTANCE_ID"                         --query 'StandardErrorContent' --output text
+              exit 1
+            fi
+            sleep 10
+          done
+          echo "Timeout waiting for SSM command"; exit 1
