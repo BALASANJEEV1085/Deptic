@@ -6,6 +6,10 @@ RUN npm install --legacy-peer-deps
 COPY apps/web/ ./
 RUN sed -i "s/const nextConfig = {/const nextConfig = { output: 'standalone',/" next.config.mjs || true
 ENV NEXT_TELEMETRY_DISABLED=1
+# Dummy build-time environment variables for Next.js static prerendering
+ENV NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy
+ENV SUPABASE_SERVICE_ROLE_KEY=dummy
 RUN npm run build
 
 # Stage 2: Build Go API backend
