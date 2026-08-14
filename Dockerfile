@@ -30,7 +30,7 @@ WORKDIR /app
 # Go API binary
 COPY --from=api-builder /app/api/server ./server
 
-# Next.js standalone output (includes apps/web/server.js in monorepo structure)
+# Next.js standalone output
 COPY --from=web-builder /app/web/.next/standalone ./web/
 COPY --from=web-builder /app/web/.next/static ./web/apps/web/.next/static/
 COPY --from=web-builder /app/web/.next/static ./web/.next/static/
@@ -55,10 +55,12 @@ RUN echo 'server {' > /etc/nginx/conf.d/default.conf && \
     echo '    }' >> /etc/nginx/conf.d/default.conf && \
     echo '}' >> /etc/nginx/conf.d/default.conf
 
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
 EXPOSE 80
 ENV PORT=8081
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 
-# Start: Go API in bg, find and run the Next.js server.js in bg, and run nginx in foreground
-CMD sh -c './server & (node web/apps/web/server.js || node web/server.js) & nginx -g "daemon off;"'
+CMD ["/app/start.sh"]
