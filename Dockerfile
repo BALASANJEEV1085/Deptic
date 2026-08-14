@@ -30,8 +30,9 @@ WORKDIR /app
 # Go API binary
 COPY --from=api-builder /app/api/server ./server
 
-# Next.js standalone output
+# Next.js standalone output (includes apps/web/server.js in monorepo structure)
 COPY --from=web-builder /app/web/.next/standalone ./web/
+COPY --from=web-builder /app/web/.next/static ./web/apps/web/.next/static/
 COPY --from=web-builder /app/web/.next/static ./web/.next/static/
 
 # nginx reverse proxy config
@@ -59,4 +60,5 @@ ENV PORT=8081
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 
-CMD sh -c './server & node web/server.js & nginx -g "daemon off;"'
+# Start: Go API in bg, find and run the Next.js server.js in bg, and run nginx in foreground
+CMD sh -c './server & (node web/apps/web/server.js || node web/server.js) & nginx -g "daemon off;"'
