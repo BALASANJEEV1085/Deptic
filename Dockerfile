@@ -1,15 +1,29 @@
-FROM nginx:1.27-alpine
+FROM nginx:1.27-alpine AS base
 RUN apk add --no-cache ca-certificates tzdata nodejs
 
 WORKDIR /app
 
 # Go API binary
-COPY --from=api-builder /app/api/server ./server
+FROM golang:1.26 AS api-builder
+WORKDIR /app
+COPY apps/api/go.mod apps/api/go.sum ./
+RUN go mod download
+COPY apps/api .
+RUN go build -o server ./cmd/server
 
 # Next.js standalone output
-COPY --from=web-builder /app/web/.next/standalone ./web/
-COPY --from=web-builder /app/web/.next/static ./web/apps/web/.next/static/
-COPY --from=web-builder /app/web/.next/static ./web/.next/static/
+FROM node:20-alpine AS web-builder
+WORKDIR /app
+COPY apps/web/package*.json ./
+RUN npm install
+COPY apps/web .
+RUN npm run build
+
+# Copy from api-builder and web-builder
+COPY --from=api-builder /app/server ./server
+COPY --from=web-builder /app/.next/standalone ./web/
+COPY --from=web-builder /app/.next/static ./web/apps/web/.next/static/
+COPY --from=web-builder /app/.next/static ./web/.next/static/
 
 # nginx reverse proxy config
 RUN echo 'server {' > /etc/nginx/conf.d/default.conf && \
