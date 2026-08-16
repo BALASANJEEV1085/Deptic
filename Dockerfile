@@ -21,9 +21,8 @@ RUN npm run build
 
 # Copy from api-builder and web-builder
 COPY --from=api-builder /app/server ./server
-COPY --from=web-builder /app/.next/standalone ./web/
 # Removed the problematic COPY command
-# COPY --from=web-builder /app/.next/static ./web/apps/web/.next/static/
+# COPY --from=web-builder /app/.next/standalone ./web/
 
 # nginx reverse proxy config
 RUN cat <<EOF > /etc/nginx/conf.d/default.conf
