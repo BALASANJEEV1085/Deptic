@@ -23,7 +23,6 @@ RUN npm run build
 COPY --from=api-builder /app/server ./server
 COPY --from=web-builder /app/.next/standalone ./web/
 COPY --from=web-builder /app/.next/static ./web/apps/web/.next/static/
-COPY --from=web-builder /app/.next/static ./web/.next/static/
 
 # nginx reverse proxy config
 RUN echo 'server {' > /etc/nginx/conf.d/default.conf && \
