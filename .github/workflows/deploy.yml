@@ -38,7 +38,7 @@ jobs:
           set -e
           FULL_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY"
           echo "Building $FULL_IMAGE:latest"
-          docker build --tag "$FULL_IMAGE:$GITHUB_SHA" --tag "$FULL_IMAGE:latest" .
+          docker build --build-arg NODE_VERSION=20 --tag "$FULL_IMAGE:$GITHUB_SHA" --tag "$FULL_IMAGE:latest" .
           docker push "$FULL_IMAGE:$GITHUB_SHA"
           docker push "$FULL_IMAGE:latest"
           echo "full_image=$FULL_IMAGE" >> "$GITHUB_OUTPUT"
