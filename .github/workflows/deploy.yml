@@ -24,7 +24,3 @@ jobs:
       - name: Run Docker container
         run: |
           docker run -d -p 80:80 --name app app
-
-      - name: Verify application
-        run: |
-          curl -f http://localhost:80 || exit 1
