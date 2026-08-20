@@ -1,4 +1,4 @@
-name: Build, Push and Deploy
+name: Deploy
 
 on:
   push:
@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -18,11 +19,13 @@ jobs:
           node-version: '24'
 
       - name: Install dependencies
-        run: npm install
-
-      - name: Build, tag, and push Docker image to ECR
         run: |
-          $(aws ecr get-login --no-include-email --region your-region)
-          docker build -t your-image-name .
-          docker tag your-image-name:latest your-ecr-repo-uri:latest
-          docker push your-ecr-repo-uri:latest
+          npm install
+
+      - name: Build Docker image
+        run: |
+          docker build -t my-app .
+
+      - name: Run Docker container
+        run: |
+          docker run -d -p 80:80 --name app my-app
