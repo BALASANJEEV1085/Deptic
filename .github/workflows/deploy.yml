@@ -77,4 +77,4 @@ jobs:
             exit 1
           fi
 
-          # Write the SSM command to deploy the new Docker image
+          # Write the SSM command to deploy the new image
