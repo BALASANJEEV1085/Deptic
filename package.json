@@ -1,5 +1,11 @@
 {
+  "name": "your-app-name",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "your-build-command",
+    "start": "node your-start-file.js"
+  },
   "dependencies": {
-    "@supabase/ssr": "^0.10.3"
+    // your dependencies here
   }
 }
