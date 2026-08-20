@@ -8,7 +8,7 @@ on:
 env:
   AWS_REGION: ap-south-1
   ECR_REPOSITORY: deptic
-  INSTANCE_ID: i-066182d905deac9c6
+  INSTANCE_ID: i-089c717b9ab890124
 
 jobs:
   deploy:
@@ -50,7 +50,7 @@ jobs:
         run: |
           set -e
           AWS_REGION="ap-south-1"
-          INSTANCE_ID="i-066182d905deac9c6"
+          INSTANCE_ID="i-089c717b9ab890124"
           ECR_REGISTRY="${ECR_REGISTRY:-696434672023.dkr.ecr.ap-south-1.amazonaws.com}"
           REPO="deptic"
           SECRET_ID="deptic/Deptic/secrets"
