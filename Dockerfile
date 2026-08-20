@@ -12,7 +12,7 @@ COPY apps/api .
 RUN go build -o server ./cmd/server
 
 # Next.js standalone output
-FROM node:20-alpine AS web-builder
+FROM node:24-alpine AS web-builder
 WORKDIR /app
 COPY apps/web/package*.json ./
 RUN npm install
@@ -21,8 +21,6 @@ RUN npm run build
 
 # Copy from api-builder and web-builder
 COPY --from=api-builder /app/server ./server
-# Removed the problematic COPY command
-# COPY --from=web-builder /app/.next/standalone ./web/
 
 # nginx reverse proxy config
 RUN cat <<EOF > /etc/nginx/conf.d/default.conf
