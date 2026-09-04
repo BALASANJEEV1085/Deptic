@@ -1,30 +1,24 @@
 #!/usr/bin/env bash
-# Simple entrypoint that launches the Go API and the Next.js web server
+# Entrypoint script to run the Go API and the Next.js front‑end in parallel.
+# This script keeps the container running as long as either process is alive.
+
 set -e
 
-# Start the Go API in background
-printf "[DEPTIC] Starting Go API backend on port 8081…\n"
-cd /app/api
-./server &
+# Start the Go API in the background
+/app/api/server &
 API_PID=$!
 
-# Start the Next.js web server in background
-printf "[DEPTIC] Starting Next.js web frontend on port 3000…\n"
+# Start Next.js in the foreground
 cd /app/web
-# The Next.js production server can be started with `npm start` (uses package.json's "start" script)
 npm start &
 WEB_PID=$!
 
-# Wait for both processes; exit if either fails
-wait $API_PID
-API_EXIT=$?
-wait $WEB_PID
-WEB_EXIT=$?
+# Wait for any of the processes to exit
+wait -n
+EXIT_STATUS=$?
 
-if [ $API_EXIT -ne 0 ] || [ $WEB_EXIT -ne 0 ]; then
-  printf "[DEPTIC] One of the services failed (API=$API_EXIT WEB=$WEB_EXIT).\n"
-  exit 1
-fi
+# Kill the other process if it is still running
+kill $API_PID 2>/dev/null || true
+kill $WEB_PID 2>/dev/null || true
 
-# If we reach here, both services terminated cleanly – exit with code 0
-exit 0
+exit $EXIT_STATUS
