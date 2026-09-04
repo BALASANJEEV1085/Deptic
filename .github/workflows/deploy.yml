@@ -1,15 +1,15 @@
-name: Deploy to EC2
+name: Build and Deploy to ECR
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials
@@ -20,34 +20,19 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Log in to Amazon ECR
-        id: ecr
-        uses: aws-actions/amazon-ecr-login@v1
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build, tag, and push Docker image
         run: |
-          IMAGE_REPO=${{ secrets.ECR_REPO }}
-          IMAGE_TAG=${{ github.sha }}
-          docker build -t $IMAGE_REPO:$IMAGE_TAG .
-          docker push $IMAGE_REPO:$IMAGE_TAG
-        env:
-          AWS_REGION: ${{ secrets.AWS_REGION }}
+          IMAGE=${{ secrets.ECR_REGISTRY }}/app:latest
+          docker build -t $IMAGE .
+          docker push $IMAGE
 
-      - name: Stop and remove old container on EC2
-        run: |
-          aws ssm send-command \
-            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
-            --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:Name,Values=deptic-app" \
-            --parameters commands="docker rm -f app || true"
-        env:
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-
-      - name: Run new container on EC2
-        run: |
-          aws ssm send-command \
-            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
-            --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:Name,Values=deptic-app" \
-            --parameters commands="docker run -d --name app --restart unless-stopped -p 8081:8081 -p 3000:3000 ${{ secrets.ECR_REPO }}:${{ github.sha }}"
-        env:
-          AWS_REGION: ${{ secrets.AWS_REGION }}
+      - name: Deploy to ECS (optional)
+        uses: aws-actions/aws-cloudformation-github-deploy@v1
+        with:
+          name: my-stack
+          template: ecs-cloudformation.yaml
+          parameter-overrides: "ImageUri=${{ secrets.ECR_REGISTRY }}/app:latest"
+          capabilities: CAPABILITY_IAM
