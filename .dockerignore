@@ -1,0 +1,13 @@
+.git
+.gitignore
+node_modules
+apps/web/node_modules
+apps/web/.next
+apps/api/*.exe
+apps/api/server
+apps/api/main.exe
+apps/api/tmp*
+apps/api/scratch
+scratch
+*.md
+.env*.local
