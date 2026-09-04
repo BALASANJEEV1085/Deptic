@@ -1,36 +1,53 @@
-name: Deploy to AWS
+name: Deploy to EC2
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
-  build_and_deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    environment: production
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Log in to Amazon ECR
+        id: ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Build and push the combined app image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: Dockerfile
-          tags: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPO_APP }}:latest
-          push: true
+      - name: Build, tag, and push Docker image
+        run: |
+          IMAGE_REPO=${{ secrets.ECR_REPO }}
+          IMAGE_TAG=${{ github.sha }}
+          docker build -t $IMAGE_REPO:$IMAGE_TAG .
+          docker push $IMAGE_REPO:$IMAGE_TAG
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }}
 
-      - name: Deploy to ECS
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        with:
-          task-definition: ecs-task-def.json  # your ECS task definition file
-          service: deptic-app
-          cluster: deptic-cluster
-          wait-for-service-stability: true
+      - name: Stop and remove old container on EC2
+        run: |
+          aws ssm send-command \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:Name,Values=deptic-app" \
+            --parameters commands="docker rm -f app || true"
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+
+      - name: Run new container on EC2
+        run: |
+          aws ssm send-command \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:Name,Values=deptic-app" \
+            --parameters commands="docker run -d --name app --restart unless-stopped -p 8081:8081 -p 3000:3000 ${{ secrets.ECR_REPO }}:${{ github.sha }}"
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }}
