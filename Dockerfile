@@ -58,13 +58,13 @@ RUN addgroup -S appgroup && \
     adduser -S appuser -G appgroup && \
     chown -R appuser:appgroup /app
 
-# Copy entrypoint script
+# Copy entrypoint script (added as part of the fix)
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
-# Expose ports
+# Expose ports used by the API and web services
 EXPOSE 8081 3000
 
 # Health check – simple probe that pings the web UI
