@@ -1,24 +1,21 @@
 #!/usr/bin/env bash
-# Entrypoint script to run the Go API and the Next.js front‑end in parallel.
-# This script keeps the container running as long as either process is alive.
-
+# Exit on any error
 set -e
 
-# Start the Go API in the background
-/app/api/server &
+# Start the API in the background
+./api/server &
 API_PID=$!
 
-# Start Next.js in the foreground
+# Start the web application (Next.js) – the build artifacts already exist in /app/web
+# Use the locally installed "next" binary.
 cd /app/web
-npm start &
+npm ci > /dev/null 2>&1 || npm install
+npm run start -p 3000 &
 WEB_PID=$!
 
-# Wait for any of the processes to exit
-wait -n
-EXIT_STATUS=$?
+# Wait for both processes to finish (they won't under normal operation)
+wait $API_PID
+wait $WEB_PID
 
-# Kill the other process if it is still running
-kill $API_PID 2>/dev/null || true
-kill $WEB_PID 2>/dev/null || true
-
-exit $EXIT_STATUS
+# If either process exits, exit with the same status
+exit $?
