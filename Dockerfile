@@ -59,7 +59,9 @@ RUN addgroup -S appgroup && \
     chown -R appuser:appgroup /app
 
 # Copy entrypoint script
-COPY --chmod=755 entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # Expose ports
