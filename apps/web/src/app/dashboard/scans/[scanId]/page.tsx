@@ -164,10 +164,7 @@ export default function ScanResultsPage() {
     
     Promise.all([
       getScan(scanId),
-      getScanVulnerabilities(scanId, true).catch(err => {
-        console.error("Failed to load vulns", err);
-        return { summary: { critical: 0, high: 0, medium: 0, low: 0 }, grouped: [] };
-      }),
+      getScanVulnerabilities(scanId, true),
       getCompliance(scanId).catch(err => {
         console.error("Failed to load compliance", err);
         return null;

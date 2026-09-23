@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/deptic-io/api/internal/scanner"
+	"golang.org/x/mod/semver"
 )
 
 type ComponentVuln struct {
@@ -35,17 +37,22 @@ type osvRequest struct {
 
 type osvResponse struct {
 	Vulns []struct {
-		ID       string `json:"id"`
-		Summary  string `json:"summary"`
-		Details  string `json:"details"`
+		ID       string   `json:"id"`
+		Summary  string   `json:"summary"`
+		Details  string   `json:"details"`
 		Aliases  []string `json:"aliases"`
 		Severity []struct {
 			Type  string `json:"type"`
 			Score string `json:"score"`
 		} `json:"severity"`
 		Affected []struct {
+			Package struct {
+				Name      string `json:"name"`
+				Ecosystem string `json:"ecosystem"`
+				PURL      string `json:"purl"`
+			} `json:"package"`
 			Ranges []struct {
-				Type   string `json:"type"`
+				Type   string              `json:"type"`
 				Events []map[string]string `json:"events"`
 			} `json:"ranges"`
 			Versions []string `json:"versions"`
@@ -54,9 +61,96 @@ type osvResponse struct {
 	} `json:"vulns"`
 }
 
+var osvQueryURL = "https://api.osv.dev/v1/query"
+
 func getSeverity(vuln osvResponse) string {
-	// Default severity
+	for _, advisory := range vuln.Vulns {
+		if severity, ok := normalizeSeverity(advisory.DatabaseSpecific["severity"]); ok {
+			return severity
+		}
+		for _, score := range advisory.Severity {
+			if severity, ok := normalizeSeverity(score.Score); ok {
+				return severity
+			}
+		}
+	}
 	return "HIGH"
+}
+
+func normalizeSeverity(value interface{}) (string, bool) {
+	text := strings.ToUpper(strings.TrimSpace(fmt.Sprint(value)))
+	for _, severity := range []string{"CRITICAL", "HIGH", "MEDIUM", "MODERATE", "LOW"} {
+		if strings.Contains(text, severity) {
+			if severity == "MODERATE" {
+				return "MEDIUM", true
+			}
+			return severity, true
+		}
+	}
+	if score, err := strconv.ParseFloat(text, 64); err == nil {
+		switch {
+		case score >= 9:
+			return "CRITICAL", true
+		case score >= 7:
+			return "HIGH", true
+		case score >= 4:
+			return "MEDIUM", true
+		default:
+			return "LOW", true
+		}
+	}
+	return "", false
+}
+
+func versionInRange(version, rangeType string, events []map[string]string, listedVersions []string) bool {
+	for _, listed := range listedVersions {
+		if listed == version {
+			return true
+		}
+	}
+	if strings.EqualFold(rangeType, "GIT") || version == "" {
+		return false
+	}
+	version = strings.TrimPrefix(version, "v")
+	if !semver.IsValid("v" + version) {
+		return false
+	}
+	introduced := "0.0.0"
+	fixed := ""
+	lastAffected := ""
+	for _, event := range events {
+		if value := strings.TrimPrefix(event["introduced"], "v"); value != "" {
+			introduced = value
+		}
+		if value := strings.TrimPrefix(event["fixed"], "v"); value != "" {
+			fixed = value
+		}
+		if value := strings.TrimPrefix(event["last_affected"], "v"); value != "" {
+			lastAffected = value
+		}
+	}
+	if !semver.IsValid("v"+introduced) || semver.Compare("v"+version, "v"+introduced) < 0 {
+		return false
+	}
+	if fixed != "" && semver.IsValid("v"+fixed) && semver.Compare("v"+version, "v"+fixed) >= 0 {
+		return false
+	}
+	if lastAffected != "" && semver.IsValid("v"+lastAffected) && semver.Compare("v"+version, "v"+lastAffected) > 0 {
+		return false
+	}
+	return true
+}
+
+func affectedPackageMatches(pkgName, ecosystem, purl string, affectedName, affectedEco string) bool {
+	if affectedName != "" && affectedName == pkgName && strings.EqualFold(affectedEco, ecosystem) {
+		return true
+	}
+	expected := "pkg:" + strings.ToLower(ecosystem) + "/" + pkgName
+	return strings.EqualFold(strings.Split(purl, "@")[0], expected)
+}
+
+func packagePURL(pkgName, ecosystem string) string {
+	return "pkg:" + strings.ToLower(ecosystem) + "/" + pkgName
 }
 
 func QueryOSV(ctx context.Context, pkgName, version, ecosystem string) ([]ComponentVuln, error) {
@@ -78,16 +172,19 @@ func QueryOSV(ctx context.Context, pkgName, version, ecosystem string) ([]Compon
 	}
 	reqBody.Package.Name = pkgName
 	reqBody.Package.Ecosystem = mappedEco
+	log.Printf("[vuln] querying OSV package=%s version=%s ecosystem=%s purl=%s", pkgName, version, ecosystem, packagePURL(pkgName, ecosystem))
 
 	b, err := json.Marshal(reqBody)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.osv.dev/v1/query", bytes.NewReader(b))
+	req, err := http.NewRequestWithContext(ctx, "POST", osvQueryURL, bytes.NewReader(b))
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
@@ -104,9 +201,32 @@ func QueryOSV(ctx context.Context, pkgName, version, ecosystem string) ([]Compon
 	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
 		return nil, err
 	}
+	log.Printf("[vuln] OSV returned %d advisories for %s@%s", len(res.Vulns), pkgName, version)
 
 	var vulns []ComponentVuln
 	for _, v := range res.Vulns {
+		matched := false
+		for _, affected := range v.Affected {
+			if !affectedPackageMatches(pkgName, ecosystem, affected.Package.PURL, affected.Package.Name, affected.Package.Ecosystem) {
+				continue
+			}
+			if len(affected.Ranges) == 0 && len(affected.Versions) == 0 {
+				matched = true
+			}
+			for _, affectedRange := range affected.Ranges {
+				if versionInRange(version, affectedRange.Type, affectedRange.Events, affected.Versions) {
+					matched = true
+				}
+			}
+			if matched {
+				break
+			}
+		}
+		if !matched {
+			log.Printf("[vuln] %s@%s (%s) not matched by OSV advisory %s", pkgName, version, ecosystem, v.ID)
+			continue
+		}
+
 		cveID := v.ID
 		for _, alias := range v.Aliases {
 			if strings.HasPrefix(alias, "CVE-") {
@@ -115,34 +235,15 @@ func QueryOSV(ctx context.Context, pkgName, version, ecosystem string) ([]Compon
 			}
 		}
 
-		severity := "MEDIUM"
-		if len(v.Severity) > 0 {
-			// Real CVSS parsing would go here, we'll try a basic heuristic
-			scoreStr := v.Severity[0].Score
-			// Sometimes database specific has cvss score
-			if cvss, ok := v.DatabaseSpecific["cvss"].(map[string]interface{}); ok {
-				if scoreObj, ok2 := cvss["score"]; ok2 {
-					if score, err := strconv.ParseFloat(fmt.Sprintf("%v", scoreObj), 64); err == nil {
-						if score >= 9.0 {
-							severity = "CRITICAL"
-						} else if score >= 7.0 {
-							severity = "HIGH"
-						} else if score >= 4.0 {
-							severity = "MEDIUM"
-						} else {
-							severity = "LOW"
-						}
-					}
+		severity := "HIGH"
+		if sev, ok := normalizeSeverity(v.DatabaseSpecific["severity"]); ok {
+			severity = sev
+		} else {
+			for _, score := range v.Severity {
+				if sev, ok := normalizeSeverity(score.Score); ok {
+					severity = sev
+					break
 				}
-			} else if strings.Contains(scoreStr, "CRITICAL") {
-				severity = "CRITICAL"
-			} else if strings.Contains(scoreStr, "HIGH") {
-				severity = "HIGH"
-			}
-		} else if dbSpecificSev, ok := v.DatabaseSpecific["severity"].(string); ok {
-			sev := strings.ToUpper(dbSpecificSev)
-			if sev == "CRITICAL" || sev == "HIGH" || sev == "MEDIUM" || sev == "LOW" {
-				severity = sev
 			}
 		}
 
@@ -173,6 +274,7 @@ func QueryOSV(ctx context.Context, pkgName, version, ecosystem string) ([]Compon
 			Summary:      summary,
 			FixedVersion: fixedVersion,
 		})
+		log.Printf("[vuln] matched %s@%s (%s): advisory=%s identifier=%s severity=%s fixed=%s", pkgName, version, ecosystem, v.ID, cveID, severity, fixedVersion)
 	}
 
 	return vulns, nil
@@ -216,9 +318,10 @@ func MatchVulnerabilities(ctx context.Context, db *sql.DB, scanID string) ([]Com
 
 			vulns, err := QueryOSV(ctx, comp.Name, comp.Version, comp.Ecosystem)
 			if err != nil {
-				fmt.Printf("Failed to query OSV for %s@%s: %v\n", comp.Name, comp.Version, err)
+				log.Printf("[vuln] query failed for %s@%s (%s): %v", comp.Name, comp.Version, comp.Ecosystem, err)
 				return
 			}
+			log.Printf("[vuln] query result for %s@%s (%s): %d matching advisories", comp.Name, comp.Version, comp.Ecosystem, len(vulns))
 
 			if len(vulns) > 0 {
 				mu.Lock()
@@ -240,6 +343,10 @@ func SaveComponentVulns(ctx context.Context, db *sql.DB, vulns []ComponentVuln) 
 		return nil
 	}
 
+	// OSV can return multiple GHSA records that normalize to the same CVE.
+	// PostgreSQL cannot update the same ON CONFLICT row twice in one INSERT.
+	vulns = deduplicateComponentVulns(vulns)
+
 	var valueStrings []string
 	var valueArgs []interface{}
 
@@ -259,6 +366,36 @@ func SaveComponentVulns(ctx context.Context, db *sql.DB, vulns []ComponentVuln) 
 
 	_, err := db.ExecContext(ctx, query, valueArgs...)
 	return err
+}
+
+func severityRank(severity string) int {
+	switch severity {
+	case "CRITICAL":
+		return 1
+	case "HIGH":
+		return 2
+	case "MEDIUM":
+		return 3
+	case "LOW":
+		return 4
+	default:
+		return 5
+	}
+}
+
+func deduplicateComponentVulns(vulns []ComponentVuln) []ComponentVuln {
+	unique := make(map[string]ComponentVuln, len(vulns))
+	for _, vuln := range vulns {
+		key := vuln.ComponentID + "\x00" + vuln.CVEID
+		if existing, ok := unique[key]; !ok || severityRank(vuln.Severity) < severityRank(existing.Severity) {
+			unique[key] = vuln
+		}
+	}
+	result := make([]ComponentVuln, 0, len(unique))
+	for _, vuln := range unique {
+		result = append(result, vuln)
+	}
+	return result
 }
 
 func GetScanVulnSummary(ctx context.Context, db *sql.DB, scanID string) (critical, high, medium, low int, err error) {
@@ -313,8 +450,10 @@ func MatchVulnerabilitiesInMemory(ctx context.Context, pkgs []scanner.Package) [
 
 			vulns, err := QueryOSV(ctx, p.Name, p.Version, p.Ecosystem)
 			if err != nil {
+				log.Printf("[vuln] query failed for %s@%s (%s): %v", p.Name, p.Version, p.Ecosystem, err)
 				return
 			}
+			log.Printf("[vuln] query result for %s@%s (%s): %d matching advisories", p.Name, p.Version, p.Ecosystem, len(vulns))
 			if len(vulns) > 0 {
 				mu.Lock()
 				for _, v := range vulns {

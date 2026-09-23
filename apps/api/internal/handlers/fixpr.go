@@ -7,16 +7,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/redis/go-redis/v9"
 	"github.com/deptic-io/api/internal/github"
 	"github.com/deptic-io/api/internal/vuln"
+	"github.com/gofiber/fiber/v2"
+	"github.com/redis/go-redis/v9"
 )
 
 type FixPRStatus struct {
@@ -161,7 +159,7 @@ func (h *ScanHandler) runFixPRBackground(scanID, userID, owner, repo, ghToken, e
 
 	// Step 2 & 3: Find clean versions
 	updateStatus(h.rdb, scanID, "finding_versions", fmt.Sprintf("Finding clean versions for %d packages...", len(pkgMap)), 10, false, "", 0, "")
-	
+
 	type cleanResult struct {
 		key          string
 		cleanVersion string
@@ -215,6 +213,20 @@ func (h *ScanHandler) runFixPRBackground(scanID, userID, owner, repo, ghToken, e
 		return
 	}
 
+	// Ask the model to patch the complete manifests before creating a branch.
+	updateStatus(h.rdb, scanID, "ai_patching", "Analyzing vulnerabilities and manifest files with AI...", 50, false, "", 0, "")
+	ghClient := github.NewClient(ghToken)
+	manifests, err := loadAIManifests(ctx, ghClient, owner, repo)
+	if err != nil {
+		fail(fmt.Sprintf("Failed to load manifest files for AI patching: %v", err))
+		return
+	}
+	aiResult, err := requestAIPatches(ctx, updates, manifests)
+	if err != nil {
+		fail(fmt.Sprintf("AI patch generation failed: %v", err))
+		return
+	}
+
 	// Step 5 & 6: Branch & Update Files
 	updateStatus(h.rdb, scanID, "branching", "Creating branch...", 55, false, "", 0, "")
 
@@ -229,7 +241,9 @@ func (h *ScanHandler) runFixPRBackground(scanID, userID, owner, repo, ghToken, e
 	defer repoResp.Body.Close()
 
 	var repoData struct {
-		Permissions struct{ Push bool `json:"push"` } `json:"permissions"`
+		Permissions struct {
+			Push bool `json:"push"`
+		} `json:"permissions"`
 		DefaultBranch string `json:"default_branch"`
 	}
 	json.NewDecoder(repoResp.Body).Decode(&repoData)
@@ -238,7 +252,9 @@ func (h *ScanHandler) runFixPRBackground(scanID, userID, owner, repo, ghToken, e
 		return
 	}
 	defaultBranch := repoData.DefaultBranch
-	if defaultBranch == "" { defaultBranch = "main" }
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
 
 	refAPI := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/ref/heads/%s", owner, repo, defaultBranch)
 	refReq, _ := http.NewRequest("GET", refAPI, nil)
@@ -249,11 +265,15 @@ func (h *ScanHandler) runFixPRBackground(scanID, userID, owner, repo, ghToken, e
 		return
 	}
 	defer refResp.Body.Close()
-	var refData struct { Object struct { Sha string `json:"sha"` } `json:"object"` }
+	var refData struct {
+		Object struct {
+			Sha string `json:"sha"`
+		} `json:"object"`
+	}
 	json.NewDecoder(refResp.Body).Decode(&refData)
 	baseSha := refData.Object.Sha
 
-	timestamp := time.Now().Format("20060102150405")
+	timestamp := time.Now().Format("20060102150405.000000000")
 	branchName := fmt.Sprintf("depticio/fix-cves-%s", timestamp)
 	createRefAPI := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/refs", owner, repo)
 
@@ -263,29 +283,25 @@ func (h *ScanHandler) runFixPRBackground(scanID, userID, owner, repo, ghToken, e
 		cbReq, _ := http.NewRequest("POST", createRefAPI, bytes.NewReader(b))
 		cbReq.Header.Set("Authorization", "Bearer "+ghToken)
 		cbResp, err := http.DefaultClient.Do(cbReq)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		defer cbResp.Body.Close()
-		if cbResp.StatusCode == 422 { return fmt.Errorf("branch exists") }
-		if cbResp.StatusCode != 201 { return fmt.Errorf("github api error %d", cbResp.StatusCode) }
+		if cbResp.StatusCode == 422 {
+			return fmt.Errorf("branch exists")
+		}
+		if cbResp.StatusCode != 201 {
+			return fmt.Errorf("github api error %d", cbResp.StatusCode)
+		}
 		return nil
 	}
 
 	if err := createBranch(branchName); err != nil {
-		if err.Error() == "branch exists" {
-			branchName = fmt.Sprintf("depticio/fix-cves-%s-%d", timestamp, rand.Intn(9999))
-			if err2 := createBranch(branchName); err2 != nil {
-				fail("Failed to create branch on GitHub")
-				return
-			}
-		} else {
-			fail("Failed to create branch on GitHub")
-			return
-		}
+		fail(fmt.Sprintf("Failed to create branch on GitHub: %v", err))
+		return
 	}
 
 	updateStatus(h.rdb, scanID, "updating", "Updating manifest files...", 65, false, "", 0, "")
-	ghClient := github.NewClient(ghToken)
-
 	updateFile := func(path, content, message string) error {
 		metaAPI := fmt.Sprintf("https://api.github.com/repos/%s/%s/contents/%s?ref=%s", owner, repo, path, branchName)
 		mReq, _ := http.NewRequest("GET", metaAPI, nil)
@@ -294,7 +310,9 @@ func (h *ScanHandler) runFixPRBackground(scanID, userID, owner, repo, ghToken, e
 		if err != nil || mResp.StatusCode != 200 {
 			return fmt.Errorf("Could not find %s", path)
 		}
-		var mData struct{ Sha string `json:"sha"` }
+		var mData struct {
+			Sha string `json:"sha"`
+		}
 		json.NewDecoder(mResp.Body).Decode(&mData)
 		mResp.Body.Close()
 
@@ -316,136 +334,31 @@ func (h *ScanHandler) runFixPRBackground(scanID, userID, owner, repo, ghToken, e
 		return nil
 	}
 
-	ecoGroups := make(map[string][]VulnerabilityFix)
-	for _, u := range updates {
-		ecoGroups[u.Ecosystem] = append(ecoGroups[u.Ecosystem], u)
-	}
-
-	for eco, vulns := range ecoGroups {
-		if eco == "npm" {
-			path, data, err := ghClient.FindManifestFile(ctx, owner, repo, "package.json")
-			if err != nil || path == "" { continue }
-			var pkg map[string]interface{}
-			if err := json.Unmarshal(data, &pkg); err == nil {
-				for _, v := range vulns {
-					found := false
-					for _, depType := range []string{"dependencies", "devDependencies"} {
-						if depsRaw, ok := pkg[depType]; ok {
-							if deps, ok := depsRaw.(map[string]interface{}); ok {
-								if _, exists := deps[v.PackageName]; exists {
-									deps[v.PackageName] = v.FixedVersion
-									found = true
-								}
-							}
-						}
-					}
-					// Transitive or not found -> force exact version in dependencies
-					if !found {
-						if pkg["dependencies"] == nil {
-							pkg["dependencies"] = make(map[string]interface{})
-						}
-						deps := pkg["dependencies"].(map[string]interface{})
-						deps[v.PackageName] = v.FixedVersion
-					}
-				}
-				b, _ := json.MarshalIndent(pkg, "", "  ")
-				updateFile(path, string(b), "fix: patch vulnerable NPM dependencies")
-			}
-		} else if eco == "pip" {
-			path, data, err := ghClient.FindManifestFile(ctx, owner, repo, "requirements.txt")
-			if err != nil || path == "" { continue }
-			lines := strings.Split(string(data), "\n")
-			for _, v := range vulns {
-				found := false
-				for i, line := range lines {
-					if strings.HasPrefix(strings.ToLower(strings.TrimSpace(line)), strings.ToLower(v.PackageName)) {
-						if strings.Contains(line, "==") || strings.Contains(line, ">=") || strings.Contains(line, "<=") || strings.Contains(line, "~=") {
-							lines[i] = fmt.Sprintf("%s==%s", v.PackageName, v.FixedVersion)
-							found = true
-						}
-					}
-				}
-				if !found {
-					lines = append(lines, fmt.Sprintf("%s==%s", v.PackageName, v.FixedVersion))
-				}
-			}
-			updateFile(path, strings.Join(lines, "\n"), "fix: patch vulnerable PIP dependencies")
-		} else if eco == "maven" {
-			path, data, err := ghClient.FindManifestFile(ctx, owner, repo, "pom.xml")
-			if err != nil || path == "" { continue }
-			content := string(data)
-			for _, v := range vulns {
-				parts := strings.Split(v.PackageName, ":")
-				if len(parts) != 2 { continue }
-				groupID, artifactId := parts[0], parts[1]
-				
-				pat := regexp.MustCompile(`(?s)(<dependency>[^<]*(?:<[^/][^>]*>[^<]*</[^>]+>[^<]*)*?<artifactId>` + regexp.QuoteMeta(artifactId) + `</artifactId>[^<]*(?:<[^/][^>]*>[^<]*</[^>]+>[^<]*)*?)<version>[^<]+</version>`)
-				newContent := pat.ReplaceAllString(content, "${1}<version>"+v.FixedVersion+"</version>")
-				if newContent != content {
-					content = newContent
-					continue
-				}
-
-				// Transitive -> append to dependencies
-				newDepXml := fmt.Sprintf("\n        <!-- Injected by DEPTIC.io to fix transitive vulnerability -->\n        <dependency>\n            <groupId>%s</groupId>\n            <artifactId>%s</artifactId>\n            <version>%s</version>\n        </dependency>\n    </dependencies>", groupID, artifactId, v.FixedVersion)
-				lastDepsIdx := strings.LastIndex(content, "</dependencies>")
-				if lastDepsIdx != -1 {
-					content = content[:lastDepsIdx] + newDepXml + content[lastDepsIdx+15:]
-				}
-			}
-			updateFile(path, content, "fix: patch vulnerable Maven dependencies")
-		} else if eco == "go" {
-			path, data, err := ghClient.FindManifestFile(ctx, owner, repo, "go.mod")
-			if err != nil || path == "" { continue }
-			lines := strings.Split(string(data), "\n")
-			for _, v := range vulns {
-				for i, line := range lines {
-					if strings.Contains(line, v.PackageName) {
-						parts := strings.Fields(line)
-						if len(parts) >= 2 {
-							pkgIdx := -1
-							if parts[0] == "require" && len(parts) >= 3 && parts[1] == v.PackageName {
-								pkgIdx = 1
-							} else if parts[0] == v.PackageName {
-								pkgIdx = 0
-							}
-							
-							if pkgIdx != -1 {
-								indirect := strings.Contains(line, "// indirect")
-								var newLine string
-								if pkgIdx == 1 {
-									newLine = fmt.Sprintf("require %s %s", v.PackageName, v.FixedVersion)
-								} else {
-									newLine = fmt.Sprintf("\t%s %s", v.PackageName, v.FixedVersion)
-								}
-								if indirect {
-									newLine += " // indirect"
-								}
-								lines[i] = newLine
-							}
-						}
-					}
-				}
-			}
-			updateFile(path, strings.Join(lines, "\n"), "fix: patch vulnerable Go dependencies")
+	updateStatus(h.rdb, scanID, "updating", "Applying AI-generated manifest patches...", 65, false, "", 0, "")
+	for _, patch := range aiResult.Files {
+		if err := updateFile(patch.Path, patch.Content, "fix: apply AI-verified dependency security patch"); err != nil {
+			fail(err.Error())
+			return
 		}
 	}
 
 	// Step 7: Create PR
 	updateStatus(h.rdb, scanID, "creating_pr", "Opening Pull Request...", 85, false, "", 0, "")
 	prAPI := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls", owner, repo)
-	
+
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("## Security Fix\n\nThis PR was automatically generated by [DEPTIC.io](https://deptic.io) to patch **%d** CVE vulnerabilities.\n\n### Packages Updated\n\n| Package | Old Version | New Version | CVEs Fixed | Verified Clean |\n|---------|-------------|-------------|------------|----------------|\n", len(updates)))
-	
+
 	transitiveCount := 0
 	for _, v := range updates {
 		sb.WriteString(fmt.Sprintf("| %s | %s | %s | %d | ✅ |\n", v.PackageName, v.CurrentVersion, v.FixedVersion, len(v.CVEIDs)))
-		if v.ParentName != "" { transitiveCount++ }
+		if v.ParentName != "" {
+			transitiveCount++
+		}
 	}
-	
+
 	sb.WriteString("\n### Version Selection Method\n\nEvery upgraded version was independently verified against the [OSV.dev](https://osv.dev) database to ensure it has **zero known CVEs** at the time of creation. This completely resolves the 'whack-a-mole' vulnerability problem.\n")
-	
+
 	if transitiveCount > 0 {
 		sb.WriteString("\n### Transitive Dependencies\n\nSome vulnerabilities were discovered in transitive dependencies. These have been explicitly pinned in your manifest files to force the clean version across your entire dependency tree.\n")
 	}
@@ -467,7 +380,7 @@ func (h *ScanHandler) runFixPRBackground(scanID, userID, owner, repo, ghToken, e
 		return
 	}
 	defer prResp.Body.Close()
-	
+
 	var prData struct {
 		Number  int    `json:"number"`
 		HTMLURL string `json:"html_url"`
@@ -519,6 +432,8 @@ func (h *ScanHandler) HandleGetFixPRs(c *fiber.Ctx) error {
 			})
 		}
 	}
-	if prs == nil { prs = []fiber.Map{} }
+	if prs == nil {
+		prs = []fiber.Map{}
+	}
 	return c.JSON(fiber.Map{"prs": prs})
 }

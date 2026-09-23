@@ -124,11 +124,11 @@ func JWTAuthMiddleware(database *sql.DB, redisClient *redis.Client) fiber.Handle
 					deviceName = "Mobile"
 				}
 				go notify.SendPushToUser(context.Background(), database, sub, notify.PushPayload{
-					Title: "New login to Deptic",
-					Body:  "Signed in from " + deviceName + " · " + time.Now().Format("Jan 2, 3:04 PM"),
-					URL:   "/dashboard/settings",
-					Tag:   "login-" + sessionID,
-					Type:  "new_login",
+					Title:              "New login to Deptic",
+					Body:               "Signed in from " + deviceName + " · " + time.Now().Format("Jan 2, 3:04 PM"),
+					URL:                "/dashboard/settings",
+					Tag:                "login-" + sessionID,
+					Type:               "new_login",
 					RequireInteraction: false,
 				})
 			}
@@ -175,7 +175,7 @@ func RegisterRoutes(api fiber.Router, database *sql.DB, redisClient *redis.Clien
 
 	// Register Workspace routes
 	wh.RegisterRoutes(api)
-	
+
 	// Register Webhook routes
 	webh.RegisterRoutes(api)
 
@@ -228,7 +228,6 @@ func RegisterRoutes(api fiber.Router, database *sql.DB, redisClient *redis.Clien
 	// Account deletion
 	api.Delete("/account", h.HandleDeleteAccount)
 }
-
 
 func deriveRepoName(repoURL, id string) string {
 	if repoURL != "" {
@@ -377,7 +376,7 @@ func (h *ScanHandler) RunFullScan(scanID, userID, githubToken, owner, repo, repo
 			defer wg.Done()
 			manifestSem <- struct{}{}
 			defer func() { <-manifestSem }()
-			
+
 			var pkgs []scanner.Package
 			var scanErr error
 
@@ -464,10 +463,17 @@ func (h *ScanHandler) RunFullScan(scanID, userID, githubToken, owner, repo, repo
 	_ = db.UpdateScanStatus(ctx, h.db, scanID, "analyzing", ecosystemStr)
 	vulns, err := vuln.MatchVulnerabilities(ctx, h.db, scanID)
 	var criticalCves, highCves, mediumCves, lowCves int
-	if err == nil && len(vulns) > 0 {
+	if err != nil {
+		fmt.Printf("Vulnerability matching failed for scan %s: %v\n", scanID, err)
+	} else {
+		fmt.Printf("Vulnerability matching found %d findings for scan %s\n", len(vulns), scanID)
 		if err := vuln.SaveComponentVulns(ctx, h.db, vulns); err != nil {
-			fmt.Printf("Failed to save vulnerabilities: %v\n", err)
+			fmt.Printf("Failed to save vulnerabilities for scan %s: %v\n", scanID, err)
+		} else {
+			fmt.Printf("Persisted %d vulnerability findings for scan %s\n", len(vulns), scanID)
 		}
+	}
+	if err == nil && len(vulns) > 0 {
 		for _, v := range vulns {
 			switch v.Severity {
 			case "CRITICAL":
@@ -483,13 +489,13 @@ func (h *ScanHandler) RunFullScan(scanID, userID, githubToken, owner, repo, repo
 
 		if criticalCves > 0 {
 			go notify.SendPushToUser(context.Background(), h.db, userID, notify.PushPayload{
-				Title: "🚨 Critical CVE in " + repo,
-				Body:  fmt.Sprintf("%d critical vulnerabilities detected · Immediate action required", criticalCves),
-				URL:   "/dashboard/scans/" + scanID + "?tab=vulnerabilities",
-				Tag:   "critical-cve-" + scanID,
-				Type:  "critical_cve",
+				Title:              "🚨 Critical CVE in " + repo,
+				Body:               fmt.Sprintf("%d critical vulnerabilities detected · Immediate action required", criticalCves),
+				URL:                "/dashboard/scans/" + scanID + "?tab=vulnerabilities",
+				Tag:                "critical-cve-" + scanID,
+				Type:               "critical_cve",
 				RequireInteraction: true,
-				Vibrate: []int{300, 100, 300, 100, 300},
+				Vibrate:            []int{300, 100, 300, 100, 300},
 				Actions: []notify.PushAction{
 					{Action: "view_scan", Title: "View CVEs"},
 				},
@@ -565,7 +571,7 @@ func (h *ScanHandler) RunFullScan(scanID, userID, githubToken, owner, repo, repo
 	if err == nil && slackEnabled && len(vulns) > 0 {
 		var cfg notify.SlackConfig
 		if err := json.Unmarshal([]byte(slackConfigJSON), &cfg); err == nil && cfg.WebhookURL != "" {
-			
+
 			// Sort vulns by severity before displaying
 			sortedVulns := make([]vuln.ComponentVuln, len(vulns))
 			copy(sortedVulns, vulns)
@@ -574,8 +580,12 @@ func (h *ScanHandler) RunFullScan(scanID, userID, githubToken, owner, repo, repo
 				for j := i + 1; j < len(sortedVulns); j++ {
 					r1, ok1 := severityRank[sortedVulns[i].Severity]
 					r2, ok2 := severityRank[sortedVulns[j].Severity]
-					if !ok1 { r1 = 5 }
-					if !ok2 { r2 = 5 }
+					if !ok1 {
+						r1 = 5
+					}
+					if !ok2 {
+						r2 = 5
+					}
 					if r2 < r1 {
 						sortedVulns[i], sortedVulns[j] = sortedVulns[j], sortedVulns[i]
 					}
@@ -655,7 +665,7 @@ func (h *ScanHandler) RunFullScan(scanID, userID, githubToken, owner, repo, repo
 				issue.Fields.Project = map[string]string{"key": cfg.ProjectKey}
 				issue.Fields.Summary = summary
 				issue.Fields.IssueType = map[string]string{"name": "Task"}
-				
+
 				issue.Fields.Labels = []string{"security", "deptic-io", "cve", strings.ToLower(highestSev)}
 				issue.Fields.Description = map[string]any{
 					"type": "doc", "version": 1,
@@ -711,7 +721,7 @@ func (h *ScanHandler) HandleGetScan(c *fiber.Ctx) error {
 		FROM components WHERE scan_id=$1
 		GROUP BY ecosystem
 	`, scanID)
-	
+
 	breakdown := make(map[string]interface{})
 	var ecosystemList []string
 	if err == nil {
@@ -786,26 +796,26 @@ func (h *ScanHandler) HandleGetScan(c *fiber.Ctx) error {
 // HandleResolveAuditID handles GET /api/scans/audit/:auditID
 func (h *ScanHandler) HandleResolveAuditID(c *fiber.Ctx) error {
 	auditID := c.Params("auditID")
-	
+
 	var fullID string
 	err := h.db.QueryRowContext(c.Context(), `
 		SELECT id FROM scans WHERE id::text LIKE $1 || '%' LIMIT 1
 	`, auditID).Scan(&fullID)
-	
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Scan not found with this Audit ID"})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Database error resolving Audit ID"})
 	}
-	
+
 	return c.JSON(fiber.Map{"scan_id": fullID})
 }
 
 // HandleListScans handles GET /api/projects/:projectID/scans
 func (h *ScanHandler) HandleListScans(c *fiber.Ctx) error {
 	projectID := c.Params("projectID")
-	
+
 	rows, err := h.db.QueryContext(c.Context(), `
 		SELECT s.id, s.project_id, s.status, s.created_at,
 		       COALESCE(s.repo_url, ''), COALESCE(s.ecosystem, ''),
@@ -816,7 +826,7 @@ func (h *ScanHandler) HandleListScans(c *fiber.Ctx) error {
 		WHERE s.project_id = $1 
 		ORDER BY s.created_at DESC
 	`, projectID)
-	
+
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to query scans"})
 	}
@@ -869,7 +879,7 @@ func (h *ScanHandler) HandleGetDashboardStats(c *fiber.Ctx) error {
 	var criticalCves, highCves, mediumCves, lowCves int
 
 	h.db.QueryRowContext(c.Context(), fmt.Sprintf("SELECT count(*) FROM projects p WHERE %s = $1", targetFilter), targetID).Scan(&totalProjects)
-	
+
 	h.db.QueryRowContext(c.Context(), fmt.Sprintf(`
 		SELECT count(*) FROM scans s JOIN projects p ON s.project_id = p.id WHERE %s = $1
 	`, targetFilter), targetID).Scan(&totalScans)
@@ -961,7 +971,7 @@ func (h *ScanHandler) HandleGetDashboardStats(c *fiber.Ctx) error {
 		ORDER BY s.created_at DESC
 		LIMIT 15
 	`, targetFilter), targetID)
-	
+
 	if err == nil {
 		defer rows.Close()
 		var recentScans []fiber.Map
@@ -969,7 +979,7 @@ func (h *ScanHandler) HandleGetDashboardStats(c *fiber.Ctx) error {
 			var scanID, status, repoURL, ecosystem string
 			var createdAt time.Time
 			var compCount, critCves, ntiaScore int
-			
+
 			if err := rows.Scan(&scanID, &status, &createdAt, &repoURL, &ecosystem, &ntiaScore, &compCount, &critCves); err == nil {
 				recentScans = append(recentScans, fiber.Map{
 					"id":              scanID,
@@ -1205,14 +1215,14 @@ type ScanVulnResponse struct {
 }
 
 type GroupedVulnResponse struct {
-	ComponentName    string   `json:"component_name"`
-	ComponentVersion string   `json:"component_version"`
-	Ecosystem        string   `json:"ecosystem"`
-	HighestSeverity  string   `json:"highest_severity"`
-	CVECount         int      `json:"cve_count"`
-	CVEs             []string `json:"cves"`
+	ComponentName    string              `json:"component_name"`
+	ComponentVersion string              `json:"component_version"`
+	Ecosystem        string              `json:"ecosystem"`
+	HighestSeverity  string              `json:"highest_severity"`
+	CVECount         int                 `json:"cve_count"`
+	CVEs             []string            `json:"cves"`
 	CVEsDetail       []map[string]string `json:"cves_detail"`
-	CleanVersion     string   `json:"clean_version"`
+	CleanVersion     string              `json:"clean_version"`
 }
 
 // HandleGetScanVulnerabilities handles GET /api/scans/:scanID/vulnerabilities
@@ -1255,7 +1265,7 @@ func (h *ScanHandler) HandleGetScanVulnerabilities(c *fiber.Ctx) error {
 		}
 		// Temporarily store ecosystem in ProjectName or somewhere just to construct grouped
 		// or just use a local struct. We will group it manually.
-		v.ProjectName = eco 
+		v.ProjectName = eco
 		vulns = append(vulns, v)
 	}
 
@@ -1272,7 +1282,7 @@ func (h *ScanHandler) HandleGetScanVulnerabilities(c *fiber.Ctx) error {
 	if grouped {
 		groupMap := make(map[string]*GroupedVulnResponse)
 		var groupKeys []string
-		
+
 		sevRank := map[string]int{"CRITICAL": 1, "HIGH": 2, "MEDIUM": 3, "LOW": 4}
 
 		for _, v := range vulns {
@@ -1288,33 +1298,37 @@ func (h *ScanHandler) HandleGetScanVulnerabilities(c *fiber.Ctx) error {
 				}
 				groupKeys = append(groupKeys, key)
 			}
-			
+
 			g := groupMap[key]
-			
+
 			// Update highest severity
 			curRank := sevRank[v.Severity]
-			if curRank == 0 { curRank = 5 }
+			if curRank == 0 {
+				curRank = 5
+			}
 			highestRank := sevRank[g.HighestSeverity]
-			if highestRank == 0 { highestRank = 5 }
-			
+			if highestRank == 0 {
+				highestRank = 5
+			}
+
 			if curRank < highestRank {
 				g.HighestSeverity = v.Severity
 			}
-			
+
 			g.CVEs = append(g.CVEs, v.CVEID)
 			g.CVEsDetail = append(g.CVEsDetail, map[string]string{
-				"id": v.CVEID,
+				"id":       v.CVEID,
 				"severity": v.Severity,
-				"summary": v.Summary,
+				"summary":  v.Summary,
 			})
 			g.CVECount++
-			
+
 			// We just keep one fixed version if it's there
 			if v.FixedVersion != "" && g.CleanVersion == "" {
 				g.CleanVersion = v.FixedVersion
 			}
 		}
-		
+
 		for _, k := range groupKeys {
 			res.Grouped = append(res.Grouped, *groupMap[k])
 		}
@@ -1469,7 +1483,7 @@ func ResolveGitHubToken(c *fiber.Ctx, db *sql.DB, userID string) string {
 		WHERE user_id = $1 AND provider = 'github'
 		LIMIT 1
 	`, userID).Scan(&providerToken)
-	
+
 	if providerToken.String != "" {
 		fmt.Printf("[DEBUG] ResolveGitHubToken: Found legacy token in auth.identities for user %s\n", userID)
 		return providerToken.String
@@ -1492,7 +1506,7 @@ func ResolveGitHubToken(c *fiber.Ctx, db *sql.DB, userID string) string {
 // HandleSaveGitHubToken handles POST /api/github/save-token
 func (h *ScanHandler) HandleSaveGitHubToken(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
-	
+
 	var req struct {
 		Token string `json:"token"`
 	}
@@ -1516,4 +1530,3 @@ func (h *ScanHandler) HandleSaveGitHubToken(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"success": true})
 }
-
