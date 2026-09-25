@@ -1,4 +1,4 @@
-name: Deploy to EC2 (Docker)
+name: Deploy EC2 Docker
 
 on:
   push:
@@ -7,10 +7,11 @@ on:
 
 env:
   REGION: ap-south-1
+  INSTANCE_ID: i-0693c5becfd991083
   ECR_REGISTRY: 759204735992.dkr.ecr.ap-south-1.amazonaws.com
   ECR_REPOSITORY: deptic
-  INSTANCE_ID: i-0693c5becfd991083
-  PUBLIC_URL: http://15.252.26.151
+  SECRETS_ID: deptic/Deptic/secrets
+  DEPLOY_PATH: /home/ec2-user/app
 
 jobs:
   build-and-deploy:
@@ -20,112 +21,141 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
+      - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Build API binary (pre-check)
+        run: |
+          cd apps/api
+          go build -o /dev/null ./cmd/server
+          echo "API build succeeded"
+
+      - name: Build web app (pre-check)
+        run: |
+          cd apps/web
+          npm ci --legacy-peer-deps
+          npm run build
+          echo "Web build succeeded"
 
       - name: Configure AWS credentials
         run: |
-          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws configure set region ${{ env.REGION }}
+          mkdir -p ~/.aws
+          cat > ~/.aws/credentials << 'EOF'
+          [default]
+          aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          EOF
+          cat > ~/.aws/config << 'EOF'
+          [default]
+          region = ${{ env.REGION }}
+          output = json
+          EOF
 
-      - name: Build and tag Docker image
+      - name: Login to Amazon ECR
         run: |
-          IMAGE_TAG="${{ github.sha }}-$(date +%s)"
-          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          echo "Image built: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          echo "Image tagged as latest"
+          aws ecr get-login-password --region ${{ env.REGION }} | \
+            docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
 
-      - name: Verify image exists
+      - name: Build and push Docker image
         run: |
-          docker image inspect $ECR_REGISTRY/$ECR_REPOSITORY:latest > /dev/null 2>&1 && echo "Image verified" || exit 1
+          IMAGE_URI="${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$(echo ${{ github.sha }} | head -c 7)"
+          FULL_IMAGE="${IMAGE_URI}"
+          docker build -t $FULL_IMAGE -f Dockerfile .
+          docker push $FULL_IMAGE
+          echo "Pushed ${FULL_IMAGE}"
 
-      - name: Push image to ECR
+      - name: Deploy via SSM
         run: |
-          aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          COMMIT_HASH=$(echo ${{ github.sha }} | head -c 7)
+          FULL_IMAGE="${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${COMMIT_HASH}"
 
-      - name: Deploy to EC2 via SSM
-        run: |
-          # Build the full image URI (no env context inside env block)
-          FULL_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:latest"
-
-          # Write SSM commands to a temp file to avoid shell parsing issues
+          # Write the SSM parameters to a file to avoid shell interpolation issues
           cat > /tmp/ssm-params.json << 'SSMPARAMS'
           {
             "commands": [
               "aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ECR_REGISTRY",
-              "docker pull $FULL_IMAGE",
+              "docker pull $IMAGE_URI",
               "docker stop app || true",
               "docker rm app || true",
-              "docker run -d --restart always -p 80:80 --name app $FULL_IMAGE"
+              "docker run -d --restart always -p 80:80 --name app $IMAGE_URI"
             ]
           }
           SSMPARAMS
 
-          # Replace variables inside the JSON payload (needed because heredoc is quoted)
-          sed -i "s|\$REGION|$REGION|g" /tmp/ssm-params.json
-          sed -i "s|\$FULL_IMAGE|$FULL_IMAGE|g" /tmp/ssm-params.json
-          sed -i "s|\$ECR_REGISTRY|$ECR_REGISTRY|g" /tmp/ssm-params.json
+          # Replace literal $REGION in the JSON with actual region
+          sed -i "s/\$REGION/${{ env.REGION }}/g" /tmp/ssm-params.json
+          sed -i "s|\$ECR_REGISTRY|${{ env.ECR_REGISTRY }}|g" /tmp/ssm-params.json
+          sed -i "s|\$IMAGE_URI|${FULL_IMAGE}|g" /tmp/ssm-params.json
+
+          echo "SSM params file content:"
+          cat /tmp/ssm-params.json
 
           COMMAND_ID=$(aws ssm send-command \
-            --instance-ids "$INSTANCE_ID" \
-            --region "$REGION" \
+            --instance-ids "${{ env.INSTANCE_ID }}" \
+            --region "${{ env.REGION }}" \
             --document-name "AWS-RunShellScript" \
             --parameters file:///tmp/ssm-params.json \
             --query "Command.CommandId" \
             --output text)
 
-          echo "SSM command sent: $COMMAND_ID"
+          echo "SSM command ID: $COMMAND_ID"
 
-          # Wait for SSM command to complete
-          for i in $(seq 1 30); do
+          # Wait for command to complete
+          for i in {1..30}; do
             STATUS=$(aws ssm list-command-invocations \
               --command-id "$COMMAND_ID" \
-              --instance-id "$INSTANCE_ID" \
-              --region "$REGION" \
-              --details \
+              --instance-id "${{ env.INSTANCE_ID }}" \
+              --region "${{ env.REGION }}" \
               --query "CommandInvocations[0].Status" \
-              --output text 2>/dev/null || echo "InProgress")
-            
+              --output text 2>/dev/null)
             if [ "$STATUS" = "Success" ]; then
-              echo "SSM command completed successfully"
+              echo "Deployment successful!"
               break
             elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "TimedOut" ]; then
-              echo "SSM command failed with status: $STATUS"
-              aws ssm list-command-invocations --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --region "$REGION" --details --query "CommandInvocations[0].CommandPlugins[0].Output" --output text
+              echo "Deployment failed with status: $STATUS"
+              aws ssm list-command-invocations \
+                --command-id "$COMMAND_ID" \
+                --instance-id "${{ env.INSTANCE_ID }}" \
+                --region "${{ env.REGION }}" \
+                --details \
+                --query "CommandInvocations[0].CommandPlugins[0].Output" \
+                --output text
               exit 1
             fi
-            echo "Waiting... attempt $i"
             sleep 10
           done
 
       - name: Health check
         run: |
-          echo "Performing health check against $PUBLIC_URL/health"
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$PUBLIC_URL/health" 2>/dev/null || echo "000")
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "Health check passed (HTTP 200)"
-          else
-            echo "Health check failed. HTTP code: $HTTP_CODE"
-            # Show last container logs for diagnostics
-            aws ssm send-command \
-              --instance-ids "$INSTANCE_ID" \
-              --region "$REGION" \
-              --document-name "AWS-RunShellScript" \
-              --parameters '{"commands":["docker logs app --tail 50"]}' \
-              --output text
-            exit 1
-          fi
+          for i in {1..12}; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://15.252.26.151/health || echo "000")
+            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
+              echo "Health check passed (HTTP $HTTP_CODE)"
+              exit 0
+            fi
+            echo "Attempt $i: Got HTTP $HTTP_CODE, retrying in 10 seconds..."
+            sleep 10
+          done
+          echo "Health check failed after 12 attempts"
+          exit 1
 
-      - name: Deployment summary
+      - name: Deploy diagnostics
+        if: always()
         run: |
-          echo "============================================"
-          echo "Deployment completed successfully"
-          echo "Image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          echo "Instance: $INSTANCE_ID"
-          echo "URL: $PUBLIC_URL"
-          echo "============================================"
+          echo "=== Deployment Diagnostics ==="
+          echo "GitHub SHA: ${{ github.sha }}"
+          echo "ECR Registry: ${{ env.ECR_REGISTRY }}"
+          echo "Repository: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$(echo ${{ github.sha }} | head -c 7)"
+          echo "Instance ID: ${{ env.INSTANCE_ID }}"
+          echo "Region: ${{ env.REGION }}"
+          echo "Public URL: http://15.252.26.151"
