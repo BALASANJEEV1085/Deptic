@@ -1,0 +1,116 @@
+name: Build and Deploy to EC2 (Docker)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGION: ap-south-1
+  ECR_REGISTRY: 759204735992.dkr.ecr.ap-south-1.amazonaws.com
+  ECR_REPOSITORY: deptic
+  INSTANCE_ID: i-0693c5becfd991083
+  PUBLIC_URL: http://15.252.26.151
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Amazon ECR
+        run: |
+          aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ap-south-1
+
+      - name: Build Docker image
+        run: |
+          FULL_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+          docker build -t $FULL_IMAGE -f apps/api/Dockerfile apps/api
+          echo "IMAGE_URI=$FULL_IMAGE" >> $GITHUB_ENV
+
+      - name: Push Docker image to ECR
+        run: |
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Deploy to EC2 via SSM
+        run: |
+          REGION="$REGION"
+          INSTANCE_ID="$INSTANCE_ID"
+          ECR_REGISTRY="$ECR_REGISTRY"
+          ECR_REPOSITORY="$ECR_REPOSITORY"
+          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+          AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
+          AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+
+          export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION=ap-south-1
+
+          cat > /tmp/ssm-params.json << 'SSMPARAMS'
+          {
+            "commands": [
+              "aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 759204735992.dkr.ecr.ap-south-1.amazonaws.com",
+              "docker pull 759204735992.dkr.ecr.ap-south-1.amazonaws.com/deptic:latest",
+              "docker stop app || true",
+              "docker rm app || true",
+              "docker run -d --restart always -p 8081:8081 --name app -e DATABASE_URL=${{ secrets.DATABASE_URL }} -e REDIS_URL=${{ secrets.REDIS_URL }} -e SUPABASE_URL=${{ secrets.SUPABASE_URL }} -e SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} -e SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }} -e JWT_SECRET=${{ secrets.JWT_SECRET }} -e GITHUB_CLIENT_ID=${{ secrets.GITHUB_CLIENT_ID }} -e GITHUB_CLIENT_SECRET=${{ secrets.GITHUB_CLIENT_SECRET }} -e NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }} -e NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }} -e NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }} -e OPEN_ROUTER_API=${{ secrets.OPEN_ROUTER_API }} 759204735992.dkr.ecr.ap-south-1.amazonaws.com/deptic:latest"
+            ]
+          }
+          SSMPARAMS
+
+          if [ -n "$IMAGE_URI" ]; then
+            sed -i "s|759204735992.dkr.ecr.ap-south-1.amazonaws.com/deptic:latest|$IMAGE_URI|g" /tmp/ssm-params.json
+          fi
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --region "$REGION" \
+            --document-name "AWS-RunShellScript" \
+            --parameters file:///tmp/ssm-params.json \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "SSM Command ID: $COMMAND_ID"
+
+          sleep 10
+
+          for i in $(seq 1 12); do
+            STATUS=$(aws ssm list-command-invocations \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --region "$REGION" \
+              --query "CommandInvocations[0].Status" \
+              --output text)
+
+            if [ "$STATUS" = "Success" ]; then
+              echo "SSM command completed successfully"
+              break
+            elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "TimedOut" ] || [ "$STATUS" = "Cancelled" ]; then
+              echo "SSM command failed with status: $STATUS"
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Health check
+        run: |
+          for i in $(seq 1 12); do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" $PUBLIC_URL:8081/health || true)
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "Health check passed (HTTP 200)"
+              exit 0
+            fi
+            echo "Attempt $i: HTTP $HTTP_CODE, retrying in 10s..."
+            sleep 10
+          done
+          echo "Health check failed after 12 attempts"
+          exit 1
