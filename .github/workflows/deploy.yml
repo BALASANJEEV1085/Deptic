@@ -1,4 +1,4 @@
-name: Deploy to EC2 (Docker)
+name: Deploy to EC2 via ECR (DEPTIC)
 
 on:
   push:
@@ -6,91 +6,55 @@ on:
   workflow_dispatch:
 
 env:
+  AWS_REGION: ap-south-1
   ECR_REGISTRY: 759204735992.dkr.ecr.ap-south-1.amazonaws.com
   ECR_REPOSITORY: deptic
-  REGION: ap-south-1
+  IMAGE_TAG: ${{ github.sha }}
   INSTANCE_ID: i-0693c5becfd991083
-  SSH_KEY: ${{ secrets.SSH_KEY }}
+  DOCKERFILE_PATH: .
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-          cache-dependency-path: apps/api/go.sum
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: apps/web/package-lock.json
-
-      - name: Install web dependencies
-        working-directory: apps/web
-        run: npm ci
-
-      - name: Build web application
-        working-directory: apps/web
-        run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          REDIS_URL: ${{ secrets.REDIS_URL }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-
-      - name: Build Go API
-        working-directory: apps/api
-        run: |
-          go mod download
-          go build -o server ./cmd/server
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Configure AWS credentials
         run: |
-          mkdir -p ~/.aws
-          cat > ~/.aws/credentials << EOF
-          [default]
-          aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          EOF
-          cat > ~/.aws/config << EOF
-          [default]
-          region = ${{ env.REGION }}
-          output = json
-          EOF
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set region $AWS_REGION
 
-      - name: Login to Amazon ECR
+      - name: Log in to Amazon ECR
         run: |
-          aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-      - name: Build and tag Docker image
+      - name: Build Docker image
         run: |
-          IMAGE_TAG="${{ github.sha }}"
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f Dockerfile .
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker build \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            -f $DOCKERFILE_PATH \
+            .
+        working-directory: .
 
       - name: Push Docker image to ECR
         run: |
-          IMAGE_TAG="${{ github.sha }}"
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
       - name: Deploy to EC2 via SSM
         run: |
-          IMAGE_TAG="${{ github.sha }}"
           IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          REGION="$AWS_REGION"
 
           cat > /tmp/ssm-params.json << 'SSMPARAMS'
           {
@@ -112,10 +76,10 @@ jobs:
             --query "Command.CommandId" \
             --output text)
 
-          echo "SSM command ID: $COMMAND_ID"
+          echo "SSM Command ID: $COMMAND_ID"
 
-          # Wait for command to complete
-          for i in $(seq 1 30); do
+          # Wait for command to complete (up to 2 minutes)
+          for i in $(seq 1 12); do
             STATUS=$(aws ssm list-command-invocations \
               --command-id "$COMMAND_ID" \
               --instance-id "$INSTANCE_ID" \
@@ -127,11 +91,12 @@ jobs:
               break
             elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "TimedOut" ]; then
               echo "Deployment failed with status: $STATUS"
-              aws ssm list-command-invocations \
+              aws ssm get-command-invocation \
                 --command-id "$COMMAND_ID" \
                 --instance-id "$INSTANCE_ID" \
                 --region "$REGION" \
-                --details
+                --query "StandardErrorContent" \
+                --output text
               exit 1
             fi
             sleep 10
@@ -140,13 +105,19 @@ jobs:
       - name: Health check
         run: |
           for i in $(seq 1 12); do
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://15.252.26.151/health || true)
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://15.252.26.151/health || echo "000")
             if [ "$HTTP_CODE" = "200" ]; then
               echo "Health check passed (HTTP 200)"
               exit 0
             fi
-            echo "Attempt $i: HTTP $HTTP_CODE - retrying in 10s..."
+            echo "Attempt $i: HTTP $HTTP_CODE - retrying in 10s"
             sleep 10
           done
           echo "Health check failed after 12 attempts"
           exit 1
+
+      - name: Deployment verification
+        run: |
+          echo "Deployment verified successfully"
+          echo "Public URL: http://15.252.26.151"
+          echo "ECR Image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
