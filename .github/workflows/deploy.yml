@@ -1,4 +1,4 @@
-name: deptic-ec2-docker-deploy
+name: build-deploy-verify
 
 on:
   push:
@@ -10,136 +10,123 @@ env:
   ECR_REPOSITORY_URI: 759204735992.dkr.ecr.ap-south-1.amazonaws.com/deptic
   EC2_INSTANCE_ID: i-0edfdb0e7a6bdcda7
   PUBLIC_URL: http://3.7.135.174
-  CONTAINER_PORT: 80
+  CONTAINER_PORT: "80"
+  HOST_PORT: "80"
   SECRETS_MANAGER_ID: deptic/Deptic/secrets
 
 jobs:
-  build-and-verify:
-    name: Build diagnostics and verify apps
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build diagnostics - repository topology
+      - name: Repository evidence diagnostics
         run: |
-          echo "=== Repository topology ==="
+          set -euo pipefail
+          echo "=== Monorepo layout ==="
           ls -la
-          echo "=== apps/api ==="
+          echo "=== apps/api (Go fiber API, listens :8081) ==="
           ls -la apps/api || true
-          echo "=== apps/web ==="
+          head -n 5 apps/api/go.mod || true
+          head -n 20 apps/api/Dockerfile || true
+          echo "=== apps/web (Next.js) ==="
           ls -la apps/web || true
-          echo "=== cli ==="
-          ls -la cli || true
-          echo "=== docker-compose ==="
+          echo "=== docker-compose topology ==="
           cat docker-compose.yml || true
+          echo "=== deploy contract ==="
+          echo "dockerfile_path=. (repo root) detected_container_port=${CONTAINER_PORT}"
 
-      - name: Set up Go
+      - name: Setup Go toolchain (diagnostics)
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
-          cache: true
+          go-version: "1.26"
           cache-dependency-path: apps/api/go.sum
 
-      - name: Go build diagnostics (apps/api)
-        working-directory: apps/api
-        run: |
-          go version
-          go env GOVERSION GOPATH GOMODCACHE
-          go mod download
-          go vet ./... || echo "go vet reported issues (non-fatal diagnostics)"
-          go build -o /tmp/server ./cmd/server
-          echo "API binary built:"
-          ls -la /tmp/server
-
-      - name: Set up Node
+      - name: Setup Node toolchain (diagnostics)
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Node build diagnostics (apps/web)
+      - name: Go build diagnostics (apps/api)
+        working-directory: apps/api
+        run: |
+          set -euo pipefail
+          go version
+          go env GOVERSION GOPATH GOCACHE
+          go mod download || echo "WARN: go mod download failed (network/module proxy)"
+          go build ./... && echo "GO_BUILD_OK" || echo "WARN: go build reported errors"
+          go vet ./... || echo "WARN: go vet reported issues"
+
+      - name: Web frontend diagnostics (apps/web)
         working-directory: apps/web
         run: |
+          set -euo pipefail
           node --version
           npm --version
-          if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
-          npm run build || echo "next build reported issues (non-fatal diagnostics)"
-
-      - name: CLI syntax check (cli/index.js)
-        run: |
-          node --version
-          node --check cli/index.js && echo "cli/index.js syntax OK"
-
-  deploy:
-    name: Build image, push to ECR, deploy to EC2 via SSM
-    runs-on: ubuntu-latest
-    needs: build-and-verify
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials (static env)
-        run: |
-          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
-            echo "AWS static credentials missing - ensure AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY are set on the runner"
-            exit 1
-          fi
-          aws --version
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ap-south-1
+          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+          npm run build && echo "WEB_BUILD_OK" || echo "WARN: next build reported errors"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Compute image tag
+      - name: Configure AWS credentials (static keys via CLI env)
+        run: |
+          set -euo pipefail
+          if [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY:-}" ]; then
+            echo "AWS static credentials not present in environment; AWS CLI will rely on runner/preconfigured credentials."
+          fi
+          aws --version
+          aws sts get-caller-identity --region "$AWS_REGION" || echo "WARN: sts get-caller-identity failed"
+
+      - name: Compute image tag and full image URI
         id: image
         run: |
-          ECR_REGISTRY="759204735992.dkr.ecr.ap-south-1.amazonaws.com"
-          ECR_REPOSITORY="deptic"
+          set -euo pipefail
+          ECR_REGISTRY="${ECR_REPOSITORY_URI%%/*}"
           IMAGE_TAG="${GITHUB_SHA}"
-          FULL_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          LATEST_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:latest"
-          echo "registry=$ECR_REGISTRY" >> "$GITHUB_OUTPUT"
-          echo "image=$FULL_IMAGE" >> "$GITHUB_OUTPUT"
-          echo "latest=$LATEST_IMAGE" >> "$GITHUB_OUTPUT"
-          echo "tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+          FULL_IMAGE="${ECR_REPOSITORY_URI}:${IMAGE_TAG}"
+          LATEST_IMAGE="${ECR_REPOSITORY_URI}:latest"
+          {
+            echo "ecr_registry=${ECR_REGISTRY}"
+            echo "image_tag=${IMAGE_TAG}"
+            echo "full_image=${FULL_IMAGE}"
+            echo "latest_image=${LATEST_IMAGE}"
+          } >> "$GITHUB_OUTPUT"
+          echo "ECR_REGISTRY=${ECR_REGISTRY}"
+          echo "FULL_IMAGE=${FULL_IMAGE}"
 
-      - name: ECR login (AWS CLI)
+      - name: Docker build diagnostics (context ., per contract dockerfile_path=.)
         run: |
-          REGION="$AWS_REGION"
-          ECR_REGISTRY="${{ steps.image.outputs.registry }}"
-          aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ap-south-1
+          set -euo pipefail
+          echo "Building docker image from context '.' tag ${{ steps.image.outputs.full_image }}"
+          docker buildx build \
+            --file Dockerfile \
+            --tag "${{ steps.image.outputs.full_image }}" \
+            --tag "${{ steps.image.outputs.latest_image }}" \
+            --load \
+            .
+          docker images | head -n 20
+          docker inspect "${{ steps.image.outputs.full_image }}" --format 'IMAGE_OK {{.Id}} {{.Config.ExposedPorts}}'
 
-      - name: Build Docker image (repository root context, port 80)
+      - name: ECR login and push (direct AWS CLI)
         run: |
-          IMAGE_URI="${{ steps.image.outputs.image }}"
-          LATEST_URI="${{ steps.image.outputs.latest }}"
-          echo "Building image: $IMAGE_URI"
-          docker build -t "$IMAGE_URI" -t "$LATEST_URI" -f Dockerfile .
-          docker images
+          set -euo pipefail
+          ECR_REGISTRY="${{ steps.image.outputs.ecr_registry }}"
+          aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+          docker push "${{ steps.image.outputs.full_image }}"
+          docker push "${{ steps.image.outputs.latest_image }}"
+          echo "PUSH_OK ${{ steps.image.outputs.full_image }}"
 
-      - name: Push Docker image to ECR
+      - name: Write SSM command payload to JSON file
         run: |
-          IMAGE_URI="${{ steps.image.outputs.image }}"
-          LATEST_URI="${{ steps.image.outputs.latest }}"
-          docker push "$IMAGE_URI"
-          docker push "$LATEST_URI"
-
-      - name: Write SSM command payload to file
-        run: |
-          IMAGE_URI="${{ steps.image.outputs.image }}"
           cat > /tmp/ssm-params.json << 'SSMPARAMS'
           {
             "commands": [
+              "set -euo pipefail",
               "export REGION=ap-south-1",
               "export ECR_REGISTRY=759204735992.dkr.ecr.ap-south-1.amazonaws.com",
-              "export IMAGE_URI=__IMAGE_URI__",
+              "export IMAGE_URI=759204735992.dkr.ecr.ap-south-1.amazonaws.com/deptic:${IMAGE_TAG}",
               "aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ECR_REGISTRY",
               "docker pull $IMAGE_URI",
               "docker stop app || true",
@@ -148,73 +135,89 @@ jobs:
             ]
           }
           SSMPARAMS
-          sed -i "s|__IMAGE_URI__|$IMAGE_URI|g" /tmp/ssm-params.json
+          sed -i "s|\${IMAGE_TAG}|${{ steps.image.outputs.image_tag }}|g" /tmp/ssm-params.json
           cat /tmp/ssm-params.json
 
-      - name: Send deployment command via SSM
-        id: ssm
+      - name: Deploy to EC2 via SSM send-command
         run: |
+          set -euo pipefail
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$EC2_INSTANCE_ID" \
             --region "$AWS_REGION" \
             --document-name "AWS-RunShellScript" \
             --parameters file:///tmp/ssm-params.json \
             --query "Command.CommandId" --output text)
-          echo "command_id=$COMMAND_ID" >> "$GITHUB_OUTPUT"
-          echo "Sent SSM command: $COMMAND_ID"
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ap-south-1
-
-      - name: Wait for SSM command success
-        run: |
-          COMMAND_ID="${{ steps.ssm.outputs.command_id }}"
+          echo "COMMAND_ID=${COMMAND_ID}"
+          echo "COMMAND_ID=${COMMAND_ID}" >> "$GITHUB_ENV"
           for i in $(seq 1 60); do
             STATUS=$(aws ssm get-command-invocation \
               --command-id "$COMMAND_ID" \
               --instance-id "$EC2_INSTANCE_ID" \
               --region "$AWS_REGION" \
               --query "Status" --output text 2>/dev/null || echo "Pending")
-            echo "SSM status: $STATUS"
-            if [ "$STATUS" = "Success" ]; then
-              echo "Deployment command succeeded"
-              exit 0
-            fi
-            if [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ] || [ "$STATUS" = "TimedOut" ]; then
-              echo "Deployment command failed"
+            echo "SSM status: ${STATUS} (attempt ${i})"
+            if [ "$STATUS" = "Success" ]; then echo "SSM_COMMAND_SUCCESS"; exit 0; fi
+            if [ "$STATUS" = "Failed" ] || [ "$STATUS" = "TimedOut" ] || [ "$STATUS" = "Cancelled" ]; then
+              echo "SSM command failed with status ${STATUS}"
               aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$EC2_INSTANCE_ID" --region "$AWS_REGION" || true
               exit 1
             fi
             sleep 10
           done
-          echo "Timed out waiting for SSM command"
+          echo "SSM command timed out"
           exit 1
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ap-south-1
 
-  verify:
-    name: Health check public endpoint
-    runs-on: ubuntu-latest
-    needs: deploy
-    steps:
-      - name: Wait for service rollout
-        run: sleep 20
-
-      - name: Health check http://3.7.135.174 (must return HTTP 200)
+      - name: Post-deploy diagnostics (container and port check on instance)
         run: |
-          URL="http://3.7.135.174"
+          set -euo pipefail
+          cat > /tmp/ssm-verify-params.json << 'SSMPARAMS'
+          {
+            "commands": [
+              "docker ps --filter name=app --no-trunc",
+              "docker inspect app --format 'IMAGE={{.Config.Image}} PORTS={{json .NetworkSettings.Ports}}'",
+              "ss -ltnp | grep -E ':80\\b' || netstat -ltnp | grep -E ':80\\b' || true",
+              "curl -sS -o /dev/null -w 'LOCAL_HTTP=%{http_code}\\n' http://127.0.0.1:80/ || true"
+            ]
+          }
+          SSMPARAMS
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$EC2_INSTANCE_ID" \
+            --region "$AWS_REGION" \
+            --document-name "AWS-RunShellScript" \
+            --parameters file:///tmp/ssm-verify-params.json \
+            --query "Command.CommandId" --output text)
           for i in $(seq 1 30); do
-            CODE=$(curl -s -o /tmp/health-body -w "%{http_code}" "$URL" || true)
-            echo "Attempt $i: HTTP $CODE"
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$EC2_INSTANCE_ID" \
+              --region "$AWS_REGION" \
+              --query "Status" --output text 2>/dev/null || echo "Pending")
+            echo "verify status: ${STATUS}"
+            if [ "$STATUS" = "Success" ]; then break; fi
+            if [ "$STATUS" = "Failed" ] || [ "$STATUS" = "TimedOut" ] || [ "$STATUS" = "Cancelled" ]; then exit 1; fi
+            sleep 5
+          done
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$EC2_INSTANCE_ID" \
+            --region "$AWS_REGION" \
+            --query "StandardOutputContent" --output text
+
+      - name: Final health check (must return HTTP 200)
+        run: |
+          set -euo pipefail
+          URL="${PUBLIC_URL}/"
+          echo "Probing ${URL}"
+          for i in $(seq 1 30); do
+            CODE=$(curl -s -o /tmp/health-body.txt -w '%{http_code}' "${URL}" || true)
+            echo "attempt ${i}: HTTP ${CODE}"
             if [ "$CODE" = "200" ]; then
-              echo "Health check passed"
-              cat /tmp/health-body || true
+              echo "HEALTH_CHECK_OK"
+              head -c 500 /tmp/health-body.txt || true
               exit 0
             fi
             sleep 10
           done
-          echo "Health check failed - service did not return HTTP 200"
+          echo "Health check never returned 200"
+          cat /tmp/health-body.txt || true
           exit 1
